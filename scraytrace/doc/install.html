@@ -1,0 +1,75 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=ANSI_X3.4-1968"><title>Chapter&#160;3.&#160;Install</title><link rel="stylesheet" href="docbook.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.69.1"><meta name="keywords" content="Solar corona, Simulation, Ray-Tracing"><link rel="start" href="index.html" title="Raytracing Software for the Simulation of the Solar Corona: User's Guide"><link rel="up" href="index.html" title="Raytracing Software for the Simulation of the Solar Corona: User's Guide"><link rel="prev" href="raytracing.html" title="Chapter&#160;2.&#160;Software Concepts"><link rel="next" href="examples.html" title="Chapter&#160;4.&#160;Mini Tutorial"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Chapter&#160;3.&#160;Install</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="raytracing.html">Prev</a>&#160;</td><th width="60%" align="center">&#160;</th><td width="20%" align="right">&#160;<a accesskey="n" href="examples.html">Next</a></td></tr></table><hr></div><div class="chapter" lang="en"><div class="titlepage"><div><div><h2 class="title"><a name="install"></a>Chapter&#160;3.&#160;Install</h2></div></div></div><div class="toc"><p><b>Table of Contents</b></p><dl><dt><span class="sect1"><a href="install.html#dependencies">1. Installing dependencies</a></span></dt><dt><span class="sect1"><a href="install.html#id2535213">2. Installing from the <span class="application">CVS</span> <code class="filename">dev</code> area at NRL</a></span></dt><dd><dl><dt><span class="sect2"><a href="install.html#id2535229">2.1. Installing the libraries</a></span></dt><dt><span class="sect2"><a href="install.html#id2535384">2.2. Installing the <span class="application">IDL</span> procedures</a></span></dt></dl></dd><dt><span class="sect1"><a href="install.html#id2548883">3. Installing tarball packages</a></span></dt><dd><dl><dt><span class="sect2"><a href="install.html#id2548887">3.1. Installing the C++ package</a></span></dt></dl></dd><dt><span class="sect1"><a href="install.html#id2549093">4. Installing form <span class="acronym">SolarSoft</span></a></span></dt></dl></div><div class="sect1" lang="en"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="dependencies"></a>1.&#160;Installing dependencies</h2></div></div></div><p>The install of the following packages is optionnal for the moment and will not affect the functioning of <span class="application">Raytrace</span> if used through <span class="application">IDL</span>.
+	</p><p>Before installing <span class="application">Raytrace</span> user can install the following packages:
+		</p><div class="itemizedlist"><ul type="disc"><li><p><code class="filename">cfitsio</code></p></li><li><p><code class="filename">CCFITS</code></p></li></ul></div><p>
+		wich can be downloaded at <a href="http://heasarc.nasa.gov/fitsio/fitsio.html" target="_top">http://heasarc.nasa.gov/fitsio/fitsio.html</a>
+	</p></div><div class="sect1" lang="en"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2535213"></a>2.&#160;Installing from the <span class="application">CVS</span> <code class="filename">dev</code> area at NRL</h2></div></div></div><div class="sect2" lang="en"><div class="titlepage"><div><div><h3 class="title"><a name="id2535229"></a>2.1.&#160;Installing the libraries</h3></div></div></div><div class="procedure"><ol type="1"><li><p>Change dir to a working area of your directory tree:
+</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>cd myworkdirectory</code></strong></pre><p>
+				</p></li><li><p>Checkout <code class="filename">Raytrace</code> out of the <span class="application">CVS</span> <code class="filename">dev</code> area:
+					</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>cvs co dev/Raytrace</code></strong>
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>cd dev/Raytrace</code></strong></pre><p>
+				</p></li><li><p>Generate make files, configure and compile:
+					</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>aclocal</code></strong>
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>autoconf</code></strong>
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>automake -a</code></strong>
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>./configure</code></strong>
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>make</code></strong></pre><p>
+				</p></li><li><p>Test if compilation was successfull doing:
+					</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>make check</code></strong>
+<code class="computeroutput">...
+Perfect !
+PASS: raytrace
+==================
+All 1 tests passed
+==================
+...
+<code class="prompt">[me@mycomputer]$ </code>
+</code></pre><p>
+				</p></li><li><p>Optionally, you can install the software. The default installation path is <code class="filename">/usr/local</code>. It can be changed by setting <em class="parameter"><code>--prefix=PATH</code></em> when calling <span><strong class="command">./configure</strong></span>. 
+					</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>make install</code></strong></pre><p>
+				</p></li></ol></div><div class="important" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Important"><tr><td rowspan="2" align="center" valign="top" width="25"><img alt="[Important]" src="important.png"></td><th align="left">Important</th></tr><tr><td align="left" valign="top"><p>Note that the shared object library <code class="filename">libraytrace.so</code> is located in the subdirectory <code class="filename">src/.libs</code> and will be installed in <em class="parameter"><code>--prefix=PATH</code></em></p></td></tr></table></div></div><div class="sect2" lang="en"><div class="titlepage"><div><div><h3 class="title"><a name="id2535384"></a>2.2.&#160;Installing the <span class="application">IDL</span> procedures</h3></div></div></div><div class="procedure"><ol type="1"><li><p>Change dir to where you usually put your <span class="application">IDL</span> procedures:
+					</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>cd myIDLdirectory</code></strong></pre><p>
+				</p></li><li><p>Checkout <code class="filename">rtidlpro</code> and <code class="filename">arnaudutil</code> packages from <span class="application">CVS</span>
+					</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>cvs co dev/rtwl</code></strong>
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>cvs co dev/arnaudutil</code></strong></pre><p>
+				</p></li><li><p>Go to the <code class="filename">lib</code> subdirectory of <code class="filename">rtwl</code>.
+					</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>cd dev/rtwl/lib</code></strong></pre><p>
+				</p></li><li><p>Copy the <code class="filename">libraytrace.so</code> file or make a symbolic link to it, assuming that <code class="envar">PATH2SO</code> in the example is set to the location of <code class="filename">libraytrace.so</code>
+					</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>cp $PATH2SO/libraytrace.so .</code></strong></pre><p>
+					or
+					</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>ln -s $PATH2SO/libraytrace.so</code></strong></pre><p>
+				</p></li><li><p>Run <span class="application">IDL</span> and execute <span><strong class="command">rttest</strong></span>. If the test is successful the installation is done.
+					</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>idl</code></strong>
+<code class="computeroutput">...</code>
+<code class="prompt">IDL[mycomputer]&gt; </code><strong class="userinput"><code>rttest</code></strong>
+<code class="computeroutput">...
+Test looks good !</code>
+<code class="prompt">IDL[mycomputer]&gt; </code></pre><p>
+				</p></li></ol></div></div></div><div class="sect1" lang="en"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2548883"></a>3.&#160;Installing tarball packages</h2></div></div></div><div class="sect2" lang="en"><div class="titlepage"><div><div><h3 class="title"><a name="id2548887"></a>3.1.&#160;Installing the C++ package</h3></div></div></div><p>The install follows the classical <span class="acronym">Unix</span>/<span class="acronym">Linux</span> install steps: <span><strong class="command">./configure</strong></span>, <span><strong class="command">make</strong></span>, <span><strong class="command">make install</strong></span>.</p><div class="procedure"><ol type="1"><li><p>Download the tarball package: [CREATE A LINK HERE]</p></li><li><p>Expand the package and move the the created directory:
+</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>tar -xzf scor-0.1.tar.gz</code></strong>
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>cd scor-0.1</code></strong></pre><p>
+</p></li><li><p>Configure:
+</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>./configure</code></strong></pre><p>
+Use <em class="parameter"><code>--help</code></em> to list the <span><strong class="command">./configure</strong></span> options. Note that is the some libraries are not located in the standard linux path, you can use the following flags: <em class="parameter"><code>CPPFLAGS</code></em><code class="filename">"=-I/non/standard/dir/include -L/non/standard/dir/libs"</code> and <em class="parameter"><code>LDFLAGS</code></em><code class="filename">=-L/non/standard/dir/libs</code>
+</p></li><li><p>Compile the sources:
+</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>make</code></strong></pre><p>
+</p></li><li><p>Optionally check if the compiled programs and libraries work:
+</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>make check</code></strong></pre><p>
+</p></li><li><p>Install the package:
+</p><pre class="screen">
+<code class="prompt">[me@mycomputer]$ </code><strong class="userinput"><code>make install</code></strong></pre><p>
+</p></li></ol></div></div></div><div class="sect1" lang="en"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2549093"></a>4.&#160;Installing form <span class="acronym">SolarSoft</span></h2></div></div></div><p>TO BE DONE</p></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="raytracing.html">Prev</a>&#160;</td><td width="20%" align="center">&#160;</td><td width="40%" align="right">&#160;<a accesskey="n" href="examples.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Chapter&#160;2.&#160;Software Concepts&#160;</td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top">&#160;Chapter&#160;4.&#160;Mini Tutorial</td></tr></table></div></body></html>

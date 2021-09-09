@@ -1,0 +1,16 @@
+IDL procedure package for SCoRT Solar Corona RayTracing software.
+$Id: README,v 1.1 2006/09/08 16:03:21 nathan Exp $
+
+Visit web site: http://ares.nrl.navy.mil/~thernis/ 
+
+or 
+
+http://secchi.nrl.navy.mil/
+
+
+For installation see INSTALL.
+
+Requires package SCoRT: Solar Corona Ray-Tracing software
+
+Bug report:
+arnaud.thernisien@nrl.navy.mil
