@@ -16,6 +16,7 @@ import matplotlib.path as mpath
 import matplotlib.patches as mpatches
 from scipy.stats import kde
 from astropy.io import fits #proporciona acceso a los archivos de FITS(Flexible Image Transport System) es un estándar de archivos portátiles 
+from astropy.wcs import WCS
 import sunpy
 from sunpy.coordinates.ephemeris import get_horizons_coord
 import sunpy.map
@@ -23,7 +24,7 @@ from sunpy.map.maputils import all_coordinates_from_map
 import json
 import random
 import pandas as pd
-
+from sunpy.sun.constants import radius as _RSUN
 
 # ## Función ajuste del centro del sol
 
@@ -81,10 +82,11 @@ smap_SB2 = sunpy.map.Map(imb2, hdrb2)
 # # LASCO
 
 if ISSIflag:
+    
 #     imL1, hdrL1 = sunpy.io.fits.read(fnameL1)[0]
     imL2, hdrL2 = sunpy.io.fits.read(LascoC2)[0]
     
-#else:
+else:
 #     with fits.open(fnameL1) as myfitsL1:
 #         imL1 = myfitsL1[0].data
 #         myfitsL1[0].header['OBSRVTRY'] = 'SOHO'
@@ -107,11 +109,11 @@ if ISSIflag:
         myfitsL2[0].header['HGLT_OBS'] = coordL2ston.lat.deg
         myfitsL2[0].header['HGLN_OBS'] = coordL2ston.lon.deg
         hdrL2 = myfitsL2[0].header
-# smap_L1 = sunpy.map.Map(imL1, hdrL1)
-smap_L2 = sunpy.map.Map(imL2, hdrL2)
+#smap_L1 = sunpy.map.Map(imL1, hdrL1)
+#smap_L2 = sunpy.map.Map(imL2, hdrL2)
 
 headers = [hdra2, hdrL2, hdrb2]
-
+print(hdrL2['INSTRUME'])
 #sin lasco:
 #headers = [hdra2, hdrb2]
 
@@ -151,7 +153,7 @@ set_parameters = np.column_stack((CMElons, CMElats, CMEtilts, heights, ks, angs)
 # In[5]:
 
 
-path = '/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test/'     
+path = '/gehme/projects/2020_gcs_with_ml/repo/data/forwardGCS_test/'     
 date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
 configfile_name = path+date_str+'Set_Parameters.csv'
 header_name = ['CMElon',
@@ -168,7 +170,7 @@ set.to_csv(configfile_name)
 
 # In[7]:
 
-def forwardGCS(configfile_name, headers, size_occ=[2,2]):
+def forwardGCS(configfile_name, headers, size_occ=[2,3.7,2]):
     # Get the location of sats and the range of each image:
     satpos, plotranges = processHeaders(headers)
     df = pd.DataFrame(pd.read_csv(configfile_name))
@@ -198,9 +200,8 @@ def forwardGCS(configfile_name, headers, size_occ=[2,2]):
             plt.ylim(plotranges[sat][2],plotranges[sat][3])
             plt.axis('off')
             #guardo cada vista CME
-
-            #en el server:
-            fig.savefig('/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}.png'.format(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1),facecolor=fig.get_facecolor())
+            #fig.savefig('/gehme/projects/2020_gcs_with_ml/repo/data/forwardGCS_test/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}.png'.format(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1),facecolor=fig.get_facecolor())
+                
             #plt.show()
             plt.close(fig)
 
