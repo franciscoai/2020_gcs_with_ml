@@ -153,7 +153,7 @@ set_parameters = np.column_stack((CMElons, CMElats, CMEtilts, heights, ks, angs)
 # In[5]:
 
 
-path = '/gehme/projects/2020_gcs_with_ml/repo/data/forwardGCS_test/'     
+path = '/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test/'     
 date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
 configfile_name = path+date_str+'Set_Parameters.csv'
 header_name = ['CMElon',
@@ -200,8 +200,9 @@ def forwardGCS(configfile_name, headers, size_occ=[2,3.7,2]):
             plt.ylim(plotranges[sat][2],plotranges[sat][3])
             plt.axis('off')
             #guardo cada vista CME
-            #fig.savefig('/gehme/projects/2020_gcs_with_ml/repo/data/forwardGCS_test/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}.png'.format(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1),facecolor=fig.get_facecolor())
-                
+            
+            fig.savefig('/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}.png'.format(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1),facecolor=fig.get_facecolor())
+            
             #plt.show()
             plt.close(fig)
 

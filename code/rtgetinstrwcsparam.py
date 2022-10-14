@@ -9,5 +9,5 @@ INPUTS:
 
 OUTPUTS:
   the different parameters needed for the raytracing. """
-def rtgetinstrwcsparam(instr,imsize,scchead,fovpix,crpix,obsang,pc,imszratio,projtypepreset=projtypepreset,pv2_1=pv2_1,rollang=rollang,crval=crval,pcin=pcin,flagfovpix=flagfovpix):
+def rtgetinstrwcsparam(instr,imsize,header,fovpix,crpix,obsang,pc,imszratio,projtypepreset=projtypepreset,pv2_1=pv2_1,rollang=rollang,crval=crval,pcin=pcin,flagfovpix=flagfovpix):
     
