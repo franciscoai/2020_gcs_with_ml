@@ -162,10 +162,10 @@ rollangheaderflag=0B
 
 if n_elements(pv2_1) ne 0 then pv2_1in=float(pv2_1)
 
-if n_elements(scchead) ne 0 then begin
+if n_elements(scchead) ne 0 then begin 
 	if scchead.instrume ne 'SECCHI' then flagsoho=scchead.telescop eq 'SOHO' else flagsoho=0b
 
-    wcs=fitshead2wcs(scchead,KEYWORD_NULL_VALUE=0)
+    wcs=fitshead2wcs(scchead,KEYWORD_NULL_VALUE=0) ;extract WCS data from FITS header
 
     if n_elements(dateobs) eq 0 then dateobs=scchead.date_obs
     if n_elements(instr) eq 0 then instr=scchead.detector
@@ -173,6 +173,7 @@ if n_elements(scchead) ne 0 then begin
 
     if n_elements(obslonlat) eq 0 then begin
         ; ---- position of the virtual spacecraft
+        ;!dtor used to convert degrees to radian
         obslonlat=float([wcs.position.crln_obs*!dtor,wcs.position.crlt_obs*!dtor,wcs.position.dsun_obs/(onersun()*1e3)])
         obslonlatflag=1l
         obslonlatheaderflag=1B
@@ -260,12 +261,14 @@ if n_elements(dateobs) eq 0 then dateobs=''
 if n_elements(rollang) eq 0 then rollang=0.
 
 ; ---- get the default parameters if requested
+;parsemoddefparam parse the model param structure returned by getmoddefparam
 if keyword_set(usedefault) then begin
     getmoddefparam,modelid,sdefault
     modparam=parsemoddefparam(sdefault,svdefault,filepro='buildmodel'+strtrim(modelid,2)+'param.pro')
 endif
 
 ; ---- detect instrument, if any
+; keyword_set return 1 (true) if its argument is defined and nonzero, and 0 (false) otherwise
 c2image=keyword_set(c2image)
 if c2image then instr='c2'
 c3image=keyword_set(c3image)
@@ -283,6 +286,7 @@ if hi2 then instr='hi2'
 xdr=keyword_set(xdr)
 
 ; ---- instrument presets if requested
+; rtgetinstrwcsparam extract pointing parameters from wcs header to initialize raytrace
 rtgetinstrwcsparam,instr,imsize,scchead,fovpix,crpix,obsangpreset,pc,projtypepreset=projtypepreset,pv2_1=pv2_1,rollang=rollang,crval=crval,pcin=pcin,flagfovpix=flagfovpix
 
 ; -- obsang and rollang is forced if passed by user
@@ -296,7 +300,7 @@ if n_elements(projtype) eq 0 then begin
     if n_elements(projtypepreset) eq 0 then projtype='ARC' else projtype=projtypepreset
 endif
 
-projtype=strupcase(projtype)
+projtype=strupcase(projtype) ; strupcase return a copy of string converted to upper case
 case projtype of
     'ARC' : projtypecode=1L
     'TAN' : projtypecode=2L
@@ -320,8 +324,9 @@ rotmat=fltarr(3,3)
 rtinitenv
 
 ; ---- start raytracing
-starttime=systime(1)
+starttime=systime(1) ; systime return the current time as either a date/time string
 if nbthreads eq 0 then begin
+SAVE, rtraytracewcs,imsize[0],imsize[1],fovpix,obspos,obsang,nepos,neang,losnbp,losrange,modelid,btot,bpol,netot,modparam,crpix,rho,mmlon,mmlat,rrr,pofinteg,quiet,neonly,roi,poiang,hlonlat,occrad,adapthres,maxsubdiv,limbdark,rotmat,obslonlat,obslonlatflag,projtypecode,pv2_1,pc,frontinteg,uvinteg,nerotcntr,nerotang,netranslation,nerotaxis,/unload), FILENAMES = '/gehme/projects/2020_gcs_with_ml/repo/gcs_idl/arguments/inputs.sav'
 s=call_external(getenv('RT_LIBFILE'),$
                 'rtraytracewcs',$
                 imsize[0],imsize[1],$
@@ -333,6 +338,8 @@ s=call_external(getenv('RT_LIBFILE'),$
                 crpix,rho,mmlon,mmlat,rrr,pofinteg,quiet,neonly,$
                 roi,poiang,hlonlat,occrad,adapthres,maxsubdiv,limbdark,$
                 rotmat,obslonlat,obslonlatflag,projtypecode,pv2_1,pc,frontinteg,uvinteg,nerotcntr,nerotang,netranslation,nerotaxis,/unload)
+
+SAVE, rtraytracewcs,imsize[0],imsize[1],fovpix,obspos,obsang,nepos,neang,losnbp,losrange,modelid,btot,bpol,netot,modparam,crpix,rho,mmlon,mmlat,rrr,pofinteg,quiet,neonly,roi,poiang,hlonlat,occrad,adapthres,maxsubdiv,limbdark,rotmat,obslonlat,obslonlatflag,projtypecode,pv2_1,pc,frontinteg,uvinteg,nerotcntr,nerotang,netranslation,nerotaxis,/unload), FILENAMES = '/gehme/projects/2020_gcs_with_ml/repo/gcs_idl/arguments/outputs.sav'
 endif else begin
 ; ---- case of nbthreads > 0
 ;      See User''s Guide for more instructions using this feature.
@@ -358,7 +365,8 @@ endif
 solar_r=abs(atan(1./obspos[2]))/fovpix
 
 ; ---- fill in the fits header
-mkhdr,h0,btot
+mkhdr,h0,btot ; mkhdr make a minimal primary (or IMAGE extension) FITS header
+; sxaddpar add or modify a parameter in FITS header array
 sxaddpar,h0,'COMMENT','scraytrace'
 sxaddpar,h0,'DESC', 'model '+strtrim(modelid,2)
 sxaddpar,h0,'AUTHOR','scraytrace'
@@ -602,7 +610,8 @@ sxaddpar,hnetot,'COMMENT','Integrated electron density'
 revision=getcvsrevision('$Revision: 1.16 $')
 
 sinfo={imsize:imsize,fovpix:fovpix,obspos:obspos,obsang:obsang,nepos:nepos,neang:neang,losnbp:losnbp,losrange:losrange,modelid:modelid,crpixprg:crpix,fitshead:hbtot,mmlon:mmlon,mmlat:mmlat,neonly:neonly,roi:roi,pofinteg:pofinteg,poiang:poiang,hlonlat:hlonlat,secchiab:secchiab,occrad:occrad,revision:revision,adapthres:adapthres,maxsubdiv:maxsubdiv,rtdetec:rtdetec,densfile:(n_elements(file) ne 0 ? file : ''),limbdark:limbdark,rotmat:rotmat,obslonlat:obslonlat,projtype:projtype,dateobs:dateobs,nerotcntr:nerotcntr,nerotang:nerotang,netranslation:netranslation,nerotaxis:nerotaxis}
-
+; create_struct creates a structure given pairs of tag names and values and 
+; can also be used to concatenate structures
 sbtot=create_struct('im',btot,sinfo)
 
 sbpol=create_struct('im',bpol,sinfo)
@@ -623,7 +632,7 @@ if n_elements(save) ne 0 then begin
             savestruct,save+'netot.xdr',snetot
             savestruct,save+'rhorrr.xdr',srhorrr
         endif else begin
-            mwrfits,sbtot,save+'btot.fits',/create
+            mwrfits,sbtot,save+'btot.fits',/create ; mwrfits write all standard FITS data types from input arrays or structures
             mwrfits,sbpol,save+'bpol.fits',/create
             mwrfits,snetot,save+'netot.fits',/create
             mwrfits,srhorrr,save+'rhorrr.fits',/create
