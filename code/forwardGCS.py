@@ -7,6 +7,7 @@
 
 
 from pyGCS_ import *
+from rtraytracewcs import *
 import numpy as np
 import numpy.ma as ma
 import datetime
@@ -188,8 +189,13 @@ def forwardGCS(configfile_name, headers, size_occ=[2,3.7,2]):
             #xi, yi, zi = xi_yi_zi_KDE(x, y)
             #plt.pcolormesh(xi, yi, zi.reshape(xi.shape), cmap='gist_yarg', facecolor='black')
             #plt.imshow(ims[sat], vmin=-10, vmax=10, cmap=cm.binary, zorder=0, extent=plotranges[sat])
+
             #imagen de puntos de la CME:
             plt.scatter(clouds[sat,:,1], clouds[0,:,2], s=5, c='purple', linewidths=0)
+
+            #imagen de intensidad de la CME:
+            rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row])
+
             #circulos occulter y limbo:
             occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
             limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
