@@ -134,196 +134,136 @@ import sunpy.map
 from sunpy.map.maputils import all_coordinates_from_map
 from sunpy.sun.constants import radius as _RSUN
 from datetime import datetime
-
-
-
-#sgui : returns a structure containing all the different parameters of the GUI.
-#sgui.lon : longitude Carrington.
-#sgui.lat : latitude.
-#sgui.rot : tilt angle or rotation around the model axis of symmetry. 0 is parallel to the equator.
-#sgui.han : half angle between the model's feet.
-#sgui.hgt : height, in Rsun.
-#sgui.rat : aspect ratio = k
-#sigin=0.1
-#sigout=0.1
-#sgui.nel=100000.
+import pandas as pd
+import os
+from ctypes import *
+import pathlib
+import scipy.io as sio
+from scipy.io import readsav
+from numpy.ctypeslib import ndpointer
 
 obslonlatheaderflag=0
 obslonlatflag=0
 rollangheaderflag=0
-
-def rtsccguicloud_calcneang(CMElon,CMElat,CMEtilt,carrlonshiftdeg=-0.0,carrstonyshiftdeg=0.0):
-    return [CMElon+carrlonshiftdeg*dtor,CMElat,CMEtilt]
-def rtsccguicloud_calcfeetheight(height,k,ang): 
-    return height*(1.-k)*math.cos(ang)/(1.+math.sin(ang))
-CMElon=60
-CMElat=20
-CMEtilt=70
-height=6
-k=3
-ang=30
-neang = rtsccguicloud_calcneang(CMElon,CMElat,CMEtilt)
-height=rtsccguicloud_calcfeetheight(height,k,ang)
-nel = 100000.
-mp = [1.5,ang,height,k,nel,0.,0.,0.,0.1,0.1]
-
-def rtraytracewcs(header, modelid=54, imsize=[512,512], losrange=[-10.,10.], modparam=mp, neang=neang, losnbp=[64]):
-    pv2_1in = header['PV2_1']
+def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=30, nel = 100000., modelid=54, imsize=np.array([512,512],dtype='int32'), losrange=np.array([-10.,10.],dtype='float32'), losnbp=64):
+    def rtsccguicloud_calcneang(CMElon,CMElat,CMEtilt,carrlonshiftdeg=-0.0,carrstonyshiftdeg=0.0):
+        return np.array([CMElon+carrlonshiftdeg*dtor,CMElat,CMEtilt],dtype='float32')
+    def rtsccguicloud_calcfeetheight(height,k,ang): 
+        return height*(1.-k)*math.cos(ang)/(1.+math.sin(ang))
+   
+    neang = rtsccguicloud_calcneang(CMElon,CMElat,CMEtilt)
+    height=rtsccguicloud_calcfeetheight(height,k,ang)
+    mp = np.array([1.5,ang,height,k,nel,0.,0.,0.,0.1,0.1],dtype='float32')
+    modparam=mp
+    # def rtraytracewcs(header, modelid=54, imsize=np.array([512,512],dtype='int32'), losrange=np.array([-10.,10.],dtype='float32'), modparam=mp, neang=neang, losnbp=64):
+    pv2_1=header['PV2_1']
     if header['INSTRUME']=='LASCO':
         flagsoho='SOHO'
         instr='c3'
     else:
         flagsoho=False
         instr='cor2'
-    dateobs=header['DATEOBS']
+    dateobs=header['DATE']
     instr=header['DETECTOR']
-    
     secchiab = header['OBSRVTRY'][-1]
-        
-    obslonlat=float(header['CRLN_OBS']*dtor),float(header['CRLT_OBS']*dtor),float(header['DSUN_OBS']/_RSUN.value)
+    obslonlat=np.array([header['CRLN_OBS']*dtor,header['CRLT_OBS']*dtor,header['DSUN_OBS']/_RSUN.value],dtype='float32')
     obslonlatflag=1
     obslonlatheaderflag=True
-        
     rollang=0.
     rollangheaderflag=True
-    
     fovpix=2./64.*dtor
     flagfovpix=False
-        
-    obspos=[0.,0,-214]
+    obspos=np.array([0.,0,-214],dtype='float32')
     obsposflag=False
        
-    obsang=[0.,0,0]
+    obsang=np.array([0.,0,0],dtype='float32')
     obsangflag=False
     
-    nepos=[0.,0,0]
+    nepos=np.array([0.,0,0],dtype='float32')
         
-    nerotcntr=[0.,0,0]
+    nerotcntr=np.array([0.,0,0],dtype='float32')
     
-    nerotang=[0.,0,0]
+    nerotang=np.array([0.,0,0],dtype='float32')
     
-    nerotaxis=[3,2,1] 
+    nerotaxis=np.array([3,2,1],dtype='int32') 
     
-    netranslation=[0.,0,0]
-    
-     
-    if not losrange: losrange=[-3.2,3.2]
-    else: losrange=float(losrange)
-    
-    if modparam==0: modparam=0.
-    else: modparam=float(modparam)
-
+    netranslation=np.array([0.,0,0],dtype='float32')
+        
     pofinteg=0
     
     frontinteg=0
     
     uvinteg=0
     
-    if quiet==0: quiet=0
-    else: quiet=2
-    if progressonly!=0 and quiet==0: quiet=1
-    if neonly==0: neonly=0
-    else: neonly=1
-    roi=zeros(imsize[0],imsize[1])
-    poiang=[0.,0,0]
-    hlonlat=[0.,0,0]
-    occrad=0
+    quiet=0
+        
+    neonly=0
+    
+    roi=np.ones((imsize[0],imsize[1]),dtype='int32')
+    poiang=np.array([0,0,0],dtype='float32')
+    hlonlat=np.array([0.,0,0],dtype='float32')
+    occrad=0.
     adapthres=0.
     maxsubdiv=4
     limbdark=0.58
     nbthreads=0
     nbchunks=0
+        
+    crpix=np.array([header['CRPIX1'], header['CRPIX1']],dtype='float32')
     
-    if obslonlat!=0 and not obslonlatflag:
-        obslonlat=float(obslonlat)
-        obspos=obslonlat[2]*[sin(obslonlat[1]), sin(obslonlat[0])*cos(obslonlat[1]),-cos(obslonlat[0])*cos(obslonlat[1])]
-        obslonlatflag=1
-    if not obslonlat:
-        obslonlat=[-atan(obspos[1],obspos[2]), asin(obspos[1]/norm(obspos)), norm(obspos)]
-        obslonlatflag=0
-
-    crpix=[header['CRPIX1'], header['CRPIX1']]
-    
-    if not obsangflag and instr==0: obsang=obsangpreset
-    
+    pc=np.array([1,8.687118e-14,-8.687118e-14,1],dtype='float32')
 
     #set projection type
     projtype='ARC' 
-    projtypecode=1
+    projtypecode=2
     
     #init the outputs
-    btot=np.zeros(imsize[0],imsize[1])
-    bpol=np.zeros(imsize[0],imsize[1])
-    netot=np.zeros(imsize[0],imsize[1])
-    rho=np.zeros(imsize[0],imsize[1])
-    mmlon=np.zeros(2)
-    mmlat=np.zeros(2)
-    rrr=np.zeros(imsize[0],imsize[1])
-    rotmat=np.zeros(3,3)
-
-    #init environment variable
-    #rtinitenv:
-    os.environ['RT_PATH'] = '/usr/local/ssw/stereo/secchi'
-    os.environ['RT_SOFILENAME'] =  'libraytrace.so'
-    os.environ['RT_SOTHREADFILENAME'] = 'libraytracethread.so'
-    os.environ['RT_SOEXTENSION'] =  'so'
-    os.environ['RT_RUNFROM'] =  'local'
-    os.environ['RT_DATAPATH'] =  '/usr/local/ssw/stereo/secchi/data/scraytrace'
-    os.environ['SSW'] =  '/usr/local/ssw'
-    os.environ['RT_SOSUBPATH'] =  'lib/linux/x86_64'
-    os.environ['RT_FORCELIBFILE'] =  ' '
-    os.environ['RT_LIBFILE'] =  '/usr/local/ssw/stereo/secchi/lib/linux/x86_64/libraytrace.so'
-    os.environ['RT_FORCELIBTHREAD'] =  ''
-    os.environ['RT_LIBFILETHREAD'] =  ''
+    btot=np.zeros((imsize[0],imsize[1]),dtype='float32')
+    bpol=np.zeros((imsize[0],imsize[1]),dtype='float32')
+    netot=np.zeros((imsize[0],imsize[1]),dtype='float32')
+    rho=np.zeros((imsize[0],imsize[1]),dtype='float32')
+    mmlon=np.zeros(2,dtype='float32')
+    mmlat=np.zeros(2,dtype='float32')
+    rrr=np.zeros((imsize[0],imsize[1]),dtype='float32')
+    rotmat=np.zeros((3,3),dtype='float32')
     
-######PRUEBA#####
-    path= '/gehme/projects/2020_gcs_with_ml/repo/gcs_idl/arguments/inputs_py.csv'
-    inputs= np.column_stack((imsize[0],imsize[1],fovpix,obspos,obsang,nepos,neang,losnbp,losrange,modelid,btot,bpol,netot,modparam,crpix,rho,mmlon,mmlat,rrr,pofinteg,quiet,neonly,roi,poiang,hlonlat,occrad,adapthres,maxsubdiv,limbdark,rotmat,obslonlat,obslonlatflag,projtypecode,pv2_1,pc,frontinteg,uvinteg,nerotcntr,nerotang,netranslation,nerotaxis))
-    set = pd.DataFrame(inputs, ['imsize_x','imsize_y','fovpix','obspos','obsang','nepos','neang','losnbp','losrange','modelid','btot','bpol','netot','modparam','crpix','rho','mmlon','mmlat','rrr','pofinteg','quiet','neonly','roi','poiang','hlonlat','occrad','adapthres','maxsubdiv','limbdark','rotmat','obslonlat','obslonlatflag','projtypecode','pv2_1','pc','frontinteg','uvinteg','nerotcntr','nerotang','netranslation','nerotaxis'])
-    set.to_csv(path)
-#headers de FITs:
-DATA_PATH = '/gehme/data'
-secchipath = DATA_PATH+'/stereo/secchi/L0'
-lascopath = DATA_PATH+'/soho/lasco/level_1/c2'
-CorA = secchipath+'/a/img/cor2/20101214/level1/20101214_162400_04c2A.fts'
-CorB = secchipath+'/b/img/cor2/20101214/level1/20101214_162400_04c2B.fts'
-LascoC2 = lascopath+'/20101214/25354684.fts'
-ima2, hdra2 = sunpy.io.fits.read(CorA)[0]
-imb2, hdrb2 = sunpy.io.fits.read(CorB)[0]
-""" with fits.open(LascoC2) as myfitsL2:
-        imL2 = myfitsL2[0].data
-        myfitsL2[0].header['OBSRVTRY'] = 'SOHO'
-        coordL2 = get_horizons_coord(-21, datetime.datetime.strptime(myfitsL2[0].header['DATE-OBS'], "%Y-%m-%dT%H:%M:%S.%f"), 'id')
-        coordL2carr = coordL2.transform_to(sunpy.coordinates.frames.HeliographicCarrington)
-        coordL2ston = coordL2.transform_to(sunpy.coordinates.frames.HeliographicStonyhurst)
-        myfitsL2[0].header['CRLT_OBS'] = coordL2carr.lat.deg
-        myfitsL2[0].header['CRLN_OBS'] = coordL2carr.lon.deg
-        myfitsL2[0].header['HGLT_OBS'] = coordL2ston.lat.deg
-        myfitsL2[0].header['HGLN_OBS'] = coordL2ston.lon.deg
-        hdrL2 = myfitsL2[0].header """
-#STEREO A:
-rtraytracewcs(hdra2)
-#STEREO B:
-#rtraytracewcs(hdrb2)
-#LASCO:
-#rtraytracewcs(hdrL2)
-#save variables pre call_external:
-
-
-""" #start raytracing
-    starttime=datetime.now().strftime("%H:%M:%S")
-    if nbthreads==0:
-        #SAVE, rtraytracewcs,imsize[0],imsize[1],fovpix,obspos,obsang,nepos,neang,losnbp,losrange,modelid,btot,bpol,netot,modparam,crpix,rho,mmlon,mmlat,rrr,pofinteg,quiet,neonly,roi,poiang,hlonlat,occrad,adapthres,maxsubdiv,limbdark,rotmat,obslonlat,obslonlatflag,projtypecode,pv2_1,pc,frontinteg,uvinteg,nerotcntr,nerotang,netranslation,nerotaxis,/unload), FILENAMES = '/gehme/projects/2020_gcs_with_ml/repo/gcs_idl/arguments/inputs.sav'
-        s=call_external(getenv('RT_LIBFILE'),$
-                    'rtraytracewcs',$
-                    imsize[0],imsize[1],$
-                    fovpix,$
-                    obspos,obsang,$
-                    nepos,neang,$
-                    losnbp,losrange,modelid,$
-                    btot,bpol,netot,modparam,$
-                    crpix,rho,mmlon,mmlat,rrr,pofinteg,quiet,neonly,$
-                    roi,poiang,hlonlat,occrad,adapthres,maxsubdiv,limbdark,$
-                    rotmat,obslonlat,obslonlatflag,projtypecode,pv2_1,pc,frontinteg,uvinteg,nerotcntr,nerotang,netranslation,nerotaxis,/unload)
-        #SAVE, rtraytracewcs,imsize[0],imsize[1],fovpix,obspos,obsang,nepos,neang,losnbp,losrange,modelid,btot,bpol,netot,modparam,crpix,rho,mmlon,mmlat,rrr,pofinteg,quiet,neonly,roi,poiang,hlonlat,occrad,adapthres,maxsubdiv,limbdark,rotmat,obslonlat,obslonlatflag,projtypecode,pv2_1,pc,frontinteg,uvinteg,nerotcntr,nerotang,netranslation,nerotaxis,/unload), FILENAMES = '/gehme/projects/2020_gcs_with_ml/repo/gcs_idl/arguments/outputs.sav'
-    else: """
+    data_input={'imsize':imsize,
+         'fovpix':fovpix,
+         'obspos':obspos,
+         'obsang':obsang,
+         'nepos':nepos,
+         'neang':neang,
+         'losnbp':losnbp,
+         'losrange':losrange,
+         'modelid':modelid,
+         'btot':btot,
+         'bpol':bpol,
+         'netot':netot,
+         'modparam':modparam,
+         'crpix':crpix,
+         'rho':rho,
+         'mmlon':mmlon,
+         'mmlat':mmlat,
+         'rrr':rrr,
+         'pofinteg':pofinteg,
+         'quiet':quiet,
+         'neonly':neonly,
+         'roi':roi,
+         'poiang':poiang,
+         'hlonlat':hlonlat,
+         'occrad':occrad,
+         'adapthres':adapthres,
+         'maxsubdiv':maxsubdiv,
+         'limbdark':limbdark,
+         'rotmat':rotmat,
+         'obslonlat':obslonlat,
+         'obslonlatflag':obslonlatflag,
+         'projtypecode':projtypecode,
+         'pv2_1':pv2_1,
+         'frontinteg':frontinteg,
+         'uvinteg':uvinteg,
+         'nerotcntr':nerotcntr,
+         'nerotang':nerotang,
+         'netranslation':netranslation,
+         'nerotaxis':nerotaxis
+    }

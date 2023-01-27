@@ -58,16 +58,17 @@ bx, by, bz = cs.cxform("GSE", "HEEQ", d, bx0,by0,bz0)
 b = np.array([bx,by,bz]).T
 #print(b)
 #print(data_pla["VX_(GSE)"])
+print(data_pla["VY_(GSE)"].size)
 
 # filter plasma speed data
 #data_pla["VX_(GSE)"][np.any(data_pla["VX_(GSE)"] == -1e31, axis=0)] = np.nan
 #data_pla["VY_(GSE)"][np.any(data_pla["VY_(GSE)"] == -1e31, axis=0), :] = np.nan
 #data_pla["VZ_(GSE)"][np.any(data_pla["VZ_(GSE)"] == -1e31)] = np.nan
 for x in data_pla["VY_(GSE)"]:
-  if data_pla["VZ_(GSE)"] == -1e31:
+  if data_pla["VY_(GSE)",x] == -1e31:
     x = np.nan
 
-print(data_pla["VZ_(GSE)"])
+print(data_pla["VY_(GSE)"].size)
 # construct an interpolator for the plasma data
 f = interp1d(
     np.asarray([calendar.timegm(x.timetuple()) for x in data_pla["EPOCH"]]),
