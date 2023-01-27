@@ -1,4 +1,0 @@
-name: morfologia
-channels:
-  - defaults
-prefix: /home/machuca/.conda/envs/morfologia
