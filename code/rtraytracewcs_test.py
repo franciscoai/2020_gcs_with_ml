@@ -145,23 +145,17 @@ from numpy.ctypeslib import ndpointer
 obslonlatheaderflag=0
 obslonlatflag=0
 rollangheaderflag=0
-
-def rtsccguicloud_calcneang(CMElon,CMElat,CMEtilt,carrlonshiftdeg=-0.0,carrstonyshiftdeg=0.0):
-    return np.array([CMElon+carrlonshiftdeg*dtor,CMElat,CMEtilt],dtype='float32')
-def rtsccguicloud_calcfeetheight(height,k,ang): 
-    return height*(1.-k)*math.cos(ang)/(1.+math.sin(ang))
-CMElon=60
-CMElat=20
-CMEtilt=70
-height=6
-k=3
-ang=30
-neang = rtsccguicloud_calcneang(CMElon,CMElat,CMEtilt)
-height=rtsccguicloud_calcfeetheight(height,k,ang)
-nel = 100000.
-mp = np.array([1.5,ang,height,k,nel,0.,0.,0.,0.1,0.1],dtype='float32')
-
-def rtraytracewcs(header, modelid=54, imsize=np.array([512,512],dtype='int32'), losrange=np.array([-10.,10.],dtype='float32'), modparam=mp, neang=neang, losnbp=64):
+def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=30, nel = 100000., modelid=54, imsize=np.array([512,512],dtype='int32'), losrange=np.array([-10.,10.],dtype='float32'), losnbp=64):
+    def rtsccguicloud_calcneang(CMElon,CMElat,CMEtilt,carrlonshiftdeg=-0.0,carrstonyshiftdeg=0.0):
+        return np.array([CMElon+carrlonshiftdeg*dtor,CMElat,CMEtilt],dtype='float32')
+    def rtsccguicloud_calcfeetheight(height,k,ang): 
+        return height*(1.-k)*math.cos(ang)/(1.+math.sin(ang))
+   
+    neang = rtsccguicloud_calcneang(CMElon,CMElat,CMEtilt)
+    height=rtsccguicloud_calcfeetheight(height,k,ang)
+    mp = np.array([1.5,ang,height,k,nel,0.,0.,0.,0.1,0.1],dtype='float32')
+    modparam=mp
+    # def rtraytracewcs(header, modelid=54, imsize=np.array([512,512],dtype='int32'), losrange=np.array([-10.,10.],dtype='float32'), modparam=mp, neang=neang, losnbp=64):
     pv2_1=header['PV2_1']
     if header['INSTRUME']=='LASCO':
         flagsoho='SOHO'
@@ -182,7 +176,7 @@ def rtraytracewcs(header, modelid=54, imsize=np.array([512,512],dtype='int32'), 
     obspos=np.array([0.,0,-214],dtype='float32')
     obsposflag=False
        
-    obsang=np.array([0.,0,0],dtype='float32')#######??????
+    obsang=np.array([0.,0,0],dtype='float32')
     obsangflag=False
     
     nepos=np.array([0.,0,0],dtype='float32')
@@ -273,154 +267,3 @@ def rtraytracewcs(header, modelid=54, imsize=np.array([512,512],dtype='int32'), 
          'netranslation':netranslation,
          'nerotaxis':nerotaxis
     }
-
-    #Set enviroment inputs
-    os.environ['RT_PATH'] = '/usr/local/ssw/stereo/secchi'
-    os.environ['RT_SOFILENAME'] =  'libraytrace.so'
-    os.environ['RT_SOTHREADFILENAME'] = 'libraytracethread.so'
-    os.environ['RT_SOEXTENSION'] =  'so'
-    os.environ['RT_RUNFROM'] =  'local'
-    os.environ['RT_DATAPATH'] =  '/usr/local/ssw/stereo/secchi/data/scraytrace'
-    os.environ['SSW'] =  '/usr/local/ssw'
-    os.environ['RT_SOSUBPATH'] =  'lib/linux/x86_64'
-    os.environ['RT_FORCELIBFILE'] =  ' '
-    os.environ['RT_LIBFILE'] =  '/usr/local/ssw/stereo/secchi/lib/linux/x86_64/libraytrace.so'
-    os.environ['RT_FORCELIBTHREAD'] =  ''
-    os.environ['RT_LIBFILETHREAD'] =  ''
-    
-    #importing libraytrace.so from C++
-    if __name__ == "__main__":
-        # Load the shared library into ctypes
-        libraytrace = pathlib.Path('/usr/local/ssw/stereo/secchi/lib/linux/x86_64/libraytrace.so').absolute()
-        c_lib = CDLL(libraytrace)
-
-    float_pointer1 = np.ctypeslib.ndpointer(dtype=np.dtype('>f4'),ndim=1,flags="CONTIGUOUS")
-    float_pointer2 = np.ctypeslib.ndpointer(dtype=np.dtype('>f4'),ndim=2,flags="CONTIGUOUS")
-    long_pointer1 = np.ctypeslib.ndpointer(dtype=np.dtype('>i4'),ndim=1,flags="CONTIGUOUS")
-    long_pointer2 = np.ctypeslib.ndpointer(dtype=np.dtype('>i4'),ndim=2,flags="CONTIGUOUS")
-
-
-    c_lib.rtraytracewcs.restype = c_int
-    c_lib.rtraytracewcs.argtypes = c_int,POINTER(c_void_p)
-
-    # tuple of pointers with the appropiate type to point to all the input variables
-    args_types = (
-    pointer(c_long),                          
-    pointer(c_long),                                 #imsize[1]
-    pointer(c_float),                                #fovpix
-    float_pointer1,                                  #obspos
-    float_pointer1,                                  #obsang
-    float_pointer1,                                  #nepos
-    float_pointer1,                                  #neang
-    pointer(c_long),                                 #losnbp
-    float_pointer1,                                  #losrange
-    pointer(c_long),                                 #modelid
-    float_pointer2,                                  #btot
-    float_pointer2,                                  #bpol
-    float_pointer2,                                  #netot
-    float_pointer1,                                  #modparam
-    float_pointer1,                                  #crpix
-    float_pointer2,                                  #rho
-    float_pointer1,                                  #mmlon
-    float_pointer1,                                  #mmlat
-    float_pointer2,                                  #rrr
-    pointer(c_long),                                 #pofinteg
-    pointer(c_long),                                 #quiet
-    pointer(c_long),                                 #neonly
-    long_pointer2,                                   #roi
-    float_pointer1,                                  #poiang
-    float_pointer1,                                  #hlonlat
-    pointer(c_float),                                #occrad
-    pointer(c_float),                                #adapthres
-    pointer(c_long),                                 #maxsubdiv
-    pointer(c_float),                                #limbdark
-    float_pointer2,                                  #rotmat
-    float_pointer1,                                  #obslonlat
-    pointer(c_long),                                 #obslonlatflag
-    pointer(c_long),                                 #projtypecode
-    c_double,                                        #pv2_1
-    float_pointer2,                                  #pc
-    pointer(c_long),                                 #frontinteg
-    pointer(c_long),                                 #uvinteg
-    float_pointer1,                                  #nerotcntr
-    float_pointer1,                                  #nerotang
-    float_pointer1,                                  #netranslation
-    long_pointer1)
-
-    # tuple with all the input variables
-    args=[
-    data_input['imsize'][0],
-    data_input['imsize'][1],                           
-    data_input['fovpix'],                                
-    data_input['obspos'],
-    data_input['obsang'],                    
-    data_input['nepos'],      
-    data_input['neang'],  
-    data_input['losnbp'],                                
-    data_input['losrange'],
-    data_input['modelid'],                               
-    data_input['btot'],
-    data_input['bpol'],
-    data_input['netot'],     
-    data_input['modparam'],  
-    data_input['crpix'],
-    data_input['rho'],
-    data_input['mmlon'],
-    data_input['mmlat'],
-    data_input['rrr'],           
-    data_input['pofinteg'],                                
-    data_input['quiet'],                                  
-    data_input['neonly'],  
-    data_input['roi'],
-    data_input['poiang'],
-    data_input['hlonlat'],
-    data_input['occrad'],                                         
-    data_input['adapthres'],                                      
-    data_input['maxsubdiv'],
-    data_input['limbdark'],                         
-    data_input['rotmat'],
-    data_input['obslonlat'],
-    data_input['obslonlatflag'], 
-    data_input['projtypecode'],                        
-    data_input['pv2_1'],                               
-    data_input['pc'],
-    data_input['frontinteg'],                          
-    data_input['uvinteg'],                              
-    data_input['nerotcntr'],
-    data_input['nerotang'],
-    data_input['netranslation'],
-    data_input['nerotaxis']
-    ]
-
-    all_args = (c_void_p * len(args))() # array of void pointers
-
-    c_lib.rtraytracewcs(len(args), all_args)
-
-
-#headers de FITs:
-DATA_PATH = '/gehme/data'
-secchipath = DATA_PATH+'/stereo/secchi/L0'
-lascopath = DATA_PATH+'/soho/lasco/level_1/c2'
-CorA = secchipath+'/a/img/cor2/20101214/level1/20101214_162400_04c2A.fts'
-CorB = secchipath+'/b/img/cor2/20101214/level1/20101214_162400_04c2B.fts'
-LascoC2 = lascopath+'/20101214/25354684.fts'
-ima2, hdra2 = sunpy.io.fits.read(CorA)[0]
-imb2, hdrb2 = sunpy.io.fits.read(CorB)[0]
-""" with fits.open(LascoC2) as myfitsL2:
-        imL2 = myfitsL2[0].data
-        myfitsL2[0].header['OBSRVTRY'] = 'SOHO'
-        coordL2 = get_horizons_coord(-21, datetime.datetime.strptime(myfitsL2[0].header['DATE-OBS'], "%Y-%m-%dT%H:%M:%S.%f"), 'id')
-        coordL2carr = coordL2.transform_to(sunpy.coordinates.frames.HeliographicCarrington)
-        coordL2ston = coordL2.transform_to(sunpy.coordinates.frames.HeliographicStonyhurst)
-        myfitsL2[0].header['CRLT_OBS'] = coordL2carr.lat.deg
-        myfitsL2[0].header['CRLN_OBS'] = coordL2carr.lon.deg
-        myfitsL2[0].header['HGLT_OBS'] = coordL2ston.lat.deg
-        myfitsL2[0].header['HGLN_OBS'] = coordL2ston.lon.deg
-        hdrL2 = myfitsL2[0].header """
-#STEREO A:
-rtraytracewcs(hdra2)
-#STEREO B:
-#rtraytracewcs(hdrb2)
-#LASCO:
-#rtraytracewcs(hdrL2)
-#save variables pre call_external:

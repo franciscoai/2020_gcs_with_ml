@@ -120,7 +120,7 @@ class InputStructure(Structure):
 
 # inputs de la estructura casteadas para que coincidan con el tipo void
 # (las arrays con .copy() porque sino sale un error de array readonly)
-# las arrays ya se aceptan como punteros, por eso no llevan pointer
+
 imsize_0 = cast(pointer(c_int32(sav_data_input['imsize'][0])),c_void_p)
 imsize_1 = cast(pointer(c_int32(sav_data_input['imsize'][1])),c_void_p)
 fovpix = cast(pointer(c_float(sav_data_input['fovpix'])),c_void_p)
