@@ -1,1 +1,1 @@
-tutorial de comparacion
+tutorial de comparacion de imagenes sinteticas entre IDL y PyGCS
