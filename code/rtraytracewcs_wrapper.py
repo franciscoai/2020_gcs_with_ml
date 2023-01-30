@@ -19,7 +19,7 @@ def rtraytracewcs_wrapper(input_data, test=False):
 
     Contact: franciscoaiglesias@gmail.com
 
-    input_data:: 
+    input_data:: dict with all the inputs. See input_obj object below for a list
     test::Bool # Set to True to ignore input_data and run the example saved in TEST_SAVE 
     """
     # Constants
@@ -46,6 +46,13 @@ def rtraytracewcs_wrapper(input_data, test=False):
     #Inicialice quiet 
     input_data['quiet'] = np.int32(0)
 
+    # CHANGE PARAM
+    # bla = np.array(input_data['modparam'])
+    # print(bla)
+    # bla[8] = 0.2
+    # bla[9] = 0.2
+    # bla[8] = 1e7
+    
     #importing libraytrace.so from C++
     if __name__ == "__main__":
         # Load the shared library into ctypes
@@ -116,6 +123,8 @@ def rtraytracewcs_wrapper(input_data, test=False):
     bpol = cast(np.ctypeslib.as_ctypes(input_data['bpol'].astype('float32').copy()),c_void_p)
     netot = cast(np.ctypeslib.as_ctypes(input_data['netot'].astype('float32').copy()),c_void_p)
     modparam = cast(np.ctypeslib.as_ctypes(input_data['modparam'].astype('float32').copy()),c_void_p)
+    #CHANGE PARAM
+    ##modparam = cast(np.ctypeslib.as_ctypes(bla.astype('float32').copy()),c_void_p)
     crpix = cast(np.ctypeslib.as_ctypes(input_data['crpix'].astype('float32').copy()),c_void_p)
     rho = cast(np.ctypeslib.as_ctypes(input_data['rho'].astype('float32').copy()),c_void_p)
     mmlon = cast(np.ctypeslib.as_ctypes(input_data['mmlon'].astype('float32').copy()),c_void_p)
@@ -187,7 +196,6 @@ def rtraytracewcs_wrapper(input_data, test=False):
                         netranslation,
                         nerotaxis
     )
-
     print("********************Corriendo...")
     c_lib.rtraytracewcs.restype = c_bool
     c_lib.rtraytracewcs.argtypes = [c_int, POINTER(InputStructure)]

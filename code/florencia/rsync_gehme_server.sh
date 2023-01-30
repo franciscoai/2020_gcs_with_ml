@@ -1,1 +1,0 @@
-rsync -azvh /home/florenciacisterna/2020_gcs_with_ml/code/florencia cisterna@192.168.2.35:/gehme/projects/2020_gcs_with_ml/repo/code/.
