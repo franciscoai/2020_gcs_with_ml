@@ -129,30 +129,21 @@ c3 = 3.7
 # In[8]:
 
 #arrays aleatorias de parámetros 1D:
-
 n = 3 #cant de valores de cada parámetro
-
 CMElons = np.random.randint(60, 63, n)
-
 CMElats = np.random.randint(20, 23, n)
-
 CMEtilts = np.random.randint(70, 73, n)
-
 heights = np.random.randint(6, 9, n)
-
 ks = np.random.random_sample(size = n)
-
 angs = np.random.randint(30, 33, n)
 
 #cada array de parámetro pasa a ser una columna del set de parámetros:
-
 set_parameters = np.column_stack((CMElons, CMElats, CMEtilts, heights, ks, angs))
 
 
 # ## Save configuración en .CSV
 
 # In[5]:
-
 
 path = '/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test/'     
 date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
@@ -190,11 +181,12 @@ def forwardGCS(configfile_name, headers, size_occ=[2,3.7,2]):
             #plt.pcolormesh(xi, yi, zi.reshape(xi.shape), cmap='gist_yarg', facecolor='black')
             #plt.imshow(ims[sat], vmin=-10, vmax=10, cmap=cm.binary, zorder=0, extent=plotranges[sat])
 
+            #imagen de intensidad de la CME:
+            btot = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row])
+            plt.imshow(btot)
+
             #imagen de puntos de la CME:
             plt.scatter(clouds[sat,:,1], clouds[0,:,2], s=5, c='purple', linewidths=0)
-
-            #imagen de intensidad de la CME:
-            rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row])
 
             #circulos occulter y limbo:
             occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
@@ -218,7 +210,6 @@ def forwardGCS(configfile_name, headers, size_occ=[2,3.7,2]):
     
 
 # ## Prueba
-
 forwardGCS(configfile_name, headers)
 
 

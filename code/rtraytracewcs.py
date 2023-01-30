@@ -141,6 +141,7 @@ import pathlib
 import scipy.io as sio
 from scipy.io import readsav
 from numpy.ctypeslib import ndpointer
+from rtraytracewcs_wrapper import rtraytracewcs_wrapper
 
 obslonlatheaderflag=0
 obslonlatflag=0
@@ -267,3 +268,5 @@ def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=3
          'netranslation':netranslation,
          'nerotaxis':nerotaxis
     }
+
+    return(rtraytracewcs_wrapper(data_input))
