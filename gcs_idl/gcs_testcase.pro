@@ -57,6 +57,6 @@ IF Result EQ 1 THEN restore, SAVE_FILE
 
 rtsccguicloud, a, b, hdreventa, hdreventb, imlasco=lasco, hdrlasco=lascohdr, sgui=sgui, sparaminit=sgui
 
-save, filename=SAVE_FILE, sgui
+;save, filename=SAVE_FILE, sgui
 END
 
