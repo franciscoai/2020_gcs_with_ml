@@ -122,7 +122,7 @@ INPUTS:
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from .rtraytracewcs_wrapper import rtraytracewcs_wrapper
+from pyGCS_raytrace.rtraytracewcs_wrapper import rtraytracewcs_wrapper
 import numpy as np
 import math
 from sunpy.sun.constants import radius as _RSUN
@@ -131,20 +131,66 @@ from ctypes import *
 obslonlatheaderflag = 0
 obslonlatflag = 0
 rollangheaderflag = 0
-pi = np.pi
-dtor = pi/180.
-
-def rtsccguicloud_calcneang(CMElon, CMElat, CMEtilt, carrlonshiftdeg=-0.0, carrstonyshiftdeg=0.0):
-    return np.array([CMElon+carrlonshiftdeg*dtor, CMElat, CMEtilt], dtype='float32')
 
 
-def rtsccguicloud_calcfeetheight(height, k, ang):
-    return height*(1.-k)*math.cos(ang)/(1.+math.sin(ang))
+def rtsccguicloud_calcneang(CMElon, CMElat, CMEtilt, carrlonshiftdeg= -0.0000000, carrstonyshiftdeg= 0.00000):
+    #inputs in radians
+    carrlonshiftdeg = math.radians(carrlonshiftdeg)
+    return np.array([CMElon + carrlonshiftdeg, CMElat, CMEtilt], dtype='float32')
+
+
+def rotatemat(crval, x): #rotmat.pro (crval está en arcsec!)
+    
+    crval = math.radians(crval/3600)
+    
+
+    match x:
+        case 1:#X
+            r = np.array([[1.,0.,0.], 
+                          [0.,math.cos(crval),-math.sin(crval)], 
+                          [0.,-math.sin(crval),math.cos(crval)]])
+        case 2:#Y
+            r = np.array([[math.cos(crval),0.,math.sin(crval)], 
+                          [0.,1.,0.], 
+                          [-math.sin(crval),0.,math.cos(crval)]])
+        case 3:#Z
+            r = np.array([[math.cos(crval),-math.sin(crval),0.], 
+                          [math.sin(crval),math.cos(crval),0.], 
+                          [0.,0.,1]])
+    return r
+
+
+def rtrotmat2rxryrz(r):
+    ry = math.asin(r[0,2])
+    c1 = math.cos(ry)
+    if (abs(c1) < 1.0e-6):
+        rz = -math.atan2(r[2,1], r[2,0])
+        rx = 0.0
+    else:
+        rz = -math.atan2(r[0,1], r[0,0])
+        rx = -math.atan2(r[1,2], r[2,2])
+    return np.array([rx, ry, rz])
+
+
+""" def rtsccguicloud_calcfeetheight(height, k, ang):
+    return height*(1.-k)*math.cos(ang)/(1.+math.sin(ang)) """
+
+def piximchangereso(pixim,reso):
+    pixccd = pixim * ( 2.**reso) + (2.**reso)/2.
+    pixsidesize = 1.
+    return pixccd/pixsidesize - 0.5
+   
 
 
 def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=30, nel=1e5, modelid=54, imsize=np.array([512, 512], dtype='int32'), losrange=np.array([-10., 10.], dtype='float32'), losnbp=64):
+    
+    CMElon = math.radians(CMElon)
+    CMElat = math.radians(CMElat)
+    CMEtilt = math.radians(CMEtilt)
+    ang = math.radians(ang)
+    
     neang = rtsccguicloud_calcneang(CMElon, CMElat, CMEtilt)
-    height = rtsccguicloud_calcfeetheight(height, k, ang)
+    # height = rtsccguicloud_calcfeetheight(height, k, ang)
     modparam = np.array([1.5, ang, height, k, nel, 0., 0., 0., 0.1, 0.1], dtype='float32')
     pv2_1 = header['PV2_1']
     if header['INSTRUME'] == 'LASCO':
@@ -156,17 +202,18 @@ def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=3
     dateobs = header['DATE']
     instr = header['DETECTOR']
     secchiab = header['OBSRVTRY'][-1]
-    obslonlat = np.array([header['CRLN_OBS']*dtor, header['CRLT_OBS']*dtor,
+    obslonlat = np.array([math.radians(header['CRLN_OBS']),math.radians(header['CRLT_OBS']),
                          header['DSUN_OBS']/_RSUN.value], dtype='float32')
     obslonlatflag = 1
     obslonlatheaderflag = True
-    rollang = 0.
+    rollang = 0.00000
     rollangheaderflag = True
-    fovpix = 2./64.*dtor
+    fovpix = 0.00028507045
     flagfovpix = False
     obspos = np.array([0., 0, -214], dtype='float32')
     obsposflag = False
-    obsang = np.array([0., 0, 0], dtype='float32')
+    rmat = rotatemat(header['CRVAL2'],2) @ rotatemat(-header['CRVAL1'],1) @ rotatemat(-rollang,3)
+    obsang = rtrotmat2rxryrz(rmat)
     obsangflag = False
     nepos = np.array([0., 0, 0], dtype='float32')
     nerotcntr = np.array([0., 0, 0], dtype='float32')
@@ -187,7 +234,8 @@ def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=3
     limbdark = 0.58
     nbthreads = 0
     nbchunks = 0
-    crpix = np.array([header['CRPIX1'], header['CRPIX1']], dtype='float32')
+    imszratio = header['NAXIS1']/imsize[0]
+    crpix = piximchangereso(np.array([header['CRPIX1'] -1, header['CRPIX2'] -1], dtype='float32'),-math.log(imszratio)/math.log(2) )
     pc = np.array([1, 8.687118e-14, -8.687118e-14, 1], dtype='float32')
 
     # set projection type
@@ -248,4 +296,4 @@ def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=3
                   }
 
     # calls rtraytrace wrapper
-    return (rtraytracewcs_wrapper(data_input))
+    return (rtraytracewcs_wrapper(data_input, test=False))

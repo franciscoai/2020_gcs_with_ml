@@ -1,0 +1,357 @@
+IDL> gcs_testcase
+% Compiled module: GCS_TESTCASE.
+% Compiled module: SCCREADFITS.
+% Compiled module: DEF_SECCHI_HDR.
+def_secchi_hdr.pro,v 1.65
+% Compiled module: MREADFITS.
+% Compiled module: HEADFITS.
+% Compiled module: FXPOSIT.
+% Compiled module: MRD_HREAD.
+% Compiled module: FITS_INTERP.
+% Compiled module: GETTOK.
+% Compiled module: REPCHR.
+% Compiled module: STRNUMBER.
+% Compiled module: TAG_EXIST.
+% Compiled module: TOTVECT.
+% Compiled module: GT_TAGVAL.
+% Compiled module: STR_TAGVAL.
+% Compiled module: TAG_INDEX.
+% Compiled module: READFITS.
+% Compiled module: SXPAR.
+% Compiled module: VALID_NUM.
+% Compiled module: GET_SMASK.
+% Compiled module: GETENV_SLASH.
+% Compiled module: SCCRORIGIN.
+% Compiled module: SXADDPAR.
+% Compiled module: SIGRANGE.
+% Compiled module: WHERE_NOT_MISSING.
+% READFITS: Now reading 1024 by 1024 array
+% READFITS: Now reading 1024 by 1024 array
+% Compiled module: LASCO_FITSHDR2STRUCT.
+% Compiled module: FXPAR.
+% Compiled module: DEF_LASCO_HDR.
+DATE_OBS:  2011-03-17T13:35:57.679
+% Compiled module: MEAN.
+% Compiled module: MOMENT.
+% Compiled module: STDDEV.
+% Compiled module: RTSCCGUICLOUD.
+% Compiled module: CMECLOUD.
+% Compiled module: ANYTIM.
+% Compiled module: CHECKVAR.
+% Compiled module: STR_LASTPOS.
+% Compiled module: REVERSE.
+% Compiled module: STR2UTC.
+% Compiled module: DELVARX.
+% Compiled module: DELVARX2.
+% Compiled module: DESTROY.
+% Compiled module: BOOST_ARRAY.
+% Compiled module: UTC2INT.
+% Compiled module: DATE2MJD.
+% Compiled module: CHECK_INT_TIME.
+% Compiled module: GET_LEAP_SEC.
+% Compiled module: UTIME2STR.
+% Compiled module: GETUTBASE.
+% Compiled module: GETUT.
+% Compiled module: INT2EX.
+% Compiled module: DAYCNV.
+% Compiled module: EX2INT.
+% Compiled module: JDCNV.
+% Compiled module: SUBMJD.
+% Compiled module: MJD2DAY.
+% Compiled module: SHELLSKELETON.
+% Compiled module: LGEN.
+% Compiled module: RTCLOUD.
+% Compiled module: FITSHEAD2WCS.
+% Compiled module: ID_UNESC.
+% Compiled module: ISVALID.
+% Compiled module: ID_ESC_INIT.
+% Compiled module: NTRIM.
+% Compiled module: BYTE2INT.
+% Compiled module: GET_FITS_PAR.
+% Compiled module: GET_FITS_TIME.
+% Compiled module: ANYTIM2UTC.
+% Compiled module: INT2UTC.
+% Compiled module: MJD2DATE.
+% Compiled module: UTC2STR.
+% Compiled module: GET_FITS_ROLL.
+% Compiled module: GET_FITS_CDELT.
+% Compiled module: REP_TAG_NAME.
+% Compiled module: GET_FITS_CEN.
+% Compiled module: COMP_FITS_CEN.
+% Compiled module: COMP_FITS_CRVAL.
+% Compiled module: WCS_FIND_KEYWORD.
+% Compiled module: WCS_DECOMP_ANGLE.
+% Compiled module: VALID_WCS.
+% Compiled module: ADD_TAG.
+% Compiled module: IDL_RELEASE.
+% Compiled module: LAST_ITEM.
+% Compiled module: WCS_SIMPLE.
+% Compiled module: WCS_FIND_TIME.
+% Compiled module: WCS_FIND_POSITION.
+% Compiled module: PB0R.
+% Compiled module: ANYTIM2JD.
+% Compiled module: JULDAY.
+% Compiled module: SUN_POS.
+% Compiled module: WCS_RSUN.
+% Compiled module: WCS_AU.
+% Compiled module: TIM2CARR.
+% Compiled module: GET_SUN.
+% Compiled module: GT_TIME.
+% Compiled module: GT_DAY.
+% Compiled module: TIM2JD.
+% Compiled module: RECPOL.
+% Compiled module: WCS_FIND_SPECTRUM.
+% Compiled module: WCS_FIND_DISTORTION.
+% Compiled module: ONERSUN.
+% Compiled module: RTGETINSTRWCSPARAM.
+% Compiled module: WCSCHANGEUNITS.
+% Compiled module: PIXIMCHANGERESO.
+% Compiled module: PIXIM2PIXCCD.
+% Compiled module: PIXCCD2PIXIM.
+% Compiled module: ROTMAT.
+% Compiled module: RTROTMAT2RXRYRZ.
+% Compiled module: RTINITENV.
+RTINITENV       UNDEFINED = <Undefined>
+FLAGDONE (RTINITENV)
+                UNDEFINED = <Undefined>
+FLAGFAILED (RTINITENV)
+                UNDEFINED = <Undefined>
+FORCEINIT       UNDEFINED = <Undefined>
+FORCELIBFILE    UNDEFINED = <Undefined>
+FORCELIBTHREAD  UNDEFINED = <Undefined>
+% Compiled module: GETCVSREVISION.
+% Compiled module: SIGN.
+RTINITENV       UNDEFINED = <Undefined>
+FLAGDONE (RTINITENV)
+                BYTE      =    1
+FLAGFAILED (RTINITENV)
+                BYTE      =    0
+FORCEINIT       UNDEFINED = <Undefined>
+FORCELIBFILE    UNDEFINED = <Undefined>
+FORCELIBTHREAD  UNDEFINED = <Undefined>
+% Compiled module: GET_ORBIT.
+% Compiled module: ANYTIM2CAL.
+% Compiled module: CHECK_EXT_TIME.
+% Compiled module: SAFE_STRING.
+% Compiled module: TEST_SPICE_ICY_DLM.
+% Compiled module: TEST_SUNSPICE_DLM.
+% Loaded DLM: ICY.
+% Compiled module: LOAD_SOHO_SPICE.
+
+[6~;+
+ ^
+% Syntax error.
+  At: /usr/local/ssw/soho/gen/idl/spice/load_sunspice_soho.pro, Line 1
+% Compiled module: LOAD_SUNSPICE_SOHO.
+% Attempt to call undefined procedure/function: 'LOAD_SUNSPICE_SOHO'.
+
+[6~;+
+ ^
+% Syntax error.
+  At: /usr/local/ssw/soho/gen/idl/spice/load_sunspice_soho.pro, Line 1
+% Compiled module: LOAD_SUNSPICE_SOHO.
+% Attempt to call undefined procedure/function: 'LOAD_SUNSPICE_SOHO'.
+RTINITENV       UNDEFINED = <Undefined>
+FLAGDONE (RTINITENV)
+                BYTE      =    1
+FLAGFAILED (RTINITENV)
+                BYTE      =    0
+FORCEINIT       UNDEFINED = <Undefined>
+FORCELIBFILE    UNDEFINED = <Undefined>
+FORCELIBTHREAD  UNDEFINED = <Undefined>
+% Compiled module: LOADCT.
+% Compiled module: FILEPATH.
+% LOADCT: Loading table B-W LINEAR
+% Compiled module: WND.
+% Compiled module: CW_FSLIDER.
+% Compiled module: CW_BGROUP.
+% Compiled module: XMANAGER.
+Computing view SC-A
+*********************************
+     0.785398
+      7.10000
+     0.450000
+      100000.
+     0.100000
+     0.100000
+      0.00000
+*********************************
+% Compiled module: RTRAYTRACEWCS.
+pro rtinitenv,forceinit=forceinit,forcelibfile=forcelibfile,forcelibthread=forcelibthread,help=help
+RT_PATH : /usr/local/ssw/stereo/secchi
+RT_SOFILENAME : libraytrace.so
+RT_SOTHREADFILENAME : libraytracethread.so
+RT_SOEXTENSION : so
+RT_RUNFROM : local
+RT_DATAPATH : /usr/local/ssw/stereo/secchi/data/scraytrace
+SSW : /usr/local/ssw
+RT_SOSUBPATH : lib/linux/x86_64
+RT_FORCELIBFILE : 
+RT_LIBFILE : /usr/local/ssw/stereo/secchi/lib/linux/x86_64/libraytrace.so
+RT_FORCELIBTHREAD : 
+RT_LIBFILETHREAD : /usr/local/ssw/stereo/secchi/lib/linux/x86_64/libraytracethread.so
+ florencia esta guardando las variables de entrada
+ *****rollang******
+      0.00000
+/usr/local/ssw/stereo/secchi/lib/linux/x86_64/libraytrace.so
+Package : scraytrace
+Version : 2.5.2
+Compilation date : Mar 12 2012 10:15:42
+In rtraytracewcs...
+Model : 54
+is : 512 , js : 512
+fovpix : 0.00028507
+obspos : 0 , 0 , -214
+obsang : -0.000358042 , -0.000225739 , -0
+nepos : 0 , 0 , 0
+neang : 3.31613 , -0.418879 , 0.523599
+nerotcntr : 0 , 0 , 0
+nerotang : 0 , 0 , 0
+nerotaxis : 3 , 2 , 1
+netranslation : 0 , 0 , 0
+losnbp : 64
+losrange : -10 , 10
+Hlonlat : 0 , 0 , 0
+occrad : 0
+adapthres : 0
+maxsubdiv : 4
+limbdark : 0.58
+obslonlatflag : 1
+projtype : 2
+uvinteg : 0
+crpix : 254.875 , 254.575
+pc [0,1,2,3] : 1 , 3.01197e-14 , -3.01197e-14 , 1
+20% 
+40% 
+60% 
+80% 
+Seconds ellapsed :
+       1.1173410
+% Compiled module: MKHDR.
+% Compiled module: GET_DATE.
+% Compiled module: SYSTIM.
+Computing view SC-B
+pro rtinitenv,forceinit=forceinit,forcelibfile=forcelibfile,forcelibthread=forcelibthread,help=help
+RT_PATH : /usr/local/ssw/stereo/secchi
+RT_SOFILENAME : libraytrace.so
+RT_SOTHREADFILENAME : libraytracethread.so
+RT_SOEXTENSION : so
+RT_RUNFROM : local
+RT_DATAPATH : /usr/local/ssw/stereo/secchi/data/scraytrace
+SSW : /usr/local/ssw
+RT_SOSUBPATH : lib/linux/x86_64
+RT_FORCELIBFILE : 
+RT_LIBFILE : /usr/local/ssw/stereo/secchi/lib/linux/x86_64/libraytrace.so
+RT_FORCELIBTHREAD : 
+RT_LIBFILETHREAD : /usr/local/ssw/stereo/secchi/lib/linux/x86_64/libraytracethread.so
+ florencia esta guardando las variables de entrada
+ *****rollang******
+      0.00000
+/usr/local/ssw/stereo/secchi/lib/linux/x86_64/libraytrace.so
+Package : scraytrace
+Version : 2.5.2
+Compilation date : Mar 12 2012 10:15:42
+In rtraytracewcs...
+Model : 54
+is : 512 , js : 512
+fovpix : 0.00028507
+obspos : 0 , 0 , -214
+obsang : 0.000558024 , 0.000651244 , -0
+nepos : 0 , 0 , 0
+neang : 3.31613 , -0.418879 , 0.523599
+nerotcntr : 0 , 0 , 0
+nerotang : 0 , 0 , 0
+nerotaxis : 3 , 2 , 1
+netranslation : 0 , 0 , 0
+losnbp : 64
+losrange : -10 , 10
+Hlonlat : 0 , 0 , 0
+occrad : 0
+adapthres : 0
+maxsubdiv : 4
+limbdark : 0.58
+obslonlatflag : 1
+projtype : 2
+uvinteg : 0
+crpix : 254.525 , 257.675
+pc [0,1,2,3] : 1 , -1.4618e-14 , 1.4618e-14 , 1
+20% 
+40% 
+60% 
+80% 
+Seconds ellapsed :
+       1.5703950
+Computing view LASCO
+
+[6~;+
+ ^
+% Syntax error.
+  At: /usr/local/ssw/soho/gen/idl/spice/load_sunspice_soho.pro, Line 1
+% Compiled module: LOAD_SUNSPICE_SOHO.
+% Attempt to call undefined procedure/function: 'LOAD_SUNSPICE_SOHO'.
+
+[6~;+
+ ^
+% Syntax error.
+  At: /usr/local/ssw/soho/gen/idl/spice/load_sunspice_soho.pro, Line 1
+% Compiled module: LOAD_SUNSPICE_SOHO.
+% Attempt to call undefined procedure/function: 'LOAD_SUNSPICE_SOHO'.
+pro rtinitenv,forceinit=forceinit,forcelibfile=forcelibfile,forcelibthread=forcelibthread,help=help
+RT_PATH : /usr/local/ssw/stereo/secchi
+RT_SOFILENAME : libraytrace.so
+RT_SOTHREADFILENAME : libraytracethread.so
+RT_SOEXTENSION : so
+RT_RUNFROM : local
+RT_DATAPATH : /usr/local/ssw/stereo/secchi/data/scraytrace
+SSW : /usr/local/ssw
+RT_SOSUBPATH : lib/linux/x86_64
+RT_FORCELIBFILE : 
+RT_LIBFILE : /usr/local/ssw/stereo/secchi/lib/linux/x86_64/libraytrace.so
+RT_FORCELIBTHREAD : 
+RT_LIBFILETHREAD : /usr/local/ssw/stereo/secchi/lib/linux/x86_64/libraytracethread.so
+ florencia esta guardando las variables de entrada
+ *****rollang******
+      0.00000
+/usr/local/ssw/stereo/secchi/lib/linux/x86_64/libraytrace.so
+Package : scraytrace
+Version : 2.5.2
+Compilation date : Mar 12 2012 10:15:42
+In rtraytracewcs...
+Model : 54
+is : 512 , js : 512
+fovpix : 0.000115386
+obspos : 0 , 0 , -214
+obsang : -0 , 0 , -0
+nepos : 0 , 0 , 0
+neang : 3.31613 , -0.418879 , 0.523599
+nerotcntr : 0 , 0 , 0
+nerotang : 0 , 0 , 0
+nerotaxis : 3 , 2 , 1
+netranslation : 0 , 0 , 0
+losnbp : 64
+losrange : -10 , 10
+Hlonlat : 0 , 0 , 0
+occrad : 0
+adapthres : 0
+maxsubdiv : 4
+limbdark : 0.58
+obslonlatflag : 1
+projtype : 2
+uvinteg : 0
+crpix : 254.798 , 253.081
+pc [0,1,2,3] : 1 , 0 , -0 , 1
+20% 
+40% 
+60% 
+80% 
+Seconds ellapsed :
+       1.1249509
+% XMANAGER: Caught unexpected error from client application. Message follows...
+% Tag name HAE_OBS is undefined for structure <Anonymous>.
+% Execution halted at:  RTRAYTRACEWCS     486 /usr/local/ssw/stereo/secchi/idl/scraytrace/rtraytracewcs.pro
+%                       EVENT_GENERATEVIEW  297 /usr/local/ssw/stereo/secchi/idl/scraytrace/rtsccguicloud.pro
+%                       XMANAGER_EVLOOP_STANDARD  478 /usr/local/itt/idl71/lib/xmanager.pro
+%                       XMANAGER          708 /usr/local/itt/idl71/lib/xmanager.pro
+%                       RTSCCGUICLOUD    1420 /usr/local/ssw/stereo/secchi/idl/scraytrace/rtsccguicloud.pro
+%                       GCS_TESTCASE      113 /gehme/projects/2020_gcs_with_ml/repo_yas/gcs_idl/gcs_testcase.pro
+%                       $MAIN$          

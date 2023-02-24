@@ -9,7 +9,8 @@ from scipy.io import readsav
 from numpy.ctypeslib import load_library, ndpointer
 from multiprocessing import sharedctypes
 import matplotlib.pyplot as plt
-
+import pandas as pd
+import pickle
 
 def rtraytracewcs_wrapper(input_data, test=False):
     """
@@ -81,7 +82,8 @@ def rtraytracewcs_wrapper(input_data, test=False):
     # Constants (system dependant)
     
     exec_path = os.getcwd()
-    test_save_file = exec_path+'/rtraytracewcs_wrapper_test_input.sav' # used to
+    #test_save_file = exec_path+'/rtraytracewcs_wrapper_test_input.sav' # used to
+    test_save_file = '/gehme/projects/2020_gcs_with_ml/data/gcs_idl/input_ok.sav'
     os.environ['RT_PATH'] = '/usr/local/ssw/stereo/secchi'
     os.environ['RT_SOFILENAME'] = 'libraytrace.so'
     os.environ['RT_SOTHREADFILENAME'] = 'libraytracethread.so'
@@ -99,9 +101,23 @@ def rtraytracewcs_wrapper(input_data, test=False):
     # importing libraytrace.so from C++
     c_lib = load_library('libraytrace.so', '/usr/local/ssw/stereo/secchi/lib/linux/x86_64/')
 
+   
+
     # test case, reads input_data from IDL save file of an example
     if test:
         input_data = readsav(test_save_file, python_dict=True)
+        file = '/gehme/projects/2020_gcs_with_ml/data/test_true.pickle'
+    else:
+        file = '/gehme/projects/2020_gcs_with_ml/data/test_false.pickle'
+        
+    with open(file, 'wb') as handle:
+        pickle.dump(input_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    
+    with open(file, 'rb') as handle:
+        data = pickle.load(handle)
+    
+
+
 
     # clase tipo estructura con los tipo de punteros
     # queda más bonito y es más rápido cuando se llama a la función
@@ -237,12 +253,15 @@ def rtraytracewcs_wrapper(input_data, test=False):
         netranslation,
         nerotaxis
     )
+    
 
     print("***Running libraytrace.so")
     c_lib.rtraytracewcs.restype = c_bool
     c_lib.rtraytracewcs.argtypes = [c_int, POINTER(InputStructure)]
     c_lib.rtraytracewcs(41, input_obj)
     print("***libraytrace.so completed")
+
+    
 
     # reads btot from mem and optionally pots it
     btot = np.ctypeslib.as_array((c_float * (input_data['imsize'][0]*input_data['imsize'][1])).from_address(input_obj.btot))

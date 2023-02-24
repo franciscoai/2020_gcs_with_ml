@@ -1,0 +1,133 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=ANSI_X3.4-1968"><title>Chapter&#160;4.&#160;Mini Tutorial</title><link rel="stylesheet" href="docbook.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.69.1"><meta name="keywords" content="Solar corona, Simulation, Ray-Tracing"><link rel="start" href="index.html" title="Raytracing Software for the Simulation of the Solar Corona: User's Guide"><link rel="up" href="index.html" title="Raytracing Software for the Simulation of the Solar Corona: User's Guide"><link rel="prev" href="install.html" title="Chapter&#160;3.&#160;Install"><link rel="next" href="newmodel.html" title="Chapter&#160;5.&#160;Implementing new models"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Chapter&#160;4.&#160;Mini Tutorial</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="install.html">Prev</a>&#160;</td><th width="60%" align="center">&#160;</th><td width="20%" align="right">&#160;<a accesskey="n" href="newmodel.html">Next</a></td></tr></table><hr></div><div class="chapter" lang="en"><div class="titlepage"><div><div><h2 class="title"><a name="examples"></a>Chapter&#160;4.&#160;Mini Tutorial</h2></div></div></div><div class="toc"><p><b>Table of Contents</b></p><dl><dt><span class="sect1"><a href="examples.html#id2549129">1. Flux Rope Simulation Using the GUI</a></span></dt><dt><span class="sect1"><a href="examples.html#id2588627">2. Using in a Command Line</a></span></dt><dd><dl><dt><span class="sect2"><a href="examples.html#id2588669">2.1. <span><strong class="command">raytracewl</strong></span></a></span></dt><dt><span class="sect2"><a href="examples.html#id2589040">2.2. Radial Profiles: <span><strong class="command">rtwlline</strong></span></a></span></dt><dt><span class="sect2"><a href="examples.html#id2589092">2.3. Circular Profiles: <span><strong class="command">rtwlcirc</strong></span></a></span></dt><dt><span class="sect2"><a href="examples.html#buildcloud">2.4. Electron density cube generation: <span><strong class="command">buildcloud</strong></span></a></span></dt></dl></dd></dl></div><p>
+	We show, step by step, how to use the main features of the software.
+</p><div class="sect1" lang="en"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2549129"></a>1.&#160;Flux Rope Simulation Using the GUI</h2></div></div></div><div class="procedure"><ol type="1"><li><p>
+				Run the <span><strong class="command">rtfrontend</strong></span>. The window shown on figure <a href="examples.html#frontend" title="Figure&#160;4.1.&#160;The Frontend.">Figure&#160;4.1, &#8220;The Frontend.&#8221;</a> should appear.
+				</p><pre class="screen">
+<code class="prompt">IDL[mycomputer]&gt; </code><strong class="userinput"><code>rtfrontend</code></strong></pre><p>
+				
+				</p><div class="figure"><a name="frontend"></a><p class="title"><b>Figure&#160;4.1.&#160;The Frontend.</b></p><div class="mediaobject"><img src="capture01.png" alt="Frontend"></div></div><p>
+				
+			</p></li><li><p>
+				
+				From the menu <span class="guimenu">File</span> &#8594; <span class="guimenuitem">Select Model</span> &#8594; <span class="guimenuitem">Model 21-40</span> &#8594; <span class="guimenuitem">33. Tube Shell Model</span>
+				
+			</p></li><li><p>
+				Click <span class="guibutton">OK</span> on the pop-up parameter window.
+			</p></li><li><p>
+				Click the <span class="guibutton">Quick Select Size</span> button and select <span class="guimenuitem">256x256</span>.
+			</p></li><li><p>
+				In the <span class="guilabel">LOS Range</span> section edit the <span class="guilabel">Start:</span> and <span class="guilabel">End:</span> to respectively <strong class="userinput"><code>-30 </code></strong> and <strong class="userinput"><code>30</code></strong>.
+			</p></li><li><p>
+				In the <span class="guilabel">Parameters:</span> section, click the <span class="guibutton">Image Type
+				</span> button and select <span class="guimenuitem">C3 Image</span>.
+			</p></li><li><p>
+				Check the <span class="guilabel">Inhibit Windows?</span> check box.
+			</p></li><li><p>
+				From the <span class="guimenu">3-D Modeling</span> menu select <span class="guimenuitem">Ne Cloud</span>. The Dragger window should appear (<a href="examples.html#dragger" title="Figure&#160;4.2.&#160;The Dragger.">Figure&#160;4.2, &#8220;The Dragger.&#8221;</a>).
+				
+				
+				</p><div class="figure"><a name="dragger"></a><p class="title"><b>Figure&#160;4.2.&#160;The Dragger.</b></p><div class="mediaobject"><img src="capture04.png" alt="Dragger"></div></div><p>
+			</p></li><li><p>
+				Now you can position the cloud model as you wish by clicking and dragging in the display area. Note that it's better if you zoom out a little bit down to 5.
+			</p></li><li><p>
+				Once you have positionned the structure the way you want, click on <span class="guibutton">Go !</span> to generate the view. It can take few seconds.
+			</p></li><li><p>
+				Move the structure again so that it's viewed in a different position. Click on <span class="guibutton">Export to Frontend</span> and then <span class="guibutton">Go !</span> to generate the view. It can take few seconds.
+			</p></li><li><p>
+				Close the Dragger window.
+			</p></li><li><p>
+				Open the selector window by clicking on <span class="guibutton">Selector</span> (see <a href="examples.html#selector" title="Figure&#160;4.3.&#160;The Selector">Figure&#160;4.3, &#8220;The Selector&#8221;</a>).
+				
+				
+				
+				</p><div class="figure"><a name="selector"></a><p class="title"><b>Figure&#160;4.3.&#160;The Selector</b></p><div class="mediaobject"><img src="capture03.png" alt="Selector"></div></div><p>
+				
+			</p></li><li><p>
+				Click on the image you want to display. The image is displayed in log scale. You can play on the cutoff using the slider on the botton left corner. You can also select if you want to visualize the <span class="guibutton">Total Brightness</span>, <span class="guibutton">Polarized Brightness</span> or <span class="guibutton">Total Ne Density</span>.
+			</p></li><li><p>
+				You can generate a movie by clicking on <span class="guibutton">Go !</span>.
+			</p></li></ol></div></div><div class="sect1" lang="en"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2588627"></a>2.&#160;Using in a Command Line</h2></div></div></div><p>
+The raytracing can be performed via the command line of <span class="application">IDL</span>. It is of course less friendly than the front end but provide more flexibility if simulations need to be automated or included in a program. Three programs are implemented <span><strong class="command">raytracewl</strong></span>, <span><strong class="command">rtwlline</strong></span> and <span><strong class="command">rtwlcirc</strong></span>. The first one generated images and the two other one radial and circular profiles. 
+</p><p>
+The following examples show how to use the program in command lines. They also show different implemented features. For more details on the parameters and keywords, please refer to the header of the programs.
+</p><div class="sect2" lang="en"><div class="titlepage"><div><div><h3 class="title"><a name="id2588669"></a>2.1.&#160;<span><strong class="command">raytracewl</strong></span></h3></div></div></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="id2588677"></a>2.1.1.&#160;No parameter passing</h4></div></div></div><p>
+</p><div class="example"><a name="id2588685"></a><p class="title"><b>Example&#160;4.1.&#160;Slab model simulation.</b></p><pre class="programlisting">; -- simulation of a slab, edge-on
+raytracewl,sbt1,sbp1,sne1,imsize=[256,256],losrange=[-30,30],$
+losnbp=128L,modelid=14,neang=[0.,-39.5,-90-12]*!dtor,/c3,/fake
+wnd,0,alog10(sbt1.im &gt; 1e-14)
+
+; -- simulation of a slab, face-on
+raytracewl,sbt2,sbp2,sne2,imsize=[256,256],losrange=[-30,30],$
+losnbp=128L,modelid=14,neang=[90.,-39.5,-90-12]*!dtor,/c3,/fake
+wnd,1,alog10(sbt2.im &gt; 1e-14)
+</pre></div><p>
+</p><p>
+</p><div class="variablelist"><dl><dt><span class="term">sbt1</span></dt><dd><p>Total brightness structures containing the image, the simulation parameters and a FITS header.</p></dd><dt><span class="term">sbp1</span></dt><dd><p>Polarized brightness structures containing the image, the simulation parameters and a FITS header.</p></dd><dt><span class="term">sne1</span></dt><dd><p>Integrated Ne structures containing the image, the simulation parameters and a FITS header.</p></dd><dt><span class="term">imsize</span></dt><dd><p>Size of the image in pixels.</p></dd><dt><span class="term">losrange</span></dt><dd><p>LOS integration range in R_Sun.</p></dd><dt><span class="term">losnbp</span></dt><dd><p>LOS number of integration points.</p></dd><dt><span class="term">modelid</span></dt><dd><p>ID of the model.</p></dd><dt><span class="term">neang</span></dt><dd><p>Rotation angles applied to the density model, in radian.</p></dd><dt><span class="term">/c3</span></dt><dd><p>LASCO C3 FOV preset.</p></dd><dt><span class="term">/fake</span></dt><dd><p>Create a fake LASCO FITS header.</p></dd></dl></div><p> 
+</p></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="id2588824"></a>2.1.2.&#160;With parameter passing</h4></div></div></div><p>
+</p><div class="example"><a name="id2588832"></a><p class="title"><b>Example&#160;4.2.&#160;CME model simulation</b></p><pre class="programlisting">raytracewl,sbt1,sbp1,sne1,imsize=[256,256],losrange=[-30,30],$$
+losnbp=128L,modelid=33,modparam=[0.7,2.55,30.,10,.2],neang=[0.,-39.5,-90-12]*!dtor,/c3,/fake
+wnd,0,alog10(sbt1.im &gt; 1e-14)
+</pre></div><p>
+</p><div class="variablelist"><dl><dt><span class="term">modparam</span></dt><dd><p> Parameters array corresponding to the model 33. See <code class="filename">models.cpp</code> for details.</p></dd></dl></div></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="id2588869"></a>2.1.3.&#160;With a Density Cube: ray-casting method</h4></div></div></div><p>
+The model 26 is useful to perform raytracing through a user electron density cube. The format of the <em class="parameter"><code>modparam</code></em> parameter array is the following (see also the source code):
+
+</p><div class="orderedlist"><ol type="1"><li><p>x size (sx)</p></li><li><p>y size (sy)</p></li><li><p>z size (sz)</p></li><li><p>xc Sun center in pix</p></li><li><p>yc Sun center in pix</p></li><li><p>zc Sun center in pix</p><div class="note" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Note"><tr><td rowspan="2" align="center" valign="top" width="25"><img alt="[Note]" src="note.png"></td><th align="left">Note</th></tr><tr><td align="left" valign="top"><p>(0,0,0) is the center of the first voxel</p></td></tr></table></div></li><li><p>voxel size in rsun, same for the 3 directions of space</p></li><li><p>data cube in lexicographical order (x,y,z)</p></li></ol></div><p>
+</p><p>
+We can build a fake electron density cube and make the raytracing for the example of it. Here it is a parallelopiped slab. Note that model 26 uses trilinear interpolation between neighbor voxels. For no interpolation, use model 25.
+</p><pre class="programlisting">; ---- build the fake density cube
+cube=fltarr(64,64,64)
+cube[32:*,32:*,32:38]=1e4
+; ---- build the parameter array
+modparam=[64,64,64,32,32,32,0.8,reform(cube,64L*64L*64L)]
+; ---- generate the view
+raytracewl,sbt,imsize=[256,256],losnbp=64L,losrange=[-20,20],$$
+modelid=26,modparam=modparam,neang=[90,-80,30]*!dtor,/cor2
+</pre><p>
+</p></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="id2588953"></a>2.1.4.&#160;With a Density Cube: splatting method</h4></div></div></div><p>TO BE DONE</p></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="id2588962"></a>2.1.5.&#160;With a PFSS Extrapolation Density Cube Model</h4></div></div></div><p>
+This model (#4) uses density cube from Y.-M Wang potential field source surface extrapolation program. In that example, a default density cube for the CR 1926 is downloaded, so that the parameters are hidden in the command line but appended within the program (see the source code). The simulation is done with a LASCO C1 FOV.
+</p><pre class="programlisting">raytracewl,sbt,imsize=[256,256],losnbp=128L,losrange=[-2,2],$$
+modelid=4,neang=[0,90,0.]*!dtor,/c1
+wnd,0,alog10(sbt.im &gt; 1e-9)
+</pre><p>
+</p></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="id2588985"></a>2.1.6.&#160;With Source Surface Field Map</h4></div></div></div><p>
+In the model 11 a map of the neutral line position is passed to the program. The corona is filled of electron density according to the distance of a given point to the neutral line. It is useful to reproduce, on average, the streamer belt.
+</p><pre class="programlisting">; ---- download the CR2012 SSFM from WSO
+rdtxtmagmap,nsheetmap,crot=2012
+; ---- format parameter array in single row vector
+modparam=reform(nsheetmap,n_elements(nsheetmap))
+; ---- run raytracing
+raytracewl,sbt,imsize=[256,256],losnbp=64L,losrange=[-20,20],modelid=11,modparam=modparam,neang=[0,90,0.]*!dtor,/cor2
+; ---- display total brightness
+wnd,0,alog10(sbt.im &gt; 1e-14)
+</pre><p>
+</p></div><div class="sect3" lang="en"><div class="titlepage"><div><div><h4 class="title"><a name="id2589010"></a>2.1.7.&#160;Overploting Radial Distance</h4></div></div></div><p>
+For the example, use the CME model simulation. The extra-parameter <em class="parameter"><code>rho</code></em> output the impact parameter, the distance between the LOS and the Sun center.
+</p><pre class="programlisting">raytracewl,sbt1,sbp1,sne1,imsize=[256,256],losrange=[-30,30],$$
+losnbp=128L,modelid=33,modparam=[0.7,2.55,30.,10,.2],neang=[0.,-39.5,-90-12]*!dtor,/c3,/fake,rho=rho
+wnd,0,alog10(sbt1.im &gt; 1e-14)
+oplotimpactgrid,rho,levels=[1,(findgen(7)+2)*4],$$
+c_labels=replicate(1,10),ystyle=5,xstyle=5,c_linestyle=1
+</pre><p>
+</p></div></div><div class="sect2" lang="en"><div class="titlepage"><div><div><h3 class="title"><a name="id2589040"></a>2.2.&#160;Radial Profiles: <span><strong class="command">rtwlline</strong></span></h3></div></div></div><p>
+Radial profile along the slab model, edge-on.
+</p><pre class="programlisting">rtwlline,sbt1,sbp1,sne1,imsize=[512,512],losrange=[-30,30],$$
+losnbp=256L,modelid=14,neang=[90.,-39.5,-90-12]*!dtor,/c3,/fake,$$
+angle=-39.5*!dtor,nbpix=250L
+plot,sbt1.im,/ylog,yrange=[1e-13,1e-8]
+</pre><p>
+
+</p><div class="variablelist"><dl><dt><span class="term">angle</span></dt><dd><p>Polar angle of the profile. Remember that in the raytracing software basis the X axis is upward, the Y axis toward right and the Z axis points from the image plane toward the inside of the display.</p></dd><dt><span class="term">nbpix</span></dt><dd><p>Number of pixel for the profile. The pixel 0 is always at the center of the Sun.</p></dd></dl></div><p>
+</p></div><div class="sect2" lang="en"><div class="titlepage"><div><div><h3 class="title"><a name="id2589092"></a>2.3.&#160;Circular Profiles: <span><strong class="command">rtwlcirc</strong></span></h3></div></div></div><p>
+Circular profile along the slab model, face-on.
+</p><pre class="programlisting">rtwlcirc,sbt1,sbp1,sne1,imsize=[512,512],losrange=[-30,30],$$
+losnbp=256L,modelid=14,neang=[0.,-39.5,-90-12]*!dtor,/c3,/fake,$$
+radius=100,nbang=360L
+plot,shift(sbt1.im,90),/ylog,yrange=[1e-15,1e-12]
+</pre><p>
+
+</p><div class="variablelist"><dl><dt><span class="term">radius</span></dt><dd><p>Radius of the circular profile in pixel. The center is at the center of the Sun.</p></dd><dt><span class="term">nbang</span></dt><dd><p>Number of pixel for the profile. 360 pixels makes 1 pixel per degree.</p></dd></dl></div><p>
+</p></div><div class="sect2" lang="en"><div class="titlepage"><div><div><h3 class="title"><a name="buildcloud"></a>2.4.&#160;Electron density cube generation: <span><strong class="command">buildcloud</strong></span></h3></div></div></div><p>
+<span><strong class="command">buildcloud</strong></span> generates a density cube for a given model. The cube is saved in a text file and is formated for the Dragger visualization tool. The following example shows how to build a density cube for the model 14. It creates a 64 x 64 x 64 cube of 60 x 60 x 60 R_Sun, the Sun center being at the center of the cube.
+</p><pre class="programlisting">buildcloud,14,cubesidenbpix=64L,cubesidersun=60.
+</pre><p>
+</p></div></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="install.html">Prev</a>&#160;</td><td width="20%" align="center">&#160;</td><td width="40%" align="right">&#160;<a accesskey="n" href="newmodel.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Chapter&#160;3.&#160;Install&#160;</td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top">&#160;Chapter&#160;5.&#160;Implementing new models</td></tr></table></div></body></html>

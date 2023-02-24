@@ -18,6 +18,7 @@ from sunpy.coordinates.ephemeris import get_horizons_coord
 import sunpy.map
 import pandas as pd
 from sunpy.sun.constants import radius as _RSUN
+import math
 
 ## Función ajuste del centro del sol
 def center_rSun_pixel(headers, plotranges, sat):
@@ -25,18 +26,25 @@ def center_rSun_pixel(headers, plotranges, sat):
         headers[sat]['NAXIS1'] - plotranges[sat][sat]
     y_cS = (headers[sat]['CRPIX2']*plotranges[sat][sat]*2) / \
         headers[sat]['NAXIS2'] - plotranges[sat][sat]
+  
     return x_cS, y_cS
 
-ISSIflag = True # flag if using LASCO data from ISSI which has STEREOlike headers already
+ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like headers already
 exec_path = os.getcwd()
 DATA_PATH = '/gehme/data'
 OPATH = exec_path + '/../output/' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
 # Files to get headers
-secchipath = DATA_PATH + '/stereo/secchi/L0'
+""" secchipath = DATA_PATH + '/stereo/secchi/L0'
 lascopath = DATA_PATH + '/soho/lasco/level_1/c2'
 CorA = secchipath + '/a/img/cor2/20101214/level1/20101214_162400_04c2A.fts'
-CorB = secchipath + '/b/img/cor2/20101214/level1/20101214_162400_04c2B.fts'
-LascoC2 = None # lascopath + '/20101214/25354684.fts'
+CorB = secchipath + '/b/img/cor2/20101214/level1/20101214_162400_04c2B.fts' """
+
+secchipath = DATA_PATH + '/stereo/secchi/L0'
+lascopath = DATA_PATH + '/soho/lasco/level_1/c2'
+CorA = secchipath + '/a/img/cor2/20110317/level1/20110317_133900_04c2A.fts'
+CorB = secchipath + '/b/img/cor2/20110317/level1/20110317_133900_04c2B.fts'
+LascoC2 = None
+#LascoC2 = lascopath + '/20110317/25365451.fts'
 # synthetic coronograph image additions
 cor2 = 2 # Tamaño de los occulters referenciados al RSUN
 c3 = 3.7 # Tamaño de los occulters referenciados al RSUN
@@ -73,17 +81,38 @@ if LascoC2 is not None:
     print(hdrL2['INSTRUME'])
 else:
     headers = [hdra2, hdrb2]
+    
+     
+    #######################
 
 # # DATOS DE ENTRADA
 # arrays aleatorias de parámetros 1D:
-n = 3  # cant de valores de cada parámetro
+""" n = 3  # cant de valores de cada parámetro
 CMElons = np.random.randint(60, 63, n)
 CMElats = np.random.randint(20, 23, n)
 CMEtilts = np.random.randint(70, 73, n)
 heights = np.random.randint(6, 9, n)
 ks = np.random.random_sample(size=n)
-angs = np.random.randint(30, 33, n)
+angs = np.random.randint(30, 33, n) """
+################################################
+""" n = 1  # cant de valores de cada parámetro
+CMElons = math.degrees(1.99032)  #used in rtsccguicloud_calcneang
+CMElats = math.degrees(0.936634) #used in rtsccguicloud_calcneang
+CMEtilts = math.degrees(1.52201) #used in rtsccguicloud_calcneang
+heights = 4.3667865e+00 #modparam[2] [Rsun]
+ks = 1.3911580e-01 #modparam[3]
+angs = math.degrees(5.2359879e-01) #modparam[1] """
+################################################
+#parameters event 20110317:
+CMElons = 190.
+CMElats = -24.
+CMEtilts = 30.
+heights = 7.1
+ks = 0.45
+angs = 45.
 
+
+###################################################
 # cada array de parámetro pasa a ser una columna del set de parámetros:
 set_parameters = np.column_stack(
     (CMElons, CMElats, CMEtilts, heights, ks, angs))
@@ -96,50 +125,64 @@ set = pd.DataFrame(set_parameters, columns=header_name)
 set.to_csv(configfile_name)
 
 # ## Función forwardGCS, simula CMEs en 3D de distintos parámetros morfológicos pero desde la misma posición de los satélites, esta dada por los headers
-def forwardGCS(configfile_name, headers, size_occ=[2, 3.7, 2]):
+def forwardGCS(configfile_name, headers, size_occ=[2, 3.7, 2], mesh=False):
     # Get the location of sats and the range of each image:
     satpos, plotranges = pyGCS.processHeaders(headers)
+    
     df = pd.DataFrame(pd.read_csv(configfile_name))
     for row in range(len(df)):
         clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt']
                         [row], df['height'][row], df['k'][row], df['ang'][row], satpos)
         for sat in range(len(satpos)):
+            
             #Btot figure raytrace:     
             # szx, szy = 512,512 # len(clouds[sat, :, 1]), len(clouds[sat, :, 2])
             # imsize=np.array([szx, szy], dtype='int32')
             # df['ang'][row], df['height'][row], df['k'][row] = 5.2359879e-01, 6.8295116e+00, 1.2376090e-01
+            
             btot = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],
                                  df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row]) #, imsize=imsize)
             m = np.nanmean(btot)
             sd = np.nanstd(btot)
-            fig = plt.figure(figsize=(4,4), facecolor='black')            
+            fig = plt.figure(figsize=(4,4), facecolor='black')
+            ##ax = fig.add_subplot()    
+            # calculo el centro y el radio del sol en coordenada de plotrange
+            x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)      
+            # circulos occulter y limbo:
+            ##occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
+            ##limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
+            ##ax.add_artist(occulter)
+            ##ax.add_artist(limbo)
             plt.imshow(btot, vmax=m+3*sd, vmin=m-3*sd, origin='lower')
             fig.savefig(OPATH + '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
             plt.close(fig)
             
-            # mesh figure (working OK)
-            fig = plt.figure(figsize=(4,4), facecolor='black') 
-            ax = fig.add_subplot()
-            x = clouds[sat, :, 1]
-            y = clouds[0, :, 2]
-            # calculo el centro y el radio del sol en coordenada de plotrange
-            x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)
-            # plots GCS mesh
-            plt.scatter(clouds[sat, :, 1], clouds[0, :, 2],
+            if mesh:
+                
+                # mesh figure
+                fig = plt.figure(figsize=(4,4), facecolor='black') 
+                ax = fig.add_subplot()
+                x = clouds[sat, :, 1]
+                y = clouds[0, :, 2]
+                # calculo el centro y el radio del sol en coordenada de plotrange
+                x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)
+                # plots GCS mesh
+                plt.scatter(clouds[sat, :, 1], clouds[0, :, 2],
                         s=5, c='purple', linewidths=0)
-            # circulos occulter y limbo:
-            occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
-            limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
-            ax.add_artist(occulter)
-            ax.add_artist(limbo)
-            # tamaño de la imagen referenciado al tamaño de la imagen del sol:
-            plt.xlim(plotranges[sat][0], plotranges[sat][1])
-            plt.ylim(plotranges[sat][2], plotranges[sat][3])
-            plt.axis('off')
-            fig.savefig(OPATH + '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_mesh.png'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
-            plt.close(fig)
+                # circulos occulter y limbo:
+                occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
+                limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
+                ax.add_artist(occulter)
+                ax.add_artist(limbo)
+                # tamaño de la imagen referenciado al tamaño de la imagen del sol:
+                plt.xlim(plotranges[sat][0], plotranges[sat][1])
+                plt.ylim(plotranges[sat][2], plotranges[sat][3])
+                plt.axis('off')
+                fig.savefig(OPATH + '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_mesh.png'.format(
+                    df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
+                plt.close(fig)
 
 if __name__ == "__main__":
-    forwardGCS(configfile_name, headers)
+    forwardGCS(configfile_name, headers, mesh=True)
+

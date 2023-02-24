@@ -196,3 +196,4 @@ dependencies:
     - scipy==1.10.0
     - sqlalchemy==1.4.46
     - sunpy==4.1.2
+prefix: /home/machuca/anaconda3/envs/gcs_ml
