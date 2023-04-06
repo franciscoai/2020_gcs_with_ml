@@ -6,19 +6,18 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from pyGCS_raytrace import pyGCS
+#from pyGCS_raytrace.GCSgui import runGCSgui
 from pyGCS_raytrace.rtraytracewcs import rtraytracewcs
 import numpy as np
 import datetime
-import struct
 import matplotlib.pyplot as plt
-from scipy.stats import kde
 from astropy.io import fits
 import sunpy
 from sunpy.coordinates.ephemeris import get_horizons_coord
 import sunpy.map
 import pandas as pd
 from sunpy.sun.constants import radius as _RSUN
-import math
+from ext_libs.rebin import rebin
 
 ## Función ajuste del centro del sol
 def center_rSun_pixel(headers, plotranges, sat):
@@ -39,10 +38,20 @@ lascopath = DATA_PATH + '/soho/lasco/level_1/c2'
 CorA = secchipath + '/a/img/cor2/20101214/level1/20101214_162400_04c2A.fts'
 CorB = secchipath + '/b/img/cor2/20101214/level1/20101214_162400_04c2B.fts' """
 
-secchipath = DATA_PATH + '/stereo/secchi/L0'
+secchipath = DATA_PATH + '/stereo/secchi/L1'
 lascopath = DATA_PATH + '/soho/lasco/level_1/c2'
-CorA = secchipath + '/a/img/cor2/20110317/level1/20110317_133900_04c2A.fts'
-CorB = secchipath + '/b/img/cor2/20110317/level1/20110317_133900_04c2B.fts'
+#event 1
+# pre evento 1154
+preCorA = secchipath + '/a/img/cor2/20110317/20110317_115400_14c2A.fts' #'/a/img/cor2/20110317/20110317_132400_14c2A.fts'
+CorA    = secchipath + '/a/img/cor2/20110317/20110317_133900_14c2A.fts'
+# pre evento 1239
+preCorB = secchipath + '/b/img/cor2/20110317/20110317_123900_14c2B.fts' #'/b/img/cor2/20110317/20110317_132400_14c2B.fts'
+CorB    = secchipath + '/b/img/cor2/20110317/20110317_133900_14c2B.fts'
+
+# #event 2
+# CorA = secchipath + '/a/img/cor2/20110317/level1/20110317_133900_04c2A.fts'
+# CorB = secchipath + '/b/img/cor2/20110317/level1/20110317_133900_04c2B.fts'
+
 LascoC2 = None
 #LascoC2 = lascopath + '/20110317/25365451.fts'
 # synthetic coronograph image additions
@@ -54,10 +63,13 @@ c3 = 3.7 # Tamaño de los occulters referenciados al RSUN
 os.makedirs(OPATH, exist_ok=True)
 # STEREO A
 ima2, hdra2 = sunpy.io._fits.read(CorA)[0]
-smap_SA2 = sunpy.map.Map(ima2, hdra2)
+preima2, prehdra2 = sunpy.io._fits.read(preCorA)[0]
+#smap_SA2 = sunpy.map.Map(ima2, hdra2)
 # STEREO B
 imb2, hdrb2 = sunpy.io._fits.read(CorB)[0]
-smap_SB2 = sunpy.map.Map(imb2, hdrb2)
+preimb2, prehdrb2 = sunpy.io._fits.read(preCorB)[0]
+
+#smap_SB2 = sunpy.map.Map(imb2, hdrb2)
 # LASCO
 if LascoC2 is not None:
     if ISSIflag:
@@ -78,10 +90,13 @@ if LascoC2 is not None:
             myfitsL2[0].header['HGLN_OBS'] = coordL2ston.lon.deg
             hdrL2 = myfitsL2[0].header
     headers = [hdra2, hdrL2, hdrb2]
-    print(hdrL2['INSTRUME'])
+    
 else:
     headers = [hdra2, hdrb2]
-    
+    ims = [ima2, imb2]
+    preims=[preima2, preimb2]
+
+    #print(hdra2)
      
     #######################
 
@@ -104,13 +119,15 @@ ks = 1.3911580e-01 #modparam[3]
 angs = math.degrees(5.2359879e-01) #modparam[1] """
 ################################################
 #parameters event 20110317:
-CMElons = 190.
-CMElats = -24.
-CMEtilts = 30.
-heights = 7.1
-ks = 0.45
-angs = 45.
+CMElons = 166.583  #  Longitude as in IDL GUI but
+CMElats = -21.2418 #  Latitude as in IDL GUI
+CMEtilts = -65.9628 # Rotation as in IDL GUI
+heights =  6.78565 # Heigth as in IDL GUI
+ks = 0.231364 # Ratio as in IDL GUI
+angs = 20.6829 # Half angle as in IDL GUI
 
+# Raytracing options
+imsize=np.array([512, 512], dtype='int32') # output image size
 
 ###################################################
 # cada array de parámetro pasa a ser una columna del set de parámetros:
@@ -131,53 +148,68 @@ def forwardGCS(configfile_name, headers, size_occ=[2, 3.7, 2], mesh=False):
     
     df = pd.DataFrame(pd.read_csv(configfile_name))
     for row in range(len(df)):
+
         clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt']
                         [row], df['height'][row], df['k'][row], df['ang'][row], satpos)
         for sat in range(len(satpos)):
             
-            #Btot figure raytrace:     
-            # szx, szy = 512,512 # len(clouds[sat, :, 1]), len(clouds[sat, :, 2])
-            # imsize=np.array([szx, szy], dtype='int32')
-            # df['ang'][row], df['height'][row], df['k'][row] = 5.2359879e-01, 6.8295116e+00, 1.2376090e-01
-            
+            #background
+            back = rebin(ims[sat],imsize,operation='mean') - rebin(preims[sat],imsize,operation='mean') 
+            m = np.nanmean(back)
+            sd = np.nanstd(back)
+            fig = plt.figure(figsize=(4,4), facecolor='black')
+            ax = fig.add_subplot()    
+            x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)      
+            ax.imshow(back, origin='lower', cmap='gray', vmax=m+3*sd, vmin=m-3*sd,
+                       extent=(plotranges[sat][0], plotranges[sat][1],plotranges[sat][2], plotranges[sat][3]))
+            occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
+            limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
+            ax.add_artist(occulter)
+            ax.add_artist(limbo)
+      
+            fig.savefig(OPATH + '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_back.png'.format(
+                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
+
+
+            #Total intensity (Btot) figure raytrace:               
             btot = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],
-                                 df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row]) #, imsize=imsize)
+                                 df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize)
+            btot =  btot #/np.max(btot)*np.max(back)
             m = np.nanmean(btot)
             sd = np.nanstd(btot)
             fig = plt.figure(figsize=(4,4), facecolor='black')
-            ##ax = fig.add_subplot()    
+            ax = fig.add_subplot()    
             # calculo el centro y el radio del sol en coordenada de plotrange
             x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)      
-            # circulos occulter y limbo:
-            ##occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
-            ##limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
-            ##ax.add_artist(occulter)
-            ##ax.add_artist(limbo)
-            plt.imshow(btot, vmax=m+3*sd, vmin=m-3*sd, origin='lower')
+            ax.imshow(btot, origin='lower', cmap='gray', vmax=m+3*sd, vmin=m-3*sd,
+                       extent=(plotranges[sat][0], plotranges[sat][1],plotranges[sat][2], plotranges[sat][3]))
+           # circulos occulter y limbo:
+            occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
+            limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
+            ax.add_artist(occulter)
+            ax.add_artist(limbo)
             fig.savefig(OPATH + '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
-            plt.close(fig)
-            
+
             if mesh:
-                
                 # mesh figure
-                fig = plt.figure(figsize=(4,4), facecolor='black') 
-                ax = fig.add_subplot()
+                #fig = plt.figure(figsize=(4,4), facecolor='black') 
+                #ax = fig.add_subplot()
                 x = clouds[sat, :, 1]
                 y = clouds[0, :, 2]
                 # calculo el centro y el radio del sol en coordenada de plotrange
-                x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)
+                #x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)
                 # plots GCS mesh
-                plt.scatter(clouds[sat, :, 1], clouds[0, :, 2],
-                        s=5, c='purple', linewidths=0)
+                plt.scatter(x, y, s=0.5, c='green', linewidths=0)
                 # circulos occulter y limbo:
-                occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
-                limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
-                ax.add_artist(occulter)
-                ax.add_artist(limbo)
+                #occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
+                #limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
+                #ax.add_artist(occulter)
+                #ax.add_artist(limbo)
                 # tamaño de la imagen referenciado al tamaño de la imagen del sol:
-                plt.xlim(plotranges[sat][0], plotranges[sat][1])
-                plt.ylim(plotranges[sat][2], plotranges[sat][3])
+                #plt.xlim(plotranges[sat][0], plotranges[sat][1])
+                #plt.ylim(plotranges[sat][2], plotranges[sat][3])
+                
                 plt.axis('off')
                 fig.savefig(OPATH + '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_mesh.png'.format(
                     df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())

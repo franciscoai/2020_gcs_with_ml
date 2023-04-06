@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import pickle
 
-def rtraytracewcs_wrapper(input_data, test=False):
+def rtraytracewcs_wrapper(input_data, test=False,compare=False):
     """
     Wrapper of the C++ library  "ssw/stereo/secchi/lib/linux/x86_64/libraytrace.so" to compute ray traceing 
     from a electronic cloud
@@ -83,7 +83,7 @@ def rtraytracewcs_wrapper(input_data, test=False):
     
     exec_path = os.getcwd()
     #test_save_file = exec_path+'/rtraytracewcs_wrapper_test_input.sav' # used to
-    test_save_file = '/gehme/projects/2020_gcs_with_ml/data/gcs_idl/input_ok.sav'
+    test_save_file = '/gehme/projects/2020_gcs_with_ml/data/gcs_idl/input_flor_a.sav'
     os.environ['RT_PATH'] = '/usr/local/ssw/stereo/secchi'
     os.environ['RT_SOFILENAME'] = 'libraytrace.so'
     os.environ['RT_SOTHREADFILENAME'] = 'libraytracethread.so'
@@ -110,14 +110,20 @@ def rtraytracewcs_wrapper(input_data, test=False):
     else:
         file = '/gehme/projects/2020_gcs_with_ml/data/test_false.pickle'
         
-    with open(file, 'wb') as handle:
-        pickle.dump(input_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    # with open(file, 'wb') as handle:
+    #     pickle.dump(input_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
-    with open(file, 'rb') as handle:
-        data = pickle.load(handle)
-    
+    # with open(file, 'rb') as handle:
+    #     data = pickle.load(handle)
 
-
+    if compare:
+        input_data_sav = readsav(test_save_file, python_dict=True)
+        for i in input_data:
+            if np.any(input_data[i] != input_data_sav[i]):
+                print(i," es distinto")
+                print("input data: ",input_data[i],type(input_data[i]))
+                print("input data sav: ",input_data_sav[i], type(input_data_sav[i]))
+        breakpoint()
 
     # clase tipo estructura con los tipo de punteros
     # queda más bonito y es más rápido cuando se llama a la función
