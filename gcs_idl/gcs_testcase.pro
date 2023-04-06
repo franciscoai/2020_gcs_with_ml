@@ -7,7 +7,7 @@ RNG=3.*[-5.,7.,-0.5,0.5]
 ;To load images from CORs A&B plus LASCO and call rtsccguicloud with forward model from Thernisien et al. (2009)
 ;Path to the save file where the GUI parameters will be saved/loaded
 DATA_PATH = '/gehme/data'
-SAVE_FILE='/gehme/projects/2020_gcs_with_ml/repo_yas/gcs_idl/gcs_testcase.sav'
+SAVE_FILE='/gehme/projects/2020_gcs_with_ml/data/gcs_idl/gcs_testcase.sav'
 secchipath=DATA_PATH+'/stereo/secchi/L0'
 lascopath=DATA_PATH+'/soho/lasco/level_1/c2'
 ;opens images of interest and backgrounds

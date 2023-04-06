@@ -136,21 +136,19 @@ def rtsccguicloud_calcneang(CMElon, CMElat, CMEtilt, carrlonshiftdeg= -0.0000000
     return np.array([CMElon + carrlonshiftdeg, CMElat, CMEtilt], dtype='float32')
 
 def rotatemat(crval, x): #rotmat.pro
-    match x:
-        case 1:#X
-            r = np.array([[1.,0.,0.], 
-                          [0.,math.cos(crval),-math.sin(crval)], 
-                          [0.,math.sin(crval),math.cos(crval)]]).transpose()
-        case 2:#Y
-            r = np.array([[math.cos(crval),0.,math.sin(crval)], 
-                          [0.,1.,0.], 
-                          [-math.sin(crval),0.,math.cos(crval)]]).transpose()
-        case 3:#Z
-            r = np.array([[math.cos(crval),-math.sin(crval),0.], 
-                          [math.sin(crval),math.cos(crval),0.], 
+    if x==1:#X
+        r = np.array([[1.,0.,0.], 
+                        [0.,math.cos(crval),-math.sin(crval)], 
+                        [0.,math.sin(crval),math.cos(crval)]]).transpose()
+    if x==2:#Y
+        r = np.array([[math.cos(crval),0.,math.sin(crval)], 
+                        [0.,1.,0.], 
+                        [-math.sin(crval),0.,math.cos(crval)]]).transpose()
+    if x==3:#Z
+        r = np.array([[math.cos(crval),-math.sin(crval),0.], 
+                        [math.sin(crval),math.cos(crval),0.], 
                           [0.,0.,1]]).transpose()
     return r
-
 
 def rtrotmat2rxryrz(r):
     ry = math.asin(r[2,0])

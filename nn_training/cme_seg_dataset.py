@@ -31,26 +31,23 @@ def center_rSun_pixel(headers, plotranges, sat):
 ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like headers already
 exec_path = os.getcwd()
 DATA_PATH = '/gehme/data'
-OPATH = exec_path + '/../output/' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
-# Files to get headers
-""" secchipath = DATA_PATH + '/stereo/secchi/L0'
-lascopath = DATA_PATH + '/soho/lasco/level_1/c2'
-CorA = secchipath + '/a/img/cor2/20101214/level1/20101214_162400_04c2A.fts'
-CorB = secchipath + '/b/img/cor2/20101214/level1/20101214_162400_04c2B.fts' """
+OPATH = exec_path + '/../../output/cme_seg_dataset' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
 
+# Files to get headers
 secchipath = DATA_PATH + '/stereo/secchi/L1'
 lascopath = DATA_PATH + '/soho/lasco/level_1/c2'
 #event 1
-# pre evento 1154
 preCorA = secchipath + '/a/img/cor2/20110317/20110317_115400_14c2A.fts' #'/a/img/cor2/20110317/20110317_132400_14c2A.fts'
 CorA    = secchipath + '/a/img/cor2/20110317/20110317_133900_14c2A.fts'
-# pre evento 1239
 preCorB = secchipath + '/b/img/cor2/20110317/20110317_123900_14c2B.fts' #'/b/img/cor2/20110317/20110317_132400_14c2B.fts'
 CorB    = secchipath + '/b/img/cor2/20110317/20110317_133900_14c2B.fts'
 
-# #event 2
-# CorA = secchipath + '/a/img/cor2/20110317/level1/20110317_133900_04c2A.fts'
-# CorB = secchipath + '/b/img/cor2/20110317/level1/20110317_133900_04c2B.fts'
+# #event 2 DECIRLE A FER QUE LOS PASE A L1!!
+# CorA    =secchipath + '/a/img/cor2/20110303/20110303_080800_14c2A.fts'
+# preCorA =secchipath + '/a/img/cor2/20110303/20110303_020800_14c2A.fts' 
+# CorB    =secchipath + '/b/img/cor2/20110303/20110303_080915_14c2B.fts'
+# preCorB =secchipath + '/b/img/cor2/20110303/20110303_040915_14c2B.fts'
+
 
 LascoC2 = None
 #LascoC2 = lascopath + '/20110317/25365451.fts'
@@ -148,42 +145,36 @@ def forwardGCS(configfile_name, headers, size_occ=[2, 3.7, 2], mesh=False):
     
     df = pd.DataFrame(pd.read_csv(configfile_name))
     for row in range(len(df)):
-
-        clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt']
-                        [row], df['height'][row], df['k'][row], df['ang'][row], satpos)
-        for sat in range(len(satpos)):
+        if mesh:
+            clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)
+        for sat in range(len(satpos)): 
             
-            #background
-            back = rebin(ims[sat],imsize,operation='mean') - rebin(preims[sat],imsize,operation='mean') 
+            #background event
+            preev = rebin(preims[sat],imsize,operation='mean') 
+            back = rebin(ims[sat],imsize,operation='mean') - preev
             m = np.nanmean(back)
             sd = np.nanstd(back)
             fig = plt.figure(figsize=(4,4), facecolor='black')
             ax = fig.add_subplot()    
             x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)      
-            ax.imshow(back, origin='lower', cmap='gray', vmax=m+3*sd, vmin=m-3*sd,
-                       extent=(plotranges[sat][0], plotranges[sat][1],plotranges[sat][2], plotranges[sat][3]))
+            ax.imshow(back, origin='lower', cmap='gray', vmax=m+3*sd, vmin=m-3*sd, extent=plotranges[sat])
             occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
             limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
             ax.add_artist(occulter)
             ax.add_artist(limbo)
-      
             fig.savefig(OPATH + '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_back.png'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
 
 
-            #Total intensity (Btot) figure raytrace:               
-            btot = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],
-                                 df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize)
-            btot =  btot #/np.max(btot)*np.max(back)
+            #Total intensity (Btot) figure from raytrace:               
+            btot = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize)
+            btot =  btot/np.mean(btot)*1e-11 + back
             m = np.nanmean(btot)
             sd = np.nanstd(btot)
             fig = plt.figure(figsize=(4,4), facecolor='black')
             ax = fig.add_subplot()    
-            # calculo el centro y el radio del sol en coordenada de plotrange
             x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)      
-            ax.imshow(btot, origin='lower', cmap='gray', vmax=m+3*sd, vmin=m-3*sd,
-                       extent=(plotranges[sat][0], plotranges[sat][1],plotranges[sat][2], plotranges[sat][3]))
-           # circulos occulter y limbo:
+            ax.imshow(btot, origin='lower', cmap='gray', vmax=m+3*sd, vmin=m-3*sd, extent=plotranges[sat])
             occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
             limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
             ax.add_artist(occulter)
@@ -192,24 +183,10 @@ def forwardGCS(configfile_name, headers, size_occ=[2, 3.7, 2], mesh=False):
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
 
             if mesh:
-                # mesh figure
-                #fig = plt.figure(figsize=(4,4), facecolor='black') 
-                #ax = fig.add_subplot()
+                # overlaps mesh figure
                 x = clouds[sat, :, 1]
                 y = clouds[0, :, 2]
-                # calculo el centro y el radio del sol en coordenada de plotrange
-                #x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)
-                # plots GCS mesh
                 plt.scatter(x, y, s=0.5, c='green', linewidths=0)
-                # circulos occulter y limbo:
-                #occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
-                #limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
-                #ax.add_artist(occulter)
-                #ax.add_artist(limbo)
-                # tamaño de la imagen referenciado al tamaño de la imagen del sol:
-                #plt.xlim(plotranges[sat][0], plotranges[sat][1])
-                #plt.ylim(plotranges[sat][2], plotranges[sat][3])
-                
                 plt.axis('off')
                 fig.savefig(OPATH + '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_mesh.png'.format(
                     df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())

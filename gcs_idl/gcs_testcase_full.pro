@@ -3,13 +3,27 @@ PRO gcs_testcase_full
 secchipath='/gehme/data/stereo/secchi/L0/'  
 lascopath='/gehme/data/soho/lasco/level_05/c2/' 
 
+;event 1
+;SECCHI A
+ima=sccreadfits(secchipath+'/a/img/cor2/20110317/level1/20110317_133900_04c2A.fts', hdreventa)
+imaprev=sccreadfits(secchipath+'/a/img/cor2/20110317/level1/20110317_132400_04c2A.fts',hdreventpa)
+;SECCHI B
+imb=sccreadfits(secchipath+'/b/img/cor2/20110317/level1/20110317_133900_04c2B.fts', hdreventb)
+imbprev=sccreadfits(secchipath+'/b/img/cor2/20110317/level1/20110317_132400_04c2B.fts', hdreventpb)
+
+;event 2
+;SECCHI A
+;ima=sccreadfits(secchipath+'a/img/cor2/20110303/20110303_080800_d4c2a.fts', hdreventa)
+;imaprev=sccreadfits(secchipath+'a/img/cor2/20110303/20110303_020800_d4c2a.fts',hdreventpa)  
+;SECCHI B
+;imb=sccreadfits(secchipath+'b/img/cor2/20110303/20110303_080915_n4c2b.fts', hdreventb)
+;imbprev=sccreadfits(secchipath+'b/img/cor2/20110303/20110303_040915_n4c2b.fts', hdreventpb)
+
+
 ;******************** COR2 ******************** 
 ;******************* COR2A ********************
 
 ;opens images of interest and backgrounds
-;SECCHI A
-ima=sccreadfits(secchipath+'a/img/cor2/20110303/20110303_080800_d4c2a.fts', hdreventa)
-imaprev=sccreadfits(secchipath+'a/img/cor2/20110303/20110303_020800_d4c2a.fts',hdreventpa)  
 
 ;prepares nice images
 ;ima=sigma_filter(ima,3,n_sigma=1.5, /iterate)
@@ -49,10 +63,6 @@ TVLCT, R, G, B, /GET
 ima = TVRD()
 wdelete, 17
 ;******************* COR2B ********************
-;SECCHI B
-imb=sccreadfits(secchipath+'b/img/cor2/20110303/20110303_080915_n4c2b.fts', hdreventb)
-imbprev=sccreadfits(secchipath+'b/img/cor2/20110303/20110303_040915_n4c2b.fts', hdreventpb)
-
 ;prepares nice images
 ;b=hist_equal((rebin((ma*(ima)-ma*(imaprev)),512,512)), per=1.)   ;better for COR1:per=5. ;COR2:per=1.
 ;b=sigrange(rebin(mb*sigrange(imb)-mb*sigrange(imbprev),512,512)) ;better for COR2 ;ESTE USÉ PARA LAS IMÁGENES DEL PPT
@@ -171,8 +181,18 @@ wdelete,18
 
 
 ;******************** calls application ********************
+;calls application
+SAVE_FILE='/gehme/projects/2020_gcs_with_ml/data/gcs_idl/gcs_testcase_full.sav'
+Result = FILE_TEST(SAVE_FILE)
+IF Result EQ 1 THEN begin
+print,"*************************************leyendo archivo "
+restore, SAVE_FILE
+endif
 
-rtsccguicloud, ima, imb, hdreventa, hdreventb, imlasco=lasco, hdrlasco=lascohdr, sgui=sguiout ;ocout=oc, imeuvia=imea, hdreuvia=heuvia, imeuvib=imeb, hdreuvib=heuvib
+rtsccguicloud, ima, imb, hdreventa, hdreventb, sgui=sguiout, sparaminit=sguiout ;imlasco=lasco, hdrlasco=lascohdr ;ocout=oc, imeuvia=imea, hdreuvia=heuvia, imeuvib=imeb, hdreuvib=heuvib
+
+Result = FILE_TEST(SAVE_FILE)
+IF Result EQ 0 THEN save, filename=SAVE_FILE, sguiout
 
 savepath='/gehme/projects/2020_gcs_with_ml/data/gcs_testcase_output'		;GERA dónde guardará imágenes de ajuste, editar para cada fecha-evento
 
@@ -185,7 +205,7 @@ savepath='/gehme/projects/2020_gcs_with_ml/data/gcs_testcase_output'		;GERA dón
 ;    sgui.rat : aspect ratio
 
 ; pasamos los datos a grados y le restamos la longitud Carrington para pasarlos a coordenadas Stonyhurst
-carr=tim2carr(hdreventa.date_obs)				; esto nos devuelve la longitud L_0 Carrington para el día
+carr=tim2carr(hdreventa.date_obs)	; esto nos devuelve la longitud L_0 Carrington para el día
 lon=sguiout.lon*180./!dpi
 lon=sguiout.lon*180./!dpi-carr
 if (lon lt 0.) then lon=360.+lon
