@@ -1,4 +1,4 @@
-1- tcsh
+1-tcsh
 2-sswidl(configura solar soft)
 3-ejecutar, simplemente haciendo: IDL> gcs_testcase
 
