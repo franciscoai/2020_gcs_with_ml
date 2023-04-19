@@ -39,7 +39,7 @@ def rnd_samples(rng, n):
 #files
 exec_path = os.getcwd()
 DATA_PATH = '/gehme/data'
-OPATH = exec_path + '/../../output/cme_seg_dataset' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
+OPATH = '/gehme-gpu/projects/2020_gcs_wiht_ml/data/cme_seg_dataset' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
 
 secchipath = DATA_PATH + '/stereo/secchi/L1'
 preCorA = secchipath + '/a/img/cor2/20110317/20110317_115400_14c2A.fts' #'/a/img/cor2/20110317/20110317_132400_14c2A.fts'
