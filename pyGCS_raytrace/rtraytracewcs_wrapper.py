@@ -260,13 +260,9 @@ def rtraytracewcs_wrapper(input_data, test=False,compare=False):
         nerotaxis
     )
     
-
-    print("***Running libraytrace.so")
     c_lib.rtraytracewcs.restype = c_bool
     c_lib.rtraytracewcs.argtypes = [c_int, POINTER(InputStructure)]
     c_lib.rtraytracewcs(41, input_obj)
-    print("***libraytrace.so completed")
-
     
 
     # reads btot from mem and optionally pots it

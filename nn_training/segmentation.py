@@ -22,16 +22,4 @@ def segmentation(sample_image):
     mask = mask_outer - mask_inner
     mask = cv2.resize(mask,(np.shape(sample_image)[0],np.shape(sample_image)[0]))
     mask= np.array(mask)
-#     m = np.nanmean(mask)
-#     sd = np.nanstd(mask)
-#     fig2 = plt.figure(figsize=(4,4), facecolor='black')
-#     ax2 = fig2.add_subplot()      
-#     ax2.imshow(mask, origin='lower', cmap='gray', vmax=m+3*sd, vmin=m-3*sd)
-#     fig2.savefig(opath+"/mask.jpg")
-
-#     fig3 = plt.figure(figsize=(4,4), facecolor='black')
-#     ax3 = fig3.add_subplot()      
-#     ax3.imshow(edges, origin='lower', cmap='gray')#, vmax=m+3*sd, vmin=m-3*sd)
-#     fig3.savefig(opath+"/edges.jpg")}
-
     return(mask)
