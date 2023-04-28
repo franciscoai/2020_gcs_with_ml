@@ -30,6 +30,7 @@ def center_rSun_pixel(headers, plotranges, sat):
   
     return x_cS, y_cS
 
+
 def rnd_samples(rng, n):
 # gernerate n random (uniform dist) float samples from range rnd[0] to rnd[1]    
     return (rng[1] - rng[0]) * np.random.random(n) + rng[0]
@@ -59,6 +60,7 @@ par_rng = [[165,167],[-22,-20],[-66,-64],[5,7],[0.21,0.23], [19,21]] # min-max r
 
 # Sintethyc image options
 size_occ = [2, 3.7, 2] # Occulters size for [sat1, sat2,sat3] in [Rsun] 3.7
+level_occ=1e-11
 imsize=np.array([512, 512], dtype='int32') # output image size
 
 ## main
@@ -109,7 +111,9 @@ set.to_csv(configfile_name)
 # generate views
 def forwardGCS(configfile_name, headers, size_occ=size_occ, mesh=False):
     # Get the location of sats and the range of each image:
+    
     satpos, plotranges = pyGCS.processHeaders(headers)
+    print("plotranges:",plotranges)
     df = pd.DataFrame(pd.read_csv(configfile_name))
     for row in range(len(df)):
         if mesh:
@@ -122,7 +126,14 @@ def forwardGCS(configfile_name, headers, size_occ=size_occ, mesh=False):
                 os.system("rm -r " + folder) 
             os.makedirs(folder)
             mask_folder = os.path.join(folder, "mask")
-            os.makedirs(mask_folder)         
+            os.makedirs(mask_folder)     
+
+            #defining ranges an radio of the occulter
+            x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=2000)
+            y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=2000)
+            xx, yy = np.meshgrid(x, y)
+            x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)  
+            r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
 
             #background event
             #preev = rebin(preims[sat],imsize,operation='mean') 
@@ -137,34 +148,33 @@ def forwardGCS(configfile_name, headers, size_occ=size_occ, mesh=False):
             sd = np.nanstd(btot)
             fig = plt.figure(figsize=(4,4), facecolor='black')
             ax = fig.add_subplot()    
-            x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)      
+            #btot[r <= size_occ[sat]] = level_occ
             ax.imshow(btot, origin='lower', cmap='gray', vmax=m+3*sd, vmin=m-3*sd, extent=plotranges[sat])
-            occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
-            #limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
-            ax.add_artist(occulter)
-            #ax.add_artist(limbo)
-
             fig.savefig(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
-            
+                        
 
-            occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='white')
-            fig2 = plt.figure(figsize=(10,10), facecolor='black')
-            ax2 = fig2.add_subplot()
-            ax2.imshow(np.zeros(imsize), origin='lower', cmap='gray', vmax=1, vmin=0, extent=plotranges[sat])             
-            #limbo = plt.Circle((x_cS, y_cS), 1, ec='black', fc='white')
-            ax2.add_artist(occulter)
-            #ax2.add_artist(limbo)
-            fig2.savefig(mask_folder +'/1.png'.format(
+            # Create an array of zeros with the same shape as the grid
+            arr = np.zeros(xx.shape)
+            # Set the values within the circle to 1
+            arr[r <= size_occ[sat]] = 1
+            # Display the array as an image using matplotlib
+            fig_occ = plt.figure(figsize=(4,4), facecolor='black')
+            ax_occ = fig_occ.add_subplot()  
+            ax_occ.imshow(arr, cmap='gray',extent=plotranges[sat],origin='lower', vmax=m+3*sd, vmin=m-3*sd)
+            fig_occ.savefig(mask_folder +'/1_occ.png'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
 
-            occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='black')
+
+
+
+            #occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='black')
             mask = segmentation(btot_orig)
             print("mask shape: ", np.shape(mask))
             fig3 = plt.figure(figsize=(10,10), facecolor='black')
             ax3 = fig3.add_subplot()        
             ax3.imshow(mask, origin='lower', cmap='gray', vmax=1, vmin=0, extent=plotranges[sat])
-            ax3.add_artist(occulter)
+            #ax3.add_artist(occulter)
             fig3.savefig(mask_folder +'/2.png'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
 
