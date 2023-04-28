@@ -53,15 +53,18 @@ LascoC2 = None # lascopath + '/20110317/25365451.fts'
 ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like headers already
 
 # GCS parameters
-par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang'] # par names
-par_units = ['deg', 'deg', 'deg', 'Rsun','','deg'] # param units
-par_num = [3, 3, 3, 3, 3, 3]  # total number of samples that will be generated for each param
-par_rng = [[165,167],[-22,-20],[-66,-64],[5,7],[0.21,0.23], [19,21]] # min-max ranges of each parameter in par_names
+par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
+par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # param units
+par_num = [3, 3, 3, 3, 3, 3,3]  # total number of samples that will be generated for each param
+par_rng = [[165,167],[-22,-20],[-66,-64],[5,7],[0.21,0.23], [19,21],[1,3]] # min-max ranges of each parameter in par_names
 
 # Sintethyc image options
-size_occ = [2, 3.7, 2] # Occulters size for [sat1, sat2,sat3] in [Rsun] 3.7
-level_occ=1e-11
 imsize=np.array([512, 512], dtype='int32') # output image size
+size_occ = [2, 3.7, 2] # Occulters size for [sat1, sat2,sat3] in [Rsun] 3.7
+level_occ=0.8 #mean level of the occulter relative to the background
+level_back=1e-12 #mean level of the background
+#level_cme=3 # cml level relative to background level
+level_noise=0.05 #photon noise level relative to background level
 
 ## main
 #read headers
@@ -109,11 +112,10 @@ set = pd.DataFrame(np.column_stack(all_par), columns=par_names)
 set.to_csv(configfile_name)
 
 # generate views
-def forwardGCS(configfile_name, headers, size_occ=size_occ, mesh=False):
+def forwardGCS(configfile_name, headers, size_occ=size_occ, mesh=False, otype="fits"):
     # Get the location of sats and the range of each image:
     
     satpos, plotranges = pyGCS.processHeaders(headers)
-    print("plotranges:",plotranges)
     df = pd.DataFrame(pd.read_csv(configfile_name))
     for row in range(len(df)):
         if mesh:
@@ -129,58 +131,80 @@ def forwardGCS(configfile_name, headers, size_occ=size_occ, mesh=False):
             os.makedirs(mask_folder)     
 
             #defining ranges an radio of the occulter
-            x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=2000)
-            y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=2000)
+            x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=512)
+            y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=512)
             xx, yy = np.meshgrid(x, y)
             x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)  
             r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
 
             #background event
             #preev = rebin(preims[sat],imsize,operation='mean') 
-            #back = rebin(ims[sat],imsize,operation='mean') - preev
+            back = level_back #rebin(ims[sat],imsize,operation='mean') - preev
 
             #Total intensity (Btot) figure from raytrace:               
             btot_orig = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize)
-            print("btot shape: ", np.shape(btot_orig))
-            # plt.hist(btot_orig.flatten(),range=[0,5e-11],bins=200, log=True)
+
+            #mask for cme
+            mask = segmentation(btot_orig)
+            mask[r <= size_occ[sat]] = 0            
+
+
+            #CME
             btot =  btot_orig#/np.mean(btot_orig)*1e-11 + back
+            btot= (btot/np.max(btot))*df['level_cme'][row]*level_back
+            fig = plt.figure(figsize=(4,4), facecolor='black')
+            ax = fig.add_subplot()
+            #adds background
+            btot+=back
             m = np.nanmean(btot)
             sd = np.nanstd(btot)
-            fig = plt.figure(figsize=(4,4), facecolor='black')
-            ax = fig.add_subplot()    
-            #btot[r <= size_occ[sat]] = level_occ
-            ax.imshow(btot, origin='lower', cmap='gray', vmax=m+3*sd, vmin=m-3*sd, extent=plotranges[sat])
-            fig.savefig(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
-                        
+            #adds occulter
+            btot[r <= size_occ[sat]] = level_occ*level_back
+            #adds noise
+            noise=np.random.poisson(lam=np.ones(imsize))*level_noise*level_back
+            btot+=noise
 
-            # Create an array of zeros with the same shape as the grid
+            #mask for occulter
             arr = np.zeros(xx.shape)
-            # Set the values within the circle to 1
             arr[r <= size_occ[sat]] = 1
-            # Display the array as an image using matplotlib
-            fig_occ = plt.figure(figsize=(4,4), facecolor='black')
-            ax_occ = fig_occ.add_subplot()  
-            ax_occ.imshow(arr, cmap='gray',extent=plotranges[sat],origin='lower', vmax=m+3*sd, vmin=m-3*sd)
-            fig_occ.savefig(mask_folder +'/1_occ.png'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
 
 
+            if otype=="fits":
+                #mask for cme
+                cme_mask = fits.PrimaryHDU(mask)
+                cme_mask.writeto(mask_folder +'/2.fits'.format(
+                    df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), overwrite=True)
+                #cme
+                cme = fits.PrimaryHDU(btot)
+                cme.writeto(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.fits'.format(
+                    df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), overwrite=True)
+                #mask for occulter
+                occ = fits.PrimaryHDU(arr)
+                occ.writeto(mask_folder +'/1.fits'.format(
+                    df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), overwrite=True)
+                
+            elif otype =="png":
+                #mask for cme
+                fig3 = plt.figure(figsize=(4,4), facecolor='black')
+                ax3 = fig3.add_subplot()        
+                ax3.imshow(mask, origin='lower', cmap='gray',vmax=1, vmin=0, extent=plotranges[sat])
+                fig3.savefig(mask_folder +'/2.png'.format(
+                    df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig3.get_facecolor())
+                #cme
+                ax.imshow(btot, origin='lower', cmap='gray', vmin = 0.5*level_back,vmax = level_back*2,extent=plotranges[sat])
+                fig.savefig(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
+                    df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
+                #mask for occulter
+                fig_occ = plt.figure(figsize=(4,4), facecolor='black')
+                ax_occ = fig_occ.add_subplot()  
+                ax_occ.imshow(arr, cmap='gray',extent=plotranges[sat],origin='lower', vmax=1, vmin=0)
+                fig_occ.savefig(mask_folder +'/1_occ.png'.format(
+                    df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
+
+            else:
+                print("format error")    
 
 
-            #occulter = plt.Circle((x_cS, y_cS), size_occ[sat], fc='black')
-            mask = segmentation(btot_orig)
-            print("mask shape: ", np.shape(mask))
-            fig3 = plt.figure(figsize=(10,10), facecolor='black')
-            ax3 = fig3.add_subplot()        
-            ax3.imshow(mask, origin='lower', cmap='gray', vmax=1, vmin=0, extent=plotranges[sat])
-            #ax3.add_artist(occulter)
-            fig3.savefig(mask_folder +'/2.png'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
-
-            #plt.show()
-
-            
 
             if mesh:
                 # overlaps mesh figure

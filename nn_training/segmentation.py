@@ -10,12 +10,10 @@ def segmentation(sample_image):
     edges = cv2.dilate(cv2.Canny(thresh.astype("uint8"),0,255),None,cv2.BORDER_CONSTANT, borderValue=1)
     
     cnt = sorted(cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)[-2], key=cv2.contourArea)
-    [print(np.size(i)) for i in cnt]
+
     cnt= [i for i in cnt if np.size(i)<(img_sz*8-50)]#deleates the image outer border
     cme_outer = cnt[-2]
     cme_inner = cnt[-3]#[i for i in cnt[0:-2] if np.size(i)<(np.size(cme_outer)-100)] 
-    print(np.size(cme_outer))
-    print(np.size(cme_inner))
 
     mask_inner = np.zeros((img_sz,img_sz), np.uint8)
     mask_outer = np.zeros((img_sz,img_sz), np.uint8)
