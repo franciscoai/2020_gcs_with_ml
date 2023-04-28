@@ -65,7 +65,7 @@ size_occ = [2.6, 3.7, 2] # Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
 level_occ=1000 #mean level of the occulter relative to the background level
 level_noise=0 #photon noise level of cme image relative to photon noise. Set to 0 to avoid
 mesh=False # set to also save a png with the GCSmesh
-otype="fits" # set the ouput file type: 'png' or 'fits'
+otype="png" # set the ouput file type: 'png' or 'fits'
 
 ## main
 #read headers
