@@ -176,7 +176,7 @@ def rtsccguicloud_calcfeetheight(height,k,ang):
     return height*(1.-k)*np.cos(ang)/(1.+np.sin(ang))
 
 
-def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=30, nel=100000., modelid=54, imsize=np.array([512, 512], dtype='int32'), losrange=np.array([-10., 10.], dtype='float32'), losnbp=64):
+def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=30, in_sig=0.1, out_sig=0.1, nel=100000., modelid=54, imsize=np.array([512, 512], dtype='int32'), losrange=np.array([-10., 10.], dtype='float32'), losnbp=64):
     
     CMElon = math.radians(CMElon)
     CMElat = math.radians(CMElat)
@@ -186,7 +186,7 @@ def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=3
     neang = rtsccguicloud_calcneang(CMElon, CMElat, CMEtilt)
     leg_height = rtsccguicloud_calcfeetheight(height, k, ang)
 
-    modparam = np.array([1.5, ang, leg_height, k, nel, 0., 0., 0., 0.1, 0.1], dtype='float32')
+    modparam = np.array([1.5, ang, leg_height, k, nel, 0., 0., 0., in_sig, out_sig], dtype='float32')
     pv2_1 = header['PV2_1']
     if header['INSTRUME'] == 'LASCO':
         flagsoho = 'SOHO'

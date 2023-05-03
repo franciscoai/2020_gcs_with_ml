@@ -50,14 +50,15 @@ lascopath = DATA_PATH + '/soho/lasco/level_1/c2' # sat3
 LascoC2 = None # lascopath + '/20110317/25365451.fts'
 ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like headers already
 
-# GCS parameters
+# GCS parameters [first 6]
+# The other parameters are:
+# level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
-par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # param units
-par_num = [1e4, 1e4, 1e4, 1e4, 1e4, 1e4, 1e4]  # total number of samples that will be generated for each param
-par_rng = [[-180,180],[-70,-70],[-180,180],[4,15],[0.1,0.49], [-180,180],[5e2,9e2]] # min-max ranges of each parameter in par_names
-par_num = [3, 3, 3, 3, 3, 3,3]  # total number of samples that will be generated for each param
-#par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[5e2,1e3]]
-
+par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
+par_rng = [[-180,180],[-70,70],[-90,90],[6,13],[0.25,0.6], [10,60],[5e3,6e3]] # min-max ranges of each parameter in par_names
+par_num = 5  # total number of samples that will be generated for each param
+#par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[5e2,1e3]] # example used for script development
+rnd_par=False # set to randomnly shuffle the generated parameters linspace 
 
 # Syntethic image options
 imsize=np.array([512, 512], dtype='int32') # output image size
@@ -68,6 +69,7 @@ mesh=False # set to also save a png with the GCSmesh
 otype="png" # set the ouput file type: 'png' or 'fits'
 
 ## main
+par_num = [par_num] * len(par_rng)
 #read headers
 # STEREO A
 ima2, hdra2 = sunpy.io._fits.read(CorA)[0]
@@ -100,7 +102,10 @@ else:
 # generate param arrays
 all_par = []
 for (rng, num) in zip(par_rng, par_num):
-    all_par.append(np.linspace(rng[0],rng[1], num))
+    cpar = np.linspace(rng[0],rng[1], num)
+    if rnd_par:
+        np.random.shuffle(cpar)
+    all_par.append(cpar)
 
 # Save configuración en .CSV
 os.makedirs(OPATH, exist_ok=True)
@@ -137,12 +142,12 @@ for row in range(len(df)):
 
 
         #Total intensity (Btot) figure from raytrace:               
-        btot = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize)
-        #btot1 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*1.3, df['k'][row]*1.05, df['ang'][row], imsize=imsize)
-        #btot = btot1 - btot
+        btot0 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, in_sig=0.5, out_sig=0.2,)
+        btot1 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*0.6, 0.1, df['ang'][row], imsize=imsize, in_sig=0.8, out_sig=0.3, nel=100000.)
+        btot = btot1 + btot0
 
         #mask for cme
-        mask = btot #segmentation(btot)
+        mask = segmentation(btot0)
         mask[r <= size_occ[sat]] = 0   
 
         #mask for occulter
@@ -154,11 +159,12 @@ for row in range(len(df)):
         level_back = np.mean(back)               
 
         #cme
-        btot = (btot/np.max(btot))*df['level_cme'][row]*level_back
-        #adds noise
-        if level_noise > 0:
-            noise=np.random.poisson(lam=btot)*level_noise
-            btot+=noise        
+        if mask.max()>0: # only if there is a cme
+            btot = (btot/np.max(btot))*df['level_cme'][row]*level_back
+            #adds noise
+            if level_noise > 0:
+                noise=np.random.poisson(lam=btot)*level_noise
+                btot+=noise        
         #adds background
         btot+=back
         m = np.nanmean(btot)
@@ -180,27 +186,31 @@ for row in range(len(df)):
             occ.writeto(mask_folder +'/1.fits'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), overwrite=True)
             
-        elif otype =="png":
-            fig = plt.figure(figsize=(4,4), facecolor='black')
-            ax = fig.add_subplot()            
+        elif otype =="png":       
             #mask for cme
             fig3 = plt.figure(figsize=(4,4), facecolor='black')
             ax3 = fig3.add_subplot()        
             ax3.imshow(mask, origin='lower', cmap='gray',vmax=1, vmin=0, extent=plotranges[sat])
             fig3.savefig(mask_folder +'/2.png'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig3.get_facecolor())
+            plt.close(fig3)
             #mask for occulter
             fig_occ = plt.figure(figsize=(4,4), facecolor='black')
             ax_occ = fig_occ.add_subplot()  
             ax_occ.imshow(arr, cmap='gray',extent=plotranges[sat],origin='lower', vmax=1, vmin=0)
             fig_occ.savefig(mask_folder +'/1.png'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())            
+                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig_occ.get_facecolor())            
+            plt.close(fig_occ)
             #cme
             m = np.mean(btot)
             sd =np.std(btot)
+            fig = plt.figure(figsize=(4,4), facecolor='black')
+            ax = fig.add_subplot()                
             ax.imshow(btot, origin='lower', cmap='gray', vmin=m-3*sd, vmax=m+3*sd,extent=plotranges[sat])
             fig.savefig(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
+            if not mesh:
+                plt.close(fig)
         else:
             print("otype value not recognized")    
 
