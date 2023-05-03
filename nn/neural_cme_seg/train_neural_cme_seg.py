@@ -6,22 +6,26 @@ import cv2
 import torchvision.models.segmentation
 import torch
 import os
+import matplotlib.pyplot as plt
 
-dataDir = "/gehme-gpu/projects/2020_gcs_wiht_ml/data/neural_cme_seg/LabPicsChemistry"
+dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset'
 
-trainDir=  dataDir + "/Train_filtered"
-testDir=  dataDir + "/Test"
-opath= "/gehme-gpu/projects/2020_gcs_wiht_ml/output/neural_cme_seg"
+trainDir=  dataDir 
+testDir=  dataDir 
+file_ext=".png"
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg"
 
 
 #------------------------------------------------------------trainign of the CNN--------------------------------------------------------------------------------------#
 
 batchSize=2 #number of images used in each iteration
-imageSize=[600,600] 
+imageSize=[512,512] 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 imgs=[] #list of images on the trainig dataset
-for pth in os.listdir(trainDir):
-    imgs.append(trainDir+"/"+pth +"//")
+dirs=os.listdir(trainDir)
+dirs= [d for d in dirs if not d.endswith(".csv")]
+for pth in dirs:
+    imgs.append(trainDir+"/"+pth)
 
 def loadData():
     batch_Imgs=[]
@@ -29,9 +33,11 @@ def loadData():
     #batch_Masks=[]
     for i in range(batchSize):        
         idx=random.randint(0,len(imgs)-1) #takes a random image from the image training list
-        img = cv2.imread(os.path.join(imgs[idx], "Image.jpg")) #reads the random image
-        img = cv2.resize(img, imageSize, cv2.INTER_LINEAR) #rezices the image       
-        maskDir=os.path.join(imgs[idx], "Vessels") #path to the mask iamge corresponding to the random image
+        file=os.listdir(imgs[idx])
+        file=[f for f in file if f.endswith(file_ext)]
+        img = cv2.imread(os.path.join(imgs[idx], file[0])) #reads the random image
+        img = cv2.resize(img, imageSize, cv2.INTER_LINEAR) #rezise the image       
+        maskDir=os.path.join(imgs[idx], "mask") #path to the mask iamge corresponding to the random image
         masks=[]
         for mskName in os.listdir(maskDir):
             vesMask = cv2.imread(maskDir+'/'+mskName, 0) #reads the mask image in greyscale 
@@ -45,6 +51,10 @@ def loadData():
         for i in range(num_objs):
             x,y,w,h = cv2.boundingRect(masks[i]) #draws an approximate rectangle around the binary  mask image and returns "x" and "y" coordinates and the "width" and "height" of the object
             boxes[i] = torch.tensor([x, y, x+w, y+h]) #creates a tensor with the parameters obtained before
+            if h==0 or w==0:
+                plt.imshow(masks[i])
+                plt.title(str(x)+"/"+str(y)+"/"+str(w)+"/"+str(h))
+                plt.show()
         masks = torch.as_tensor(masks, dtype=torch.uint8) #converts the mask list into a tensor
         img = torch.as_tensor(img, dtype=torch.float32)   #converts the image list into a tensor     
         
@@ -70,7 +80,7 @@ model.to(device) # move model to the right device
 optimizer = torch.optim.AdamW(params=model.parameters(), lr=1e-5) # optimization technique that comes under gradient decent algorithm
 model.train()#sets the model to train mode
 
-for i in range(5001): #Number of iterations starting in zero, so if we want 5000 iteration we will need 5001 iteration
+for i in range(1341): #Number of iterations starting in zero, so if we want 5000 iteration we will need 5001 iteration
     images, targets= loadData() #call the function, images=batch_img and targets=batch_data
     images = list(image.to(device) for image in images) #send images to the selected device
     targets=[{k: v.to(device) for k,v in t.items()} for t in targets] #send targets to the selected device
@@ -84,5 +94,5 @@ for i in range(5001): #Number of iterations starting in zero, so if we want 5000
     optimizer.step()
    
     print(i,'loss:', losses.item())
-    if i%500==0:
+    if i%1340==0:
         torch.save(model.state_dict(),opath + "/" + str(i)+".torch")

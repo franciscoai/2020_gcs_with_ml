@@ -10,41 +10,54 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import matplotlib.image as mpimg
 
-dataDir = "/gehme-gpu/projects/2020_gcs_wiht_ml/data/neural_cme_seg/LabPicsChemistry"
-trainDir=  dataDir + "/Train"
-testDir=  dataDir + "/Test"
-opath= "/gehme-gpu/projects/2020_gcs_wiht_ml/output/neural_cme_seg"
 
-batchSize=2 #number of images used in each iteration
-imageSize=[600,600] 
+dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset'
+trainDir=  dataDir 
+testDir=  dataDir 
+file_ext=".png"
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg"
+pretrained_nn="200.torch"
+
+
+batchSize=1
+ #number of images used in each iteration
+imageSize=[512,512] 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-for num in os.listdir(testDir):
+for num in os.listdir(testDir)[0]:
     imgs=[]
-    for pth in os.listdir(testDir):
-        imgs.append(testDir+"/"+pth +"//")
+    dirs=os.listdir(trainDir)
+    dirs= [d for d in dirs if not d.endswith(".csv")]
+    for pth in dirs:
+        imgs.append(testDir+"/"+pth)
+    
     idx=random.randint(0,len(imgs)-1) #select a random image from the testing batch
     
+
+
+
     model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
     in_features = model.roi_heads.box_predictor.cls_score.in_features 
     model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=2)
-    model.load_state_dict(torch.load(opath + "/"+ "5000.torch")) #loads the last iteration of training 
+    model.load_state_dict(torch.load(opath + "/"+ pretrained_nn)) #loads the last iteration of training 
     model.to(device)# move model to the right device
     model.eval()#set the model to evaluation state
-
-    images = cv2.imread(os.path.join(imgs[idx], "Image.jpg")) #reads the testing random image
+    file=os.listdir(imgs[idx])
+    file=[f for f in file if f.endswith(file_ext)]
+    images = cv2.imread(os.path.join(imgs[idx], file[0])) #reads the random image
     images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)
     images = torch.as_tensor(images, dtype=torch.float32).unsqueeze(0)
     images=images.swapaxes(1, 3).swapaxes(2, 3)
     images = list(image.to(device) for image in images)
 
 
-    maskDir=os.path.join(imgs[idx], "Vessels") #path to the mask iamge corresponding to the random image
+    maskDir=os.path.join(imgs[idx], "mask") #path to the mask iamge corresponding to the random image
     masks=[]
     for mskName in os.listdir(maskDir):
 
         vesMask = cv2.imread(maskDir+'/'+mskName,0) #reads the mask image in greyscale
+
         vesMask = (vesMask > 0).astype(np.uint8) #The mask image is stored in 0–255 format and is converted to 0–1 format
         vesMask=cv2.resize(vesMask,imageSize,cv2.INTER_NEAREST) #resizes the mask image to the same size of the random image
     
@@ -68,16 +81,16 @@ for num in os.listdir(testDir):
     for i in range(len(pred[0]['masks'])):
         msk=pred[0]['masks'][i,0].detach().cpu().numpy()
         scr=pred[0]['scores'][i].detach().cpu().numpy()
-        if scr>0.8 :
-            im2[:,:,0][msk>0.5] = random.randint(0,255)
-            im2[:, :, 1][msk > 0.5] = random.randint(0,255)
-            im2[:, :, 2][msk > 0.5] = random.randint(0, 255)
-        else:
-            scr="the score is too low"
+        #if scr>0.8 :
+        im2[:,:,0][msk>0.5] = random.randint(0,255)
+        im2[:, :, 1][msk > 0.5] = random.randint(0,255)
+        im2[:, :, 2][msk > 0.5] = random.randint(0, 255)
+        # else:
+        #     scr="the score is too low"
             
 
     pic = np.hstack([im,im2])
-    cv2.imwrite(opath+"/"+"Saved"+str(num)+".jpg", pic)
-    #cv2.imshow(str(scr), np.hstack([im,im2]))
+    cv2.imwrite(opath+"/"+"Saved"+str(num)+".png", pic)
+    cv2.imshow(str(scr), np.hstack([im,im2]))
 
-    #cv2.waitKey()
+    cv2.waitKey()
