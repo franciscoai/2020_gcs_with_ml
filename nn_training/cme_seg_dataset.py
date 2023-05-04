@@ -122,8 +122,8 @@ for row in range(len(df)):
     print(f'Saving image pair {row} of {len(df)-1}')
     for sat in range(len(satpos)):
         #defining ranges an radio of the occulter
-        x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=512)
-        y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=512)
+        x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
+        y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
         xx, yy = np.meshgrid(x, y)
         x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)  
         r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
