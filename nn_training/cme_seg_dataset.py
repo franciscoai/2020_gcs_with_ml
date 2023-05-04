@@ -31,10 +31,6 @@ def center_rSun_pixel(headers, plotranges, sat):
     return x_cS, y_cS
 
 
-def rnd_samples(rng, n):
-# gernerate n random (uniform dist) float samples from range rnd[0] to rnd[1]    
-    return (rng[1] - rng[0]) * np.random.random(n) + rng[0]
-
 ######Main
 # CONSTANTS
 #files
@@ -55,8 +51,8 @@ ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like head
 # level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[6,13],[0.25,0.6], [10,60],[5e3,6e3]] # min-max ranges of each parameter in par_names
-par_num = 100  # total number of samples that will be generated for each param
+par_rng = [[-180,180],[-70,70],[-90,90],[5,13],[0.25,0.6], [10,60],[1e3,8e3]] # min-max ranges of each parameter in par_names
+par_num = 5000  # total number of samples that will be generated for each param
 #par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[5e2,1e3]] # example used for script development
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 
@@ -124,15 +120,7 @@ same_corona = [get_corona(0,imsize=imsize), get_corona(1,imsize=imsize)]
 # generate views
 for row in range(len(df)):
     print(f'Saving image pair {row} of {len(df)-1}')
-    for sat in range(len(satpos)): 
-        #creating folders for each case
-        folder = os.path.join(OPATH, str(row*len(satpos)+sat))
-        if os.path.exists(folder):
-            os.system("rm -r " + folder) 
-        os.makedirs(folder)
-        mask_folder = os.path.join(folder, "mask")
-        os.makedirs(mask_folder)     
-
+    for sat in range(len(satpos)):
         #defining ranges an radio of the occulter
         x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=512)
         y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=512)
@@ -142,13 +130,18 @@ for row in range(len(df)):
 
 
         #Total intensity (Btot) figure from raytrace:               
-        btot0 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, in_sig=0.5, out_sig=0.2,)
+        btot0 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, in_sig=0.5, out_sig=0.25,)
+        
+        #mask for cme outer envelope
+        mask = segmentation(btot0)
+        mask[r <= size_occ[sat]] = 0  
+        if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
+            print(f'WARNINGN: CME number {row} mask is null because it is probably behind the occulter, skipping all views...')
+            break
+
+        #adds a flux rope-like structure
         btot1 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*0.6, 0.1, df['ang'][row], imsize=imsize, in_sig=0.8, out_sig=0.3, nel=100000.)
         btot = btot1 + btot0
-
-        #mask for cme
-        mask = segmentation(btot0)
-        mask[r <= size_occ[sat]] = 0   
 
         #mask for occulter
         arr = np.zeros(xx.shape)
@@ -159,18 +152,25 @@ for row in range(len(df)):
         level_back = np.mean(back)               
 
         #cme
-        if mask.max()>0: # only if there is a cme
-            btot = (btot/np.max(btot))*df['level_cme'][row]*level_back
-            #adds noise
-            if level_noise > 0:
-                noise=np.random.poisson(lam=btot)*level_noise
-                btot+=noise        
+        btot = (btot/np.max(btot))*df['level_cme'][row]*level_back
+        #adds noise
+        if level_noise > 0:
+            noise=np.random.poisson(lam=btot)*level_noise
+            btot+=noise        
         #adds background
         btot+=back
         m = np.nanmean(btot)
         sd = np.nanstd(btot)
         #adds occulter
         btot[r <= size_occ[sat]] = level_occ*level_back
+
+        #creating folders for each case
+        folder = os.path.join(OPATH, str(row*len(satpos)+sat))
+        if os.path.exists(folder):
+            os.system("rm -r " + folder) 
+        os.makedirs(folder)
+        mask_folder = os.path.join(folder, "mask")
+        os.makedirs(mask_folder)   
 
         if otype=="fits":
             #mask for cme
@@ -225,4 +225,4 @@ for row in range(len(df)):
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
             plt.close(fig)
 
-os.system("chgrp -R gehme " + OPATH)
+#os.system("chgrp -R gehme " + OPATH)
