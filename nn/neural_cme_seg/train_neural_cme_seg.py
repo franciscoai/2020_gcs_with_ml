@@ -96,6 +96,6 @@ for i in range(train_ncases): #Number of iterations
     optimizer.step()
    
     print(i,'loss:', losses.item())
-    if i%500==0:
+    if i%1000==0:
         torch.save(model.state_dict(),opath + "/" + str(i)+".torch")
 torch.save(model.state_dict(),opath + "/" + str(i)+".torch")

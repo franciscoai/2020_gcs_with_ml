@@ -18,21 +18,21 @@ file_ext=".png"
 trained_model = '4095.torch'
 trainDir=  dataDir 
 testDir=  dataDir 
-batchSize=1 #number of images used in each iteration
-imageSize=[512,512] 
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
-print(f'Using device:  {device}')
+imageSize=[512,512]
+n_test_cases = 100
+
 
 #main
-test_images = os.listdir(testDir)[0:30]
-for num in test_images:
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
+print(f'Using device:  {device}')
+test_dirs = os.listdir(testDir)
+test_dirs= [d for d in test_dirs if not d.endswith(".csv")][0:n_test_cases]
+imgs = [os.path.join(testDir, dir) for dir in test_dirs]
+all_scr =[]
+ind = 0
+for num in test_dirs:
     print(f'Inference of imge: {num}')
-    imgs=[]
-    dirs=os.listdir(trainDir)
-    dirs= [d for d in dirs if not d.endswith(".csv")]
-    for pth in dirs:
-        imgs.append(testDir+"/"+pth)
-    idx=random.randint(0,len(imgs)-1) #select a random image from the testing batch
+    idx=random.randint(0,len(test_dirs)-1) #select a random image from the testing batch
     #loads model
     model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
     in_features = model.roi_heads.box_predictor.cls_score.in_features 
@@ -43,7 +43,7 @@ for num in test_images:
     #inference
     file=os.listdir(imgs[idx])
     file=[f for f in file if f.endswith(file_ext)]
-    images = cv2.imread(os.path.join(imgs[idx], file[0])) #reads the random image
+    images = cv2.imread(os.path.join(imgs[idx], file[0]))
     images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)
     im = images.copy()
     images = cv2.normalize(images, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX) # normalize to 0,1
@@ -69,19 +69,27 @@ for num in test_images:
 
     im= im.astype(np.uint8)
     im2 = im.copy()
-
-    for i in range(len(pred[0]['masks'])):
+    nmasks = len(pred[0]['masks'])
+    colors = [[255,0,0],[0,255,0],[0,0,255]]
+    for i in range(nmasks):
         msk=pred[0]['masks'][i,0].detach().cpu().numpy()
         scr=pred[0]['scores'][i].detach().cpu().numpy()
+        all_scr.append(scr)
         if scr>0.8 :
-            im2[:, :, 0][msk > 0.5] = random.randint(0, 255)
-            im2[:, :, 1][msk > 0.5] = random.randint(0, 255)
-            im2[:, :, 2][msk > 0.5] = random.randint(0, 255)
+            im2[:, :, 0][msk > 0.5] = colors[i][0]
+            im2[:, :, 1][msk > 0.5] = colors[i][1]
+            im2[:, :, 2][msk > 0.5] = colors[i][2]
         else:
-            scr="the score is too low"         
+            scr="below_0.8"         
 
     pic = np.hstack([im,im2])
     os.makedirs(opath, exist_ok=True)
-    cv2.imwrite(opath+"/"+"test"+str(num)+".png", pic)
-    #cv2.imshow(str(scr), np.hstack([im,im2]))
-    #cv2.waitKey()
+    cv2.imwrite(opath+"/"+str(num)+"_img_"+str(num)+'_scr_'+str(scr)+'.png', pic)
+    ind+=1
+
+fig = plt.figure()
+plt.plot(all_scr,'*b')
+plt.title(f'The mean score of {len(test_dirs)} test cases is: {np.mean(all_scr)}')
+plt.yscale('log')
+plt.savefig(opath+"/all_scores.png")
+plt.close()
