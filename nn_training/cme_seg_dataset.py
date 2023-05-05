@@ -30,6 +30,19 @@ def center_rSun_pixel(headers, plotranges, sat):
         headers[sat]['NAXIS2'] - plotranges[sat][sat]
     return x_cS, y_cS
 
+def deg2px(x,y,plotranges,imsize):
+    scale_x = (plotranges[sat][1]-plotranges[sat][0])/imsize[0]
+    scale_y =(plotranges[sat][3]-plotranges[sat][2])/imsize[1]
+    x_px=[]
+    y_px=[]    
+    for i in range(len(x)):
+        v_x= (np.round((x[i]-plotranges[sat][0])/scale_x)).astype("int") 
+        v_y= (np.round((y[i]-plotranges[sat][2])/scale_y)).astype("int") 
+
+        x_px.append(v_x)
+        y_px.append(v_y)
+    breakpoint()
+    return(x_px,y_px)
 
 ######Main
 # CONSTANTS
@@ -52,7 +65,7 @@ ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like head
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[5,13],[0.25,0.6], [10,60],[1e3,8e3]] # min-max ranges of each parameter in par_names
-par_num = 5000  # total number of samples that will be generated for each param
+par_num = 1  # total number of samples that will be generated for each param
 #par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[5e2,1e3]] # example used for script development
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 
@@ -61,7 +74,7 @@ imsize=np.array([512, 512], dtype='int32') # output image size
 size_occ = [2.6, 3.7, 2] # Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
 level_occ=1000 #mean level of the occulter relative to the background level
 level_noise=0 #photon noise level of cme image relative to photon noise. Set to 0 to avoid
-mesh=False # set to also save a png with the GCSmesh
+mesh=True # set to also save a png with the GCSmesh
 otype="png" # set the ouput file type: 'png' or 'fits'
 
 ## main
@@ -170,7 +183,22 @@ for row in range(len(df)):
             os.system("rm -r " + folder) 
         os.makedirs(folder)
         mask_folder = os.path.join(folder, "mask")
-        os.makedirs(mask_folder)   
+        os.makedirs(mask_folder) 
+
+
+        clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)                
+        x = clouds[sat, :, 1]
+        y = clouds[0, :, 2]
+        cloud_arr= np.zeros(imsize)
+        p_x,p_y=deg2px(x,y,plotranges,imsize)
+        for i in range(len(p_x)):
+            cloud_arr[p_x[i], p_y[i]] = 1
+        fig8 = plt.figure(figsize=(4,4), facecolor='black')
+        plt.imshow(cloud_arr)
+  
+        fig8.savefig(OPATH+ '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_mesh_test.png'.format(
+                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig8.get_facecolor())
+            
 
         if otype=="fits":
             #mask for cme
@@ -216,9 +244,9 @@ for row in range(len(df)):
 
         if mesh:
             # overplot  GCS mesh to cme figure
-            clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)                
-            x = clouds[sat, :, 1]
-            y = clouds[0, :, 2]
+            #clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)                
+            # x = clouds[sat, :, 1]
+            # y = clouds[0, :, 2]
             plt.scatter(x, y, s=0.5, c='green', linewidths=0)
             plt.axis('off')
             fig.savefig(OPATH+ '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_mesh.png'.format(
