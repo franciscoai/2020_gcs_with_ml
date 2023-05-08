@@ -30,6 +30,17 @@ def center_rSun_pixel(headers, plotranges, sat):
         headers[sat]['NAXIS2'] - plotranges[sat][sat]
     return x_cS, y_cS
 
+def deg2px(x,y,plotranges,imsize):
+    scale_x = (plotranges[sat][1]-plotranges[sat][0])/imsize[0]
+    scale_y =(plotranges[sat][3]-plotranges[sat][2])/imsize[1]
+    x_px=[]
+    y_px=[]    
+    for i in range(len(x)):
+        v_x= (np.round((x[i]-plotranges[sat][0])/scale_x)).astype("int") 
+        v_y= (np.round((y[i]-plotranges[sat][2])/scale_y)).astype("int") 
+        x_px.append(v_x)
+        y_px.append(v_y)
+    return(y_px,x_px)
 
 ######Main
 # CONSTANTS
@@ -51,10 +62,10 @@ ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like head
 # level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[5,13],[0.25,0.6], [10,60],[1e3,8e3]] # min-max ranges of each parameter in par_names
-par_num = 5000  # total number of samples that will be generated for each param
-#par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[5e2,1e3]] # example used for script development
-rnd_par=True # set to randomnly shuffle the generated parameters linspace 
+par_rng = [[-180,180],[-70,70],[-90,90],[5,13],[0.25,0.6], [10,60],[5e2,1e3]] # min-max ranges of each parameter in par_names
+par_num = 5000  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
+#par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[9e4,10e4]] # example used for script development
+rnd_par=False # set to randomnly shuffle the generated parameters linspace 
 
 # Syntethic image options
 imsize=np.array([512, 512], dtype='int32') # output image size
@@ -121,27 +132,41 @@ same_corona = [get_corona(0,imsize=imsize), get_corona(1,imsize=imsize)]
 for row in range(len(df)):
     print(f'Saving image pair {row} of {len(df)-1}')
     for sat in range(len(satpos)):
-        #defining ranges an radio of the occulter
+        #defining ranges and radius of the occulter
         x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
         y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
         xx, yy = np.meshgrid(x, y)
         x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)  
         r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
 
-
-        #Total intensity (Btot) figure from raytrace:               
-        btot0 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, in_sig=0.5, out_sig=0.25,)
-        
+     
         #mask for cme outer envelope
-        mask = segmentation(btot0)
+        clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)                
+        x = clouds[sat, :, 1]
+        y = clouds[0, :, 2]
+        cloud_arr= np.zeros(imsize)
+        p_x,p_y=deg2px(x,y,plotranges,imsize)
+        for i in range(len(p_x)):
+            cloud_arr[p_x[i], p_y[i]] = 1
+        # fig8 = plt.figure(figsize=(4,4), facecolor='black')
+        # plt.imshow(cloud_arr, origin='lower')
+        # fig8.savefig(OPATH+ '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_mesh_test.png'.format(
+        #         df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig8.get_facecolor())
+        # plt.close(fig8)           
+
+        btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.05, out_sig=0.05, nel=1e5)     
+        mask = segmentation(btot_mask)
         mask[r <= size_occ[sat]] = 0  
         if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
             print(f'WARNINGN: CME number {row} mask is null because it is probably behind the occulter, skipping all views...')
             break
 
+        #Total intensity (Btot) figure from raytrace:               
+        btot0 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.5, out_sig=0.25, nel=1e5)
+                      
         #adds a flux rope-like structure
-        btot1 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*0.6, 0.1, df['ang'][row], imsize=imsize, in_sig=0.8, out_sig=0.3, nel=100000.)
-        btot = btot1 + btot0
+        btot1 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*0.6, 0.13, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.7, out_sig=0.3, nel=1e5)
+        btot = btot0 + btot1
 
         #mask for occulter
         arr = np.zeros(xx.shape)
@@ -170,7 +195,7 @@ for row in range(len(df)):
             os.system("rm -r " + folder) 
         os.makedirs(folder)
         mask_folder = os.path.join(folder, "mask")
-        os.makedirs(mask_folder)   
+        os.makedirs(mask_folder) 
 
         if otype=="fits":
             #mask for cme
