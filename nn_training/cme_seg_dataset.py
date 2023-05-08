@@ -47,7 +47,7 @@ def deg2px(x,y,plotranges,imsize):
 #files
 exec_path = os.getcwd()
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_test' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
 
 #sattelite positions
 secchipath = DATA_PATH + '/stereo/secchi/L1'
@@ -63,7 +63,7 @@ ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like head
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[5,13],[0.25,0.6], [10,60],[5e2,1e3]] # min-max ranges of each parameter in par_names
-par_num = 5000  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
+par_num = 1000  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
 #par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[9e4,10e4]] # example used for script development
 rnd_par=False # set to randomnly shuffle the generated parameters linspace 
 

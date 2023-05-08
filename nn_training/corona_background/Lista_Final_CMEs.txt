@@ -1,4 +1,4 @@
-no[#]	date_a	time_a	date_b	time_b	PA_a[deg]	PA_b[deg]	clong a[deg]	clong b[deg]	hlong a[deg]	hlong b[deg]	angle e-a[deg]	angle b-e[deg]	angle b-a[deg]	evento_a	evento_b	preevento_a_1h	preevento_b_1h	preevento_a_3h	preevento_b_3h
+no[#]	date_a	time_a	date_b	time_b	PA_a[deg]	PA_b[deg]	clong a[deg]	clong b[deg]	hlong a[deg]	hlong b[deg]	angle e-a[deg]	angle b-e[deg]	angle b-a[deg]	evento_a	evento_b	preevento_a_1h	preevento_b_1h	preevento_a_2h	preevento_b_2h
 1	2007-01-09	00:02:40	2007-01-09	*	45	*	353.555	353.415	0.219	0.079	0.251	0.103	0.150	2007-01-09 00:02:40		2007-01-08 23:02:40	NaT	2007-01-08 22:02:40	NaT
 2	2007-01-15	12:02:40	2007-01-15	*	315	*	268.009	267.751	0.266	0.008	0.298	0.043	0.274	2007-01-15 12:02:40		2007-01-15 11:02:40	NaT	2007-01-15 10:02:40	NaT
 3	2007-01-19	05:02:40	2007-01-19	05:02:44	0/360	45/215	219.214	218.872	0.298	-0.044	0.328	0.048	*	2007-01-19 05:02:40	2007-01-19 05:02:44	2007-01-19 04:02:40	2007-01-19 04:02:44	2007-01-19 03:02:40	2007-01-19 03:02:44
