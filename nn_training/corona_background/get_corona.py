@@ -9,14 +9,14 @@ import numpy as np
 import sunpy
 import pandas as pd
 from ext_libs.rebin import rebin
-
+import scipy
 
 
 def rnd_samples(rng, n):
 # gernerate n random (uniform dist) float samples from range rnd[0] to rnd[1]    
     return (rng[1] - rng[0]) * np.random.random(n) + rng[0]
 
-def get_corona(sat, imsize=None, diff=True):
+def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     '''
     Returns a measured "quiet" (with no CME) solar corona observed by satelitte sat, the implemented instruments are
 
@@ -27,6 +27,8 @@ def get_corona(sat, imsize=None, diff=True):
     OPTIONS:
         diff: Set to True to return a time differential corona.
         imsize: Set to [x,y] to imsize the output image to that size
+        rnd_rot: Set to rotate the ouput image by a random angle around the central pixel
+
     '''
     # CONSTANTS
     #files
@@ -58,6 +60,9 @@ def get_corona(sat, imsize=None, diff=True):
     else:
         os.error('Input instrument not recognized, check value of sat')
     
+    if rnd_rot:
+        oimg = scipy.ndimage.rotate(oimg, np.random.randint(low=0, high=360), reshape=False)
+ 
     if imsize is not None:
         oimg = rebin(oimg,imsize,operation='mean') 
 

@@ -6,7 +6,6 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from pyGCS_raytrace import pyGCS
-#from pyGCS_raytrace.GCSgui import runGCSgui
 from pyGCS_raytrace.rtraytracewcs import rtraytracewcs
 from nn_training.segmentation import segmentation
 from nn_training.corona_background.get_corona import get_corona
@@ -20,7 +19,8 @@ import sunpy.map
 import pandas as pd
 from sunpy.sun.constants import radius as _RSUN
 from ext_libs.rebin import rebin
-
+from nn_training.low_freq_map import low_freq_map
+import scipy
 
 ## Función ajuste del centro del sol
 def center_rSun_pixel(headers, plotranges, sat):
@@ -47,7 +47,7 @@ def deg2px(x,y,plotranges,imsize):
 #files
 exec_path = os.getcwd()
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_test' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_fran' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
 
 #sattelite positions
 secchipath = DATA_PATH + '/stereo/secchi/L1'
@@ -62,10 +62,10 @@ ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like head
 # level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[5,13],[0.25,0.6], [10,60],[5e2,1e3]] # min-max ranges of each parameter in par_names
-par_num = 1000  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
+par_rng = [[-180,180],[-70,70],[-90,90],[8,14],[0.2,0.6], [10,60],[1e2,8e2]] # min-max ranges of each parameter in par_names
+par_num = 4000  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
 #par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[9e4,10e4]] # example used for script development
-rnd_par=False # set to randomnly shuffle the generated parameters linspace 
+rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 
 # Syntethic image options
 imsize=np.array([512, 512], dtype='int32') # output image size
@@ -74,6 +74,8 @@ level_occ=1000 #mean level of the occulter relative to the background level
 level_noise=0 #photon noise level of cme image relative to photon noise. Set to 0 to avoid
 mesh=False # set to also save a png with the GCSmesh
 otype="png" # set the ouput file type: 'png' or 'fits'
+im_range=0.5 # range of the color scale of the output final syntethyc image in std dev around the mean
+back_rnd_rot=True # set to randomly rotate the background image around its center
 
 ## main
 par_num = [par_num] * len(par_rng)
@@ -154,7 +156,7 @@ for row in range(len(df)):
         #         df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig8.get_facecolor())
         # plt.close(fig8)           
 
-        btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.05, out_sig=0.05, nel=1e5)     
+        btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.1, out_sig=0.1, nel=1e5)     
         mask = segmentation(btot_mask)
         mask[r <= size_occ[sat]] = 0  
         if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
@@ -165,7 +167,9 @@ for row in range(len(df)):
         btot0 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.5, out_sig=0.25, nel=1e5)
                       
         #adds a flux rope-like structure
-        btot1 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*0.6, 0.13, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.7, out_sig=0.3, nel=1e5)
+        height_diff = np.random.uniform(low=0.55, high=0.65)
+        aspect_ratio_frope = np.random.uniform(low=0.9, high=0.14)
+        btot1 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*height_diff, 0.13, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.7, out_sig=0.3, nel=1e5)
         btot = btot0 + btot1
 
         #mask for occulter
@@ -174,10 +178,13 @@ for row in range(len(df)):
 
         #background corona
         back = same_corona[sat]
+        if back_rnd_rot:
+            back =  scipy.ndimage.rotate(back, np.random.randint(low=0, high=360), reshape=False)
         level_back = np.mean(back)               
 
         #cme
-        btot = (btot/np.max(btot))*df['level_cme'][row]*level_back
+        var_map = low_freq_map(dim=[imsize[0],imsize[1],1],off=[1],var=[1.5],func=[13])
+        btot = var_map*(btot/np.max(btot))*df['level_cme'][row]*level_back
         #adds noise
         if level_noise > 0:
             noise=np.random.poisson(lam=btot)*level_noise
@@ -231,7 +238,7 @@ for row in range(len(df)):
             sd =np.std(btot)
             fig = plt.figure(figsize=(4,4), facecolor='black')
             ax = fig.add_subplot()                
-            ax.imshow(btot, origin='lower', cmap='gray', vmin=m-3*sd, vmax=m+3*sd,extent=plotranges[sat])
+            ax.imshow(btot, origin='lower', cmap='gray', vmin=m-im_range*sd, vmax=m+im_range*sd,extent=plotranges[sat])
             fig.savefig(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
             if not mesh:
