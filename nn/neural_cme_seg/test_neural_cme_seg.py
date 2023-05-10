@@ -86,7 +86,7 @@ for num in test_dirs:
 
     pic = np.hstack([im,im2])
     os.makedirs(opath, exist_ok=True)
-    cv2.imwrite(opath+"/"+str(idx)+"_img_"+str(idx)+'_scr_'+str(scr)+'.png', pic)
+    cv2.imwrite(opath+"/img_"+str(idx)+'_scr_'+str(scr)+'.png', pic)
     ind+=1
 
 fig = plt.figure()
