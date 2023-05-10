@@ -7,16 +7,16 @@ import torchvision.models.segmentation
 import torch
 import os
 import matplotlib.pyplot as plt
-
+import pickle
 #------------------------------------------------------------trainign of the CNN--------------------------------------------------------------------------------------#
-dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset'
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg"
+dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_fran'
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_fran"
 file_ext=".png"
 trainDir=  dataDir 
 testDir=  dataDir 
 batchSize=8 #number of images used in each iteration
 imageSize=[512,512] 
-train_ncases=4096 # Total no. of epochs
+train_ncases=5000 # Total no. of epochs
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 
 #main
@@ -82,6 +82,7 @@ model.to(device) # move model to the right device
 optimizer = torch.optim.AdamW(params=model.parameters(), lr=1e-5) # optimization technique that comes under gradient decent algorithm
 model.train()#sets the model to train mode
 
+all_loss=[]
 for i in range(train_ncases): #Number of iterations
     images, targets= loadData() #call the function, images=batch_img and targets=batch_data
     images = list(image.to(device) for image in images) #send images to the selected device
@@ -95,7 +96,13 @@ for i in range(train_ncases): #Number of iterations
     losses.backward() #computes the partial derivative of the output f with respect to each of the input variables.
     optimizer.step()
    
+    all_loss.append(losses.item())
     print(i,'loss:', losses.item())
     if i%1000==0:
         torch.save(model.state_dict(),opath + "/" + str(i)+".torch")
+
 torch.save(model.state_dict(),opath + "/" + str(i)+".torch")
+
+#saves all losses in a pickle file
+with open(opath + "/all_loss", 'wb') as file:
+    pickle.dump(all_loss, file, protocol=pickle.HIGHEST_PROTOCOL)

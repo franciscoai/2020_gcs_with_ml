@@ -11,12 +11,11 @@ from PIL import Image
 import matplotlib.image as mpimg
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset'
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg/"
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg/test_output"
+dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_fran_test'
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_fran/"
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_fran/test_output"
 file_ext=".png"
-trained_model = '4095.torch'
-trainDir=  dataDir 
+trained_model = '4999.torch'
 testDir=  dataDir 
 imageSize=[512,512]
 n_test_cases = 100
@@ -31,7 +30,6 @@ imgs = [os.path.join(testDir, dir) for dir in test_dirs]
 all_scr =[]
 ind = 0
 for num in test_dirs:
-    print(f'Inference of imge: {num}')
     idx=random.randint(0,len(test_dirs)-1) #select a random image from the testing batch
     #loads model
     model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
@@ -43,6 +41,7 @@ for num in test_dirs:
     #inference
     file=os.listdir(imgs[idx])
     file=[f for f in file if f.endswith(file_ext)]
+    print(f'Inference of imge: {idx}')
     images = cv2.imread(os.path.join(imgs[idx], file[0]))
     images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)
     im = images.copy()
@@ -84,7 +83,7 @@ for num in test_dirs:
 
     pic = np.hstack([im,im2])
     os.makedirs(opath, exist_ok=True)
-    cv2.imwrite(opath+"/"+str(num)+"_img_"+str(num)+'_scr_'+str(scr)+'.png', pic)
+    cv2.imwrite(opath+"/"+str(idx)+"_img_"+str(idx)+'_scr_'+str(scr)+'.png', pic)
     ind+=1
 
 fig = plt.figure()
