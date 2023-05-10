@@ -18,14 +18,14 @@ file_ext=".png"
 trained_model = '4999.torch'
 testDir=  dataDir 
 imageSize=[512,512]
-n_test_cases = 100
+test_ncases = 100
 
 
 #main
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 print(f'Using device:  {device}')
 test_dirs = os.listdir(testDir)
-test_dirs= [d for d in test_dirs if not d.endswith(".csv")][0:n_test_cases]
+test_dirs= [d for d in test_dirs if not d.endswith(".csv")][0:test_ncases]
 imgs = [os.path.join(testDir, dir) for dir in test_dirs]
 all_scr =[]
 ind = 0
