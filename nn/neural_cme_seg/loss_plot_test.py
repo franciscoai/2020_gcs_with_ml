@@ -10,16 +10,19 @@ import matplotlib.pyplot as plt
 import pickle
 #------------------------------------------------------------trainign of the CNN--------------------------------------------------------------------------------------#
 dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_fran_test'
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_fran/test_output"
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_fran"
+trained_model = '4999.torch'
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_fran/"
 file_ext=".png"
 trainDir=  dataDir 
 testDir=  dataDir 
-batchSize=8 #number of images used in each iteration
+batchSize=1 #number of images used in each iteration
 imageSize=[512,512] 
-train_ncases=5000 # Total no. of epochs
+test_ncases=100 # Total no. of epochs
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 
 #main
+torch.cuda.empty_cache()
 print(f'Using device:  {device}')
 os.makedirs(opath,exist_ok=True)
 imgs=[] #list of images on the trainig dataset
@@ -75,33 +78,41 @@ def loadData():
     return batch_Imgs, batch_Data #, batch_Masks
 
 #---------------------------------------------------------Defines the CNN by a pre trained R-CNN----------------------------------------------------------
-model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)   # load an instance segmentation model pre-trained on COCO dataset
-in_features = model.roi_heads.box_predictor.cls_score.in_features # get number of input features for the classifier
-model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=2) # replace the pre-trained head with a new one
+
+model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
+in_features = model.roi_heads.box_predictor.cls_score.in_features 
+model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=2)
+model.load_state_dict(torch.load(model_path + "/"+ trained_model)) #loads the last iteration of training 
+    
 model.to(device) # move model to the right device
-optimizer = torch.optim.AdamW(params=model.parameters(), lr=1e-5) # optimization technique that comes under gradient decent algorithm
 model.train()#sets the model to train mode
 
+all_scr =[]
 test_loss=[]
-for i in range(train_ncases): #Number of iterations
+for i in range(test_ncases): #Number of iterations
     images, targets= loadData() #call the function, images=batch_img and targets=batch_data
     images = list(image.to(device) for image in images) #send images to the selected device
     targets=[{k: v.to(device) for k,v in t.items()} for t in targets] #send targets to the selected device
-    #masks=list(image.to(device) for image in masks)
-   
-    #optimizer.zero_grad() #Sets the gradients of all optimized torch.Tensors to zero.
     loss_dict = model(images, targets)
     losses = sum(loss for loss in loss_dict.values()) #The loss is composed of several parts: class loss, bounding box loss, and mask loss. We sum all of these parts together to get the total loss as a single number
-   
-
-   
     test_loss.append(losses.item())
     print(i,'loss:', losses.item())
     if i%1000==0:
         torch.save(model.state_dict(),opath + "/" + str(i)+".torch")
-
-torch.save(model.state_dict(),opath + "/" + str(i)+".torch")
-
 #saves all losses in a pickle file
 with open(opath + "/test_loss", 'wb') as file:
     pickle.dump(test_loss, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+  
+    #model.eval()#set the model to evaluation state
+    #file=os.listdir(imgs[i])
+    #file=[f for f in file if f.endswith(file_ext)]#looks for png file
+    # images = cv2.imread(os.path.join(imgs[i], file[0]))
+    # images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)
+    # im = images.copy()
+    # images = cv2.normalize(images, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX) # normalize to 0,1
+    # images = torch.as_tensor(images, dtype=torch.float32).unsqueeze(0)
+    # images=images.swapaxes(1, 3).swapaxes(2, 3)
+    # images = list(image.to(device) for image in images)
+    #with torch.no_grad(): #runs the image through the net and gets a prediction for the object in the image.
+            #pred = model(images)
