@@ -79,7 +79,10 @@ for num in test_dirs:
             im2[:, :, 1][msk > 0.5] = colors[i][1]
             im2[:, :, 2][msk > 0.5] = colors[i][2]
         else:
-            scr="below_0.8"         
+            scr="below_0.8" 
+
+
+                    
 
     pic = np.hstack([im,im2])
     os.makedirs(opath, exist_ok=True)
