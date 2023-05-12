@@ -73,7 +73,7 @@ for num in test_dirs:
     for i in range(nmasks):
         msk=pred[0]['masks'][i,0].detach().cpu().numpy()
         scr=pred[0]['scores'][i].detach().cpu().numpy()
-        all_scr.append(scr)
+        all_scr.append([scr,idx])
         if scr>0.8 :
             im2[:, :, 0][msk > 0.5] = colors[i][0]
             im2[:, :, 1][msk > 0.5] = colors[i][1]
@@ -88,10 +88,11 @@ for num in test_dirs:
     os.makedirs(opath, exist_ok=True)
     cv2.imwrite(opath+"/img_"+str(idx)+'_scr_'+str(scr)+'.png', pic)
     ind+=1
+score = [i[0] for i in all_scr]
+fig= plt.figure(figsize=(10, 5)) 
+ax = fig.add_subplot() 
+ax.hist(score,bins=30)
+ax.set_title(f'Mean scr: {np.mean(score)}; % of scr>0.8: {(len(score[score>0.8]))/len(score)}')
+ax.set_yscale('log')
+fig.savefig(model_path+"all_scores.png")
 
-fig = plt.figure()
-plt.plot(all_scr,'*b')
-plt.title(f'The mean score of {len(test_dirs)} test cases is: {np.mean(all_scr)}')
-plt.yscale('log')
-plt.savefig(opath+"/all_scores.png")
-plt.close()
