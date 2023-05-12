@@ -8,7 +8,23 @@ import torch
 import os
 import matplotlib.pyplot as plt
 from PIL import Image
-import matplotlib.image as mpimg
+import matplotlib as mpl
+from astropy.io import fits
+mpl.use('Agg')
+
+def normalize(image):
+    '''
+    Normalizes the values of the input image to have a given range (as fractions of the sd around the mean)
+    maped to [0,1]. It clips output values outside [0,1]
+    '''
+    sd_range=1.
+    m = np.mean(image)
+    sd = np.std(image)
+    image = (image - m + sd_range * sd) / (2 * sd_range * sd)
+    image[image >1]=1
+    image[image <0]=0
+    return image
+
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
 dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_fran_test'
@@ -22,6 +38,7 @@ test_ncases = 100
 
 
 #main
+os.makedirs(opath, exist_ok=True)
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 print(f'Using device:  {device}')
 test_dirs = os.listdir(testDir)
@@ -45,7 +62,7 @@ for num in test_dirs:
     images = cv2.imread(os.path.join(imgs[idx], file[0]))
     images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)
     im = images.copy()
-    images = cv2.normalize(images, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX) # normalize to 0,1
+    images = normalize(images) #cv2.normalize(images, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F) # normalize to 0,1
     images = torch.as_tensor(images, dtype=torch.float32).unsqueeze(0)
     images=images.swapaxes(1, 3).swapaxes(2, 3)
     images = list(image.to(device) for image in images)
@@ -69,7 +86,7 @@ for num in test_dirs:
     im= im.astype(np.uint8)
     im2 = im.copy()
     nmasks = len(pred[0]['masks'])
-    colors = [[255,0,0],[0,255,0],[0,0,255]]
+    colors = [[255,0,0],[0,255,0],[0,0,255],[0,0,0]]
     for i in range(nmasks):
         msk=pred[0]['masks'][i,0].detach().cpu().numpy()
         scr=pred[0]['scores'][i].detach().cpu().numpy()
@@ -81,13 +98,10 @@ for num in test_dirs:
         else:
             scr="below_0.8" 
 
-
-                    
-
     pic = np.hstack([im,im2])
-    os.makedirs(opath, exist_ok=True)
     cv2.imwrite(opath+"/img_"+str(idx)+'_scr_'+str(scr)+'.png', pic)
     ind+=1
+    
 score = [i[0] for i in all_scr]
 fig= plt.figure(figsize=(10, 5)) 
 ax = fig.add_subplot() 
