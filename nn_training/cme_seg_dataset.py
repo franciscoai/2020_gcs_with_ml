@@ -22,8 +22,10 @@ from ext_libs.rebin import rebin
 from nn_training.low_freq_map import low_freq_map
 import scipy
 
-## Función ajuste del centro del sol
 def center_rSun_pixel(headers, plotranges, sat):
+    '''
+    Gets the location of Suncenter 
+    '''    
     x_cS = (headers[sat]['CRPIX1']*plotranges[sat][sat]*2) / \
         headers[sat]['NAXIS1'] - plotranges[sat][sat]
     y_cS = (headers[sat]['CRPIX2']*plotranges[sat][sat]*2) / \
@@ -31,6 +33,9 @@ def center_rSun_pixel(headers, plotranges, sat):
     return x_cS, y_cS
 
 def deg2px(x,y,plotranges,imsize):
+    '''
+    Computes spatial plate scale in both dimensions
+    '''    
     scale_x = (plotranges[sat][1]-plotranges[sat][0])/imsize[0]
     scale_y =(plotranges[sat][3]-plotranges[sat][2])/imsize[1]
     x_px=[]
@@ -62,7 +67,7 @@ ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like head
 # level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[8,14],[0.2,0.6], [10,60],[1e2,8e2]] # min-max ranges of each parameter in par_names
+par_rng = [[-180,180],[-70,70],[-90,90],[8,14],[0.2,0.6], [10,60],[1e2,5e2]] # min-max ranges of each parameter in par_names
 par_num = 4000  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
 #par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[9e4,10e4]] # example used for script development
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
@@ -70,11 +75,11 @@ rnd_par=True # set to randomnly shuffle the generated parameters linspace
 # Syntethic image options
 imsize=np.array([512, 512], dtype='int32') # output image size
 size_occ = [2.6, 3.7, 2] # Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
-level_occ=1000 #mean level of the occulter relative to the background level
+level_occ=0. #mean level of the occulter relative to the background level
 level_noise=0 #photon noise level of cme image relative to photon noise. Set to 0 to avoid
 mesh=False # set to also save a png with the GCSmesh
 otype="png" # set the ouput file type: 'png' or 'fits'
-im_range=0.5 # range of the color scale of the output final syntethyc image in std dev around the mean
+im_range=1. # range of the color scale of the output final syntethyc image in std dev around the mean
 back_rnd_rot=True # set to randomly rotate the background image around its center
 
 ## main
@@ -188,13 +193,14 @@ for row in range(len(df)):
         #adds noise
         if level_noise > 0:
             noise=np.random.poisson(lam=btot)*level_noise
-            btot+=noise        
+            btot+=noise    
+        else:
+            noise=0    
         #adds background
         btot+=back
-        m = np.nanmean(btot)
-        sd = np.nanstd(btot)
         #adds occulter
-        btot[r <= size_occ[sat]] = level_occ*level_back
+        btot[r <= size_occ[sat]] = level_occ*level_back + noise
+
 
         #creating folders for each case
         folder = os.path.join(OPATH, str(row*len(satpos)+sat))
@@ -233,7 +239,7 @@ for row in range(len(df)):
             fig_occ.savefig(mask_folder +'/1.png'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig_occ.get_facecolor())            
             plt.close(fig_occ)
-            #cme
+            #full image
             m = np.mean(btot)
             sd =np.std(btot)
             fig = plt.figure(figsize=(4,4), facecolor='black')

@@ -39,7 +39,7 @@ def loadData():
         file=[f for f in file if f.endswith(file_ext)]
         img = cv2.imread(os.path.join(imgs[idx], file[0])) #reads the random image
         img = cv2.resize(img, imageSize, cv2.INTER_LINEAR) #rezise the image  
-        img = cv2.normalize(img, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX) # normalize to 0,1
+        img = normalize(img) #cv2.normalize(img, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)  # normalize to 0,1
         maskDir=os.path.join(imgs[idx], "mask") #path to the mask corresponding to the random image
         masks=[]
         for mskName in os.listdir(maskDir):
@@ -73,6 +73,19 @@ def loadData():
     batch_Imgs=torch.stack([torch.as_tensor(d) for d in batch_Imgs],0) #Concatenates a sequence of tensors along a new dimension formed from the images in greyscale
     batch_Imgs = batch_Imgs.swapaxes(1, 3).swapaxes(2, 3)
     return batch_Imgs, batch_Data #, batch_Masks
+
+def normalize(image):
+    '''
+    Normalizes the values of the model input image to have a given range (as fractions of the sd around the mean)
+    maped to [0,1]. It clips output values outside [0,1]
+    '''
+    sd_range=1.
+    m = np.mean(image)
+    sd = np.std(image)
+    image = (image - m + sd_range * sd) / (2 * sd_range * sd)
+    image[image >1]=1
+    image[image <0]=0
+    return image
 
 #---------------------------------------------------------Defines the CNN by a pre trained R-CNN----------------------------------------------------------
 model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)   # load an instance segmentation model pre-trained on COCO dataset
