@@ -65,7 +65,7 @@ def low_freq_map(dim=[512,512,4],off=[0,0,0,0],var=[1,1,1,1],func=[0,1,2,3]):
 		if func[i]==0:
 			tmp=var[i]*(np.sin(xx/700.)+ np.sin(yy/300.)+np.sin(xx/200+yy/400.))/3.
 		if func[i]==13:
-			rnd = np.random.uniform(low=dim[0]/7, high=dim[0]/15, size=(4))
+			rnd = np.random.uniform(low=dim[0]/9, high=dim[0]/16, size=(4))
 			tmp=var[i]*(np.sin(xx/rnd[0])+ np.sin(yy/rnd[1])+np.sin(xx/rnd[2]+yy/rnd[3]))/3.			
 		if func[i]==1:
 			tmp=var[i]*np.sin(xx/150.)

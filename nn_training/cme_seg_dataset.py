@@ -7,7 +7,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from pyGCS_raytrace import pyGCS
 from pyGCS_raytrace.rtraytracewcs import rtraytracewcs
-from nn_training.segmentation import segmentation
+from nn_training.get_cme_mask import get_cme_mask
 from nn_training.corona_background.get_corona import get_corona
 import numpy as np
 import datetime
@@ -52,7 +52,7 @@ def deg2px(x,y,plotranges,imsize):
 #files
 exec_path = os.getcwd()
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_fran' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_new' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
 
 #sattelite positions
 secchipath = DATA_PATH + '/stereo/secchi/L1'
@@ -67,8 +67,8 @@ ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like head
 # level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[8,14],[0.2,0.6], [10,60],[1e2,5e2]] # min-max ranges of each parameter in par_names
-par_num = 4000  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
+par_rng = [[-180,180],[-70,70],[-90,90],[8,14],[0.1,0.6], [10,60],[5e1,2e2]] # [5e1,1e2] min-max ranges of each parameter in par_names
+par_num = 10000  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
 #par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[9e4,10e4]] # example used for script development
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 
@@ -76,7 +76,8 @@ rnd_par=True # set to randomnly shuffle the generated parameters linspace
 imsize=np.array([512, 512], dtype='int32') # output image size
 size_occ = [2.6, 3.7, 2] # Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
 level_occ=0. #mean level of the occulter relative to the background level
-level_noise=0 #photon noise level of cme image relative to photon noise. Set to 0 to avoid
+cme_noise= [0,5.] #gaussian noise level of cme image. [mean, sd], both expressed in fractions of the cme-only image mean level. Set mean to None to avoid
+occ_noise = [0,20.] # occulter gaussian noise. [mean, sd] both expressed in fractions of the abs mean background level. Set mean to None to avoid
 mesh=False # set to also save a png with the GCSmesh
 otype="png" # set the ouput file type: 'png' or 'fits'
 im_range=1. # range of the color scale of the output final syntethyc image in std dev around the mean
@@ -139,6 +140,7 @@ same_corona = [get_corona(0,imsize=imsize), get_corona(1,imsize=imsize)]
 for row in range(len(df)):
     print(f'Saving image pair {row} of {len(df)-1}')
     for sat in range(len(satpos)):
+
         #defining ranges and radius of the occulter
         x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
         y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
@@ -148,21 +150,17 @@ for row in range(len(df)):
 
      
         #mask for cme outer envelope
-        clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)                
-        x = clouds[sat, :, 1]
-        y = clouds[0, :, 2]
-        cloud_arr= np.zeros(imsize)
-        p_x,p_y=deg2px(x,y,plotranges,imsize)
-        for i in range(len(p_x)):
-            cloud_arr[p_x[i], p_y[i]] = 1
-        # fig8 = plt.figure(figsize=(4,4), facecolor='black')
-        # plt.imshow(cloud_arr, origin='lower')
-        # fig8.savefig(OPATH+ '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_mesh_test.png'.format(
-        #         df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig8.get_facecolor())
-        # plt.close(fig8)           
+        # mask from GCS cloud points TBD!!
+        # clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)                
+        # x = clouds[sat, :, 1]
+        # y = clouds[0, :, 2]
+        # cloud_arr= np.zeros(imsize)
+        # p_x,p_y=deg2px(x,y,plotranges,imsize)
+        # for i in range(len(p_x)):
+        #     cloud_arr[p_x[i], p_y[i]] = 1
 
         btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.1, out_sig=0.1, nel=1e5)     
-        mask = segmentation(btot_mask)
+        mask = get_cme_mask(btot_mask)
         mask[r <= size_occ[sat]] = 0  
         if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
             print(f'WARNINGN: CME number {row} mask is null because it is probably behind the occulter, skipping all views...')
@@ -188,19 +186,22 @@ for row in range(len(df)):
         level_back = np.mean(back)               
 
         #cme
+        #adds a random patchy spatial variation of the cme only 
         var_map = low_freq_map(dim=[imsize[0],imsize[1],1],off=[1],var=[1.5],func=[13])
         btot = var_map*(btot/np.max(btot))*df['level_cme'][row]*level_back
         #adds noise
-        if level_noise > 0:
-            noise=np.random.poisson(lam=btot)*level_noise
-            btot+=noise    
-        else:
-            noise=0    
+        if cme_noise[0] is not None :
+            m = np.mean(btot)
+            noise=np.random.normal(loc=cme_noise[0]*m, scale=cme_noise[1]*np.abs(m), size=imsize)
+            btot[btot > 0]+=noise[btot > 0]    
         #adds background
         btot+=back
         #adds occulter
+        if occ_noise[0] is not None:
+            noise=np.random.normal(loc=occ_noise[0]*level_back, scale=occ_noise[1]*np.abs(level_back), size=imsize)[r <= size_occ[sat]]
+        else:
+            noise =0        
         btot[r <= size_occ[sat]] = level_occ*level_back + noise
-
 
         #creating folders for each case
         folder = os.path.join(OPATH, str(row*len(satpos)+sat))
@@ -240,8 +241,8 @@ for row in range(len(df)):
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig_occ.get_facecolor())            
             plt.close(fig_occ)
             #full image
-            m = np.mean(btot)
-            sd =np.std(btot)
+            m = np.mean(btot[mask>0])
+            sd = np.std(btot[mask>0])
             fig = plt.figure(figsize=(4,4), facecolor='black')
             ax = fig.add_subplot()                
             ax.imshow(btot, origin='lower', cmap='gray', vmin=m-im_range*sd, vmax=m+im_range*sd,extent=plotranges[sat])

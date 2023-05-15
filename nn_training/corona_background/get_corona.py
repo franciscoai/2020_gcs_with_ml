@@ -12,10 +12,6 @@ from ext_libs.rebin import rebin
 import scipy
 
 
-def rnd_samples(rng, n):
-# gernerate n random (uniform dist) float samples from range rnd[0] to rnd[1]    
-    return (rng[1] - rng[0]) * np.random.random(n) + rng[0]
-
 def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     '''
     Returns a measured "quiet" (with no CME) solar corona observed by satelitte sat, the implemented instruments are
@@ -32,15 +28,17 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     '''
     # CONSTANTS
     #files
-    DATA_PATH = '/gehme/data'
-    secchipath = DATA_PATH + '/stereo/secchi/L1'
-
+    data_path = '/gehme/data'
+    secchipath = data_path + '/stereo/secchi/L1'
 
     # main
     # STEREO A
     if sat==0:
-        p0 = secchipath + '/a/img/cor2/20110317/20110317_115400_14c2A.fts'
-        p1 = secchipath + '/a/img/cor2/20110317/20110317_122400_14c2A.fts'        
+        p0 = ['/a/img/cor2/20110317/20110317_115400_14c2A.fts', '/a/img/cor2/20130424/20130424_055400_14c2A.fts']
+        p1 = ['/a/img/cor2/20110317/20110317_122400_14c2A.fts', '/a/img/cor2/20130424/20130424_062400_14c2A.fts']           
+        i = np.random.randint(low=0, high=len(p0))
+        p0=secchipath + p0[i]
+        p1=secchipath + p1[i]
         i0, h0 = sunpy.io._fits.read(p0)[0]
         if diff:
             i1, h1 = sunpy.io._fits.read(p1)[0]
@@ -49,8 +47,11 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
             oimg = i1
     # STEREO B
     elif sat==1:
-        p0 = secchipath + '/b/img/cor2/20110317/20110317_123900_14c2B.fts' 
-        p1 = secchipath + '/b/img/cor2/20110317/20110317_125400_14c2B.fts'    
+        p0 = ['/b/img/cor2/20110317/20110317_123900_14c2B.fts', '/b/img/cor2/20130424/20130424_065400_14c2B.fts']
+        p1 = ['/b/img/cor2/20110317/20110317_125400_14c2B.fts', '/b/img/cor2/20130424/20130424_072400_14c2B.fts']        
+        i = np.random.randint(low=0, high=len(p0))           
+        p0=secchipath + p0[i]
+        p1=secchipath + p1[i]    
         i0, h0 = sunpy.io._fits.read(p0)[0]
         if diff:
             i1, h1 = sunpy.io._fits.read(p1)[0]

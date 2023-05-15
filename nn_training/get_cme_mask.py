@@ -2,7 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
-def segmentation(sample_image):
+def get_cme_mask(sample_image):
+    '''
+    Returns a binary mask for the CME in the input (CME-only brigthness image)
+    '''    
     img_sz=np.shape(sample_image)[0]*2
     norm_img =(sample_image-np.min(sample_image))/(np.max(sample_image)-np.min(sample_image))
     img = cv2.resize(norm_img,(img_sz,img_sz))
