@@ -173,12 +173,10 @@ def normalize(image):
 
 #main
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_fran_test'
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_fran/"
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/infer_neural_cme_seg_exp_paper"
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new/"
+opath= model_path + "/infer_neural_cme_seg_exp_paper"
 file_ext=".png"
-trained_model = '4999.torch'
-testDir=  dataDir 
+trained_model = '8000.torch'
 imageSize=[512,512]
 do_run_diff = True # set to use running diff images
 

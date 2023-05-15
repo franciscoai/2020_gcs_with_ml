@@ -27,11 +27,11 @@ def normalize(image):
 
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_fran_test'
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_fran/"
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_fran/test_output"
+dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_new'
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new/"
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new/test_output_8000"
 file_ext=".png"
-trained_model = '4999.torch'
+trained_model = '6000.torch'
 testDir=  dataDir 
 imageSize=[512,512]
 test_ncases = 100
@@ -58,7 +58,7 @@ for num in test_dirs:
     #inference
     file=os.listdir(imgs[idx])
     file=[f for f in file if f.endswith(file_ext)]
-    print(f'Inference of imge: {idx}')
+    print(f'Inference No. {ind}/{len(test_dirs)} of imge: {idx}')
     images = cv2.imread(os.path.join(imgs[idx], file[0]))
     images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)
     im = images.copy()
@@ -70,14 +70,15 @@ for num in test_dirs:
         pred = model(images)
 
     # To plot the true mask
-    # maskDir=os.path.join(imgs[idx], "mask") #path to the mask iamge corresponding to the random image
-    # masks=[]
-    # for mskName in os.listdir(maskDir):
-    #     vesMask = cv2.imread(maskDir+'/'+mskName,0) #reads the mask image in greyscale
-    #     vesMask = (vesMask > 0).astype(np.uint8) #The mask image is stored in 0–255 format and is converted to 0–1 format
-    #     vesMask=cv2.resize(vesMask,imageSize,cv2.INTER_NEAREST) #resizes the mask image to the same size of the random image
-    #     cv2.imshow("mask",vesMask.astype('float64'))#for plotting if the dtype is uint8 it tries to plot as 0-255 format being 0 black and 255 withe, so 1 its close to 0 so it will be black. But if we use float64 it will take 0 as 0 and 1 as 255. 
+    maskDir=os.path.join(imgs[idx], "mask") #path to the mask iamge corresponding to the random image
+    masks=[]
+    for mskName in os.listdir(maskDir):
+        vesMask = cv2.imread(maskDir+'/'+mskName,0) #reads the mask image in greyscale
+        vesMask = (vesMask > 0).astype(np.uint8) #The mask image is stored in 0–255 format and is converted to 0–1 format
+        vesMask=cv2.resize(vesMask,imageSize,cv2.INTER_NEAREST) #resizes the mask image to the same size of the random image
+        #cv2.imshow("mask",vesMask.astype('float64'))#for plotting if the dtype is uint8 it tries to plot as 0-255 format being 0 black and 255 withe, so 1 its close to 0 so it will be black. But if we use float64 it will take 0 as 0 and 1 as 255. 
         
+
     #The predicted object ‘masks’ are saved as a matrix in the same size as the image with each pixel 
     #having a value that corresponds to how likely it is part of the object. And only displays the ones with scores larger than 0.8
     #ssume that only pixels which values larger than 0.5 are likely to be part of the objects.
@@ -85,6 +86,7 @@ for num in test_dirs:
 
     im= im.astype(np.uint8)
     im2 = im.copy()
+    im3 = im.copy()
     nmasks = len(pred[0]['masks'])
     colors = [[255,0,0],[0,255,0],[0,0,255],[0,0,0]]
     for i in range(nmasks):
@@ -98,15 +100,15 @@ for num in test_dirs:
         else:
             scr="below_0.8" 
 
-    pic = np.hstack([im,im2])
+    im3[vesMask > 0] = 255
+    pic = np.hstack([im,im2,im3])
     cv2.imwrite(opath+"/img_"+str(idx)+'_scr_'+str(scr)+'.png', pic)
     ind+=1
-    
-score = [i[0] for i in all_scr]
+score = np.array([float(i[0]) for i in all_scr])
 fig= plt.figure(figsize=(10, 5)) 
 ax = fig.add_subplot() 
 ax.hist(score,bins=30)
-ax.set_title(f'Mean scr: {np.mean(score)}; % of scr>0.8: {(len(score[score>0.8]))/len(score)}')
+ax.set_title(f'Mean scr: {np.mean(score)}; % of scr>0.8: {len(score[score>0.8])/len(score)}')
 ax.set_yscale('log')
 fig.savefig(model_path+"all_scores.png")
 

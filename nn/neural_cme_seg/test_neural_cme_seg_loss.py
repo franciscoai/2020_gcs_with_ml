@@ -8,21 +8,21 @@ import torch
 import os
 import matplotlib.pyplot as plt
 import pickle
-import matplotlib as mpl
-mpl.use('Agg')
 #------------------------------------------------------------trainign of the CNN--------------------------------------------------------------------------------------#
-dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_new'
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new"
+dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_fran_test'
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_fran"
+trained_model = '4999.torch'
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_fran/"
 file_ext=".png"
 trainDir=  dataDir 
 testDir=  dataDir 
-batchSize=8 #number of images used in each iteration
+batchSize=1 #number of images used in each iteration
 imageSize=[512,512] 
-train_ncases=10000 # Total no. of epochs
-gpu=1 # GPU to use
-device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
+test_ncases=100 # Total no. of epochs
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 
 #main
+torch.cuda.empty_cache()
 print(f'Using device:  {device}')
 os.makedirs(opath,exist_ok=True)
 imgs=[] #list of images on the trainig dataset
@@ -42,7 +42,7 @@ def loadData():
         file=[f for f in file if f.endswith(file_ext)]
         img = cv2.imread(os.path.join(imgs[idx], file[0])) #reads the random image
         img = cv2.resize(img, imageSize, cv2.INTER_LINEAR) #rezise the image  
-        img = normalize(img) #cv2.normalize(img, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)  # normalize to 0,1
+        img = cv2.normalize(img, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX) # normalize to 0,1
         maskDir=os.path.join(imgs[idx], "mask") #path to the mask corresponding to the random image
         masks=[]
         for mskName in os.listdir(maskDir):
@@ -75,66 +75,63 @@ def loadData():
     #greyscale to 3 identical RGB ??    
     batch_Imgs=torch.stack([torch.as_tensor(d) for d in batch_Imgs],0) #Concatenates a sequence of tensors along a new dimension formed from the images in greyscale
     batch_Imgs = batch_Imgs.swapaxes(1, 3).swapaxes(2, 3)
-    return batch_Imgs, batch_Data #, batch_Masks
-
-def normalize(image):
-    '''
-    Normalizes the values of the model input image to have a given range (as fractions of the sd around the mean)
-    maped to [0,1]. It clips output values outside [0,1]
-    '''
-    sd_range=1.
-    m = np.mean(image)
-    sd = np.std(image)
-    image = (image - m + sd_range * sd) / (2 * sd_range * sd)
-    image[image >1]=1
-    image[image <0]=0
-    return image
+    return batch_Imgs, batch_Data,idx, file #, batch_Masks
 
 #---------------------------------------------------------Defines the CNN by a pre trained R-CNN----------------------------------------------------------
-model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)   # load an instance segmentation model pre-trained on COCO dataset
-in_features = model.roi_heads.box_predictor.cls_score.in_features # get number of input features for the classifier
-model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=2) # replace the pre-trained head with a new one
+
+model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
+in_features = model.roi_heads.box_predictor.cls_score.in_features 
+model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=2)
+model.load_state_dict(torch.load(model_path + "/"+ trained_model)) #loads the last iteration of training 
+    
 model.to(device) # move model to the right device
-optimizer = torch.optim.AdamW(params=model.parameters(), lr=1e-5) # optimization technique that comes under gradient decent algorithm
 model.train()#sets the model to train mode
 
-all_loss=[]
-for i in range(train_ncases): #Number of iterations
-    images, targets= loadData() #call the function, images=batch_img and targets=batch_data
+all_scr =[]
+test_loss=[]
+for i in range(test_ncases): #Number of iterations
+
+    images, targets,idx,file= loadData() #call the function, images=batch_img and targets=batch_data
     images = list(image.to(device) for image in images) #send images to the selected device
     targets=[{k: v.to(device) for k,v in t.items()} for t in targets] #send targets to the selected device
-    #masks=list(image.to(device) for image in masks)
-   
-    optimizer.zero_grad() #Sets the gradients of all optimized torch.Tensors to zero.
     loss_dict = model(images, targets)
     losses = sum(loss for loss in loss_dict.values()) #The loss is composed of several parts: class loss, bounding box loss, and mask loss. We sum all of these parts together to get the total loss as a single number
-   
-    losses.backward() #computes the partial derivative of the output f with respect to each of the input variables.
-    optimizer.step()
-   
-    all_loss.append(losses.item())
+    test_loss.append([losses.item(),idx,file[0]]) #appends loss, folder index, image file name for each iteration 
     print(i,'loss:', losses.item())
-    if i%2000==0:
+    if i%1000==0:
         torch.save(model.state_dict(),opath + "/" + str(i)+".torch")
-        #saves all losses in a pickle file
-        with open(opath + "/all_loss", 'wb') as file:
-            pickle.dump(all_loss, file, protocol=pickle.HIGHEST_PROTOCOL)
-        #plots losss
-        plt.plot(all_loss)
-        plt.title('Training loss')
-        plt.grid('both')
-        plt.yscale("log")
-        plt.savefig(opath + '/all_loss.png')
-        plt.close()
-
-torch.save(model.state_dict(),opath + "/" + str(i)+".torch")
 #saves all losses in a pickle file
-with open(opath + "/all_loss", 'wb') as file:
-    pickle.dump(all_loss, file, protocol=pickle.HIGHEST_PROTOCOL)
-#plots losss
-plt.plot(all_loss)
-plt.title('Training loss')
-plt.grid('both')
-plt.yscale("log")
-plt.savefig(opath + '/all_loss.png')
-plt.close()
+with open(opath + "/test_loss", 'wb') as file:
+    pickle.dump(test_loss, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+  
+    #model.eval()#set the model to evaluation state
+    #file=os.listdir(imgs[i])
+    #file=[f for f in file if f.endswith(file_ext)]#looks for png file
+    # images = cv2.imread(os.path.join(imgs[i], file[0]))
+    # images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)
+    # im = images.copy()
+    # images = cv2.normalize(images, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX) # normalize to 0,1
+    # images = torch.as_tensor(images, dtype=torch.float32).unsqueeze(0)
+    # images=images.swapaxes(1, 3).swapaxes(2, 3)
+    # images = list(image.to(device) for image in images)
+    #with torch.no_grad(): #runs the image through the net and gets a prediction for the object in the image.
+            #pred = model(images)
+
+
+# --------------------------------------------------------Loss function from train and test --------------------------------------------------------------------------------------------          
+
+training_loss_file = "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new/all_loss"
+testing_loss_file = "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new/test_loss"
+
+with open(training_loss_file, 'rb') as file:
+    training_loss = pickle.load(file)
+with open(testing_loss_file, 'rb') as file:
+    testing_loss = pickle.load(file)
+fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+axs[0].plot(training_loss)  
+axs[0].set_title('Training loss')
+axs[0].set_yscale("log")
+axs[1].hist([i[0] for i in testing_loss],bins=50) 
+axs[1].set_title('Testing loss')
+fig.savefig(opath +'/loss_train_and_test.png')
