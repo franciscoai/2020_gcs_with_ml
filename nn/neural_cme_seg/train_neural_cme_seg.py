@@ -18,8 +18,8 @@ trainDir=  dataDir
 testDir=  dataDir 
 batchSize=8 #number of images used in each iteration
 imageSize=[512,512] 
-train_ncases=10000 # Total no. of epochs
-gpu=1 # GPU to use
+train_ncases=20000 # Total no. of epochs
+gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 
 #main
@@ -114,7 +114,7 @@ for i in range(train_ncases): #Number of iterations
    
     all_loss.append(losses.item())
     print(i,'loss:', losses.item())
-    if i%2000==0:
+    if (i>0) and (i%2000==0):
         torch.save(model.state_dict(),opath + "/" + str(i)+".torch")
         #saves all losses in a pickle file
         with open(opath + "/all_loss", 'wb') as file:

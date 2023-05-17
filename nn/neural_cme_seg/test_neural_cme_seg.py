@@ -27,11 +27,11 @@ def normalize(image):
 
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_new'
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new/"
+dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_new_test'
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new"
 opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new/test_output_8000"
 file_ext=".png"
-trained_model = '6000.torch'
+trained_model = '19999.torch'
 testDir=  dataDir 
 imageSize=[512,512]
 test_ncases = 100
@@ -88,7 +88,7 @@ for num in test_dirs:
     im2 = im.copy()
     im3 = im.copy()
     nmasks = len(pred[0]['masks'])
-    colors = [[255,0,0],[0,255,0],[0,0,255],[0,0,0]]
+    colors = [[255,0,0],[0,255,0],[0,0,255],[0,0,0],[0,255,255],[255,255,0]]
     for i in range(nmasks):
         msk=pred[0]['masks'][i,0].detach().cpu().numpy()
         scr=pred[0]['scores'][i].detach().cpu().numpy()
@@ -104,11 +104,12 @@ for num in test_dirs:
     pic = np.hstack([im,im2,im3])
     cv2.imwrite(opath+"/img_"+str(idx)+'_scr_'+str(scr)+'.png', pic)
     ind+=1
+
 score = np.array([float(i[0]) for i in all_scr])
 fig= plt.figure(figsize=(10, 5)) 
 ax = fig.add_subplot() 
 ax.hist(score,bins=30)
 ax.set_title(f'Mean scr: {np.mean(score)}; % of scr>0.8: {len(score[score>0.8])/len(score)}')
 ax.set_yscale('log')
-fig.savefig(model_path+"all_scores.png")
+fig.savefig(model_path+"/all_scores.png")
 

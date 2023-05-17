@@ -12,6 +12,7 @@ import matplotlib as mpl
 mpl.use('Agg')
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 from ext_libs.rebin import rebin
+import csv
 
 def convert_string(s):
     s = s.replace("(1)", "")
@@ -171,89 +172,152 @@ def normalize(image):
     image[image <0]=0
     return image
 
+
+def neural_cme_segmentation(model_param, img, device):
+    '''
+    Infers a cme segmentation mask in the input coronograph image (img) using the trauined R-CNN with weigths given by model_param
+    '''    
+    #loads model
+    model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
+    in_features = model.roi_heads.box_predictor.cls_score.in_features 
+    model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=2)
+    model.load_state_dict(model_param) #loads the last iteration of training 
+    model.to(device)# move model to the right device
+    model.eval()#set the model to evaluation state
+
+    #inference
+    images = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    #images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)        
+    images = normalize(images) #cv2.normalize(images, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F) # normalize to 0,1
+    oimages = images.copy()                                   
+    images = torch.as_tensor(images, dtype=torch.float32).unsqueeze(0)
+    images=images.swapaxes(1, 3).swapaxes(2, 3)
+    images = list(image.to(device) for image in images)
+    with torch.no_grad(): #runs the image through the net and gets a prediction for the object in the image.
+        pred = model(images)
+
+    # mask image and saves it along with the original
+    orig_img =  np.array(oimages)[:,:,0]
+    masked_img = orig_img.copy()
+    masks = pred[0]['masks']
+    nmasks = len(masks)
+    color=[-255,255,-255,-255,-255,255]
+    all_lbl = []
+    if nmasks > 0:
+        for i in range(nmasks):
+            msk=pred[0]['masks'][i,0].detach().cpu().numpy()
+            scr=pred[0]['scores'][i].detach().cpu().numpy()
+            lbl = pred[0]['labels'][i].detach().cpu().numpy()
+            all_lbl.append(lbl)
+            if scr>0.5 : # Score threshold to consider a valid mask
+                masked_img[:, :][msk > 0.5] = color[lbl] # assumes a likelyhood threshold of 0.5
+            else:
+                scr="below_0.8" 
+    else:
+        scr="NO_mask"  
+    return orig_img,masked_img, masks, scr, all_lbl
+
+def read_fits(file_path):
+    imageSize=[512,512]
+    try:       
+        img = fits.open(file_path)[0].data
+        img = rebin(img, imageSize)   
+        return img  
+    except:
+        print(f'WARNING. I could not find file {file_path}')
+        return None
+
+def plot_to_png(ofile,orig_img, masked_img, title=None):                    
+    fig, axs = plt.subplots(2, 3, figsize=[20,10])
+    axs = axs.ravel()
+    for i in range(len(orig_img)):
+        axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
+        axs[i].axis('off')
+        axs[i+3].imshow(masked_img[i], vmin=0, vmax=1, cmap='gray')
+        axs[i+3].axis('off')
+    axs[0].set_title('Cor A')  
+    axs[1].set_title('Cor B')             
+    axs[2].set_title('Lasco')       
+    if title is not None:
+        fig.suptitle('\n'.join([title[i]+' ; '+title[i+1] for i in range(0,len(title),2)]) , fontsize=16)   
+
+
+    plt.tight_layout()
+    plt.savefig(ofile)
+    plt.close()
+    # #write fits
+    # occ = fits.PrimaryHDU(pic)
+    # occ.writeto(ofile)   
+     
+      
 #main
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new/"
 opath= model_path + "/infer_neural_cme_seg_exp_paper"
 file_ext=".png"
-trained_model = '8000.torch'
-imageSize=[512,512]
-do_run_diff = True # set to use running diff images
+trained_model = '19999.torch'
+do_run_diff = True # set to use running diff instead of base diff (False)
 
 #main
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
+gpu=0 # GPU to use
+device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 print(f'Using device:  {device}')
 
-event = get_paths_cme_exp_sources() # get all files event
 os.makedirs(opath, exist_ok=True)
+event = get_paths_cme_exp_sources() # get all files event
+file = open(opath + '/all_events.csv', 'w')
+writer = csv.writer(file)
+writer.writerow(event[0].keys())
+for e in event:
+    writer.writerow(e.values())
+file.close()
+
+model_param = torch.load(model_path + "/"+ trained_model)
+
 for ev in event:
     for t in range(len(ev['pro_files'])):
-        cimg= ev['ima1'][t]
-        cpre = ev['pre_ima'][t]
-        #reads files and computes a base diff
-        if t == 0 or do_run_diff:
-            i0 = fits.open(cpre)[0].data
-            i0 = rebin(i0, imageSize)
+        #cora
+        cimga= ev['ima1'][t]
+        if do_run_diff:
+            cprea = ev['ima0'][t]
+        else:
+            cprea = ev['pre_ima'][t]
+        print('Inference of imge:'+cimga)     
         try:
-            i1 = fits.open(cimg)[0].data
-            i1 = rebin(i1, imageSize)
-            img = i1-i0
-
-            #loads model
-
-            # # Initialize the Weight Transforms
-            # weights = MaskRCNN_ResNet50_FPN_Weights.DEFAULT
-            # preprocess = weights.transforms()
-            # img_transformed = preprocess(img)
-
-            model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
-            in_features = model.roi_heads.box_predictor.cls_score.in_features 
-            model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=2)
-            model.load_state_dict(torch.load(model_path + "/"+ trained_model)) #loads the last iteration of training 
-            model.to(device)# move model to the right device
-            model.eval()#set the model to evaluation state
-
-            #inference
-            print('Inference of imge:'+cimg)
-            images = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-            images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)        
-            images = normalize(images) #cv2.normalize(images, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F) # normalize to 0,1
-            oimages = images.copy()                
-            print(np.min(images), np.max(images), np.mean(images), np.std(images))            
-            images = torch.as_tensor(images, dtype=torch.float32).unsqueeze(0)
-            images=images.swapaxes(1, 3).swapaxes(2, 3)
-            images = list(image.to(device) for image in images)
-            with torch.no_grad(): #runs the image through the net and gets a prediction for the object in the image.
-                pred = model(images)
-
-            # mask image and saves it along with the original
-            img =  np.array(oimages)[:,:,0]
-            im2 = img.copy()
-            nmasks = len(pred[0]['masks'])
-            color=[-255,-255]
-            if nmasks > 0:
-                for i in range(nmasks):
-                    msk=pred[0]['masks'][i,0].detach().cpu().numpy()
-                    scr=pred[0]['scores'][i].detach().cpu().numpy()
-                    if scr>0.5 : # Score threshold to conside a valid mask
-                        im2[:, :][msk > 0.5] = color[i] # assumes a likelyhood threshold of 0.5
-                    else:
-                        scr="below_0.8" 
-            else:
-                scr="NO_mask" 
-            ofile = os.path.join(opath,os.path.basename(ev['pro_files'][t])+'_scr_'+str(scr)+'.png')
-            #print(f'Saving file {ofile}')
-
-            #saves in png
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[15, 5])
-            ax1.imshow(img, vmin=0, vmax=1, cmap='gray')
-            ax2.imshow(im2, vmin=0, vmax=1, cmap='gray')
-            plt.tight_layout()
-            plt.savefig(ofile)
-            plt.close()
-
-            # #write fits
-            # occ = fits.PrimaryHDU(pic)
-            # occ.writeto(ofile)            
+            img = read_fits(cimga) -read_fits(cprea) 
+            orig_imga, masked_imga, maska, scra, labelsa  = neural_cme_segmentation(model_param, img, device)
         except:
-            print(f'WARNING. I could not find file {cimg}, skipping...')
+            orig_imga, masked_imga, maska, scra, labelsa  = neural_cme_segmentation(model_param, img, device)
+            orig_imga = masked_imga =np.zeros((512,512))
+            print(f'Inference skipped')
+
+        #corb
+        cimgb= ev['imb1'][t]
+        if do_run_diff:
+            cpreb = ev['imb0'][t]
+        else:
+            cpreb = ev['pre_imb'][t]
+        print('Inference of imge:'+cimgb)
+        try:
+            img = read_fits(cimgb) - read_fits(cpreb)
+            orig_imgb, masked_imgb, maskb, scrb, labelsb = neural_cme_segmentation(model_param, img, device)
+        except:
+            orig_imgb = masked_imgb =np.zeros((512,512))
+            print(f'Inference skipped')
+                
+        #lasco
+        cimgl= ev['lasco1'][t]
+        if do_run_diff:
+            cprel = ev['lasco0'][t]
+        else:
+            cprel = ev['pre_lasco'][t]
+        print('Inference of imge:'+cimgl)
+        try:
+            img = read_fits(cimgl) - read_fits(cprel)
+            orig_imgl, masked_imgl, maskl, scrl, labelsl = neural_cme_segmentation(model_param, img, device)
+        except:
+            orig_imgl = masked_imgl =np.zeros((512,512))
+            print(f'Inference skipped')   
+
+        ofile = os.path.join(opath,os.path.basename(ev['pro_files'][t])+'.png')
+        plot_to_png(ofile, [orig_imga,orig_imgb, orig_imgl], [masked_imga,masked_imgb,masked_imgl], title=[cimga, cprea, cimgb, cpreb, cimgl, cprel])
