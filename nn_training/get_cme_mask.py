@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
-def get_cme_mask(sample_image):
+def get_cme_mask(sample_image, inner_cme):
     '''
     Returns a binary mask for the CME in the input (CME-only brigthness image)
     '''    
@@ -20,13 +20,19 @@ def get_cme_mask(sample_image):
         mask = np.zeros((np.shape(sample_image)[0],np.shape(sample_image)[0]))
     else:
         if len(cnt)>=3:
-            cme_outer = cnt[-2]
-            cme_inner = cnt[-3]#[i for i in cnt[0:-2] if np.size(i)<(np.size(cme_outer)-100)] 
-            mask_inner = np.zeros((img_sz,img_sz), np.uint8)
-            mask_outer = np.zeros((img_sz,img_sz), np.uint8)
-            mask_inner = cv2.drawContours(mask_inner, [cme_inner],-1, 1, -1)
-            mask_outer = cv2.drawContours(mask_outer, [cme_outer],-1, 1, -1)
-            mask = mask_outer - mask_inner
+ #           if inner_cme==True:
+                cme_outer = cnt[-2]
+                cme_inner = cnt[-3]#[i for i in cnt[0:-2] if np.size(i)<(np.size(cme_outer)-100)] 
+                mask_inner = np.zeros((img_sz,img_sz), np.uint8)
+                mask_outer = np.zeros((img_sz,img_sz), np.uint8)
+                mask_inner = cv2.drawContours(mask_inner, [cme_inner],-1, 1, -1)
+                mask_outer = cv2.drawContours(mask_outer, [cme_outer],-1, 1, -1)
+                mask = mask_outer - mask_inner
+            # else:
+            #     cme_outer = cnt[-2]
+            #     mask_outer = np.zeros((img_sz,img_sz), np.uint8)
+            #     mask_outer = cv2.drawContours(mask_outer, [cme_outer],-1, 1, -1)
+                #mask = mask_outer
         else: # for when the inner border of the cme i not visible
             cme_outer = cnt[-1]    
             mask_outer = np.zeros((img_sz,img_sz), np.uint8)

@@ -52,7 +52,7 @@ def deg2px(x,y,plotranges,imsize):
 #files
 exec_path = os.getcwd()
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_new' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/outer_cme' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
 
 #sattelite positions
 secchipath = DATA_PATH + '/stereo/secchi/L1'
@@ -68,9 +68,10 @@ ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like head
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[8,14],[0.2,0.6], [10,60],[5e1,2e2]] # [5e1,1e2] min-max ranges of each parameter in par_names
-par_num = 10000  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
+par_num = 10  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
 #par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[9e4,10e4]] # example used for script development
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
+
 
 # Syntethic image options
 imsize=np.array([512, 512], dtype='int32') # output image size
@@ -82,6 +83,7 @@ mesh=False # set to also save a png with the GCSmesh
 otype="png" # set the ouput file type: 'png' or 'fits'
 im_range=1. # range of the color scale of the output final syntethyc image in std dev around the mean
 back_rnd_rot=True # set to randomly rotate the background image around its center
+inner_cme=False
 
 ## main
 par_num = [par_num] * len(par_rng)
@@ -158,7 +160,6 @@ for row in range(len(df)):
         # p_x,p_y=deg2px(x,y,plotranges,imsize)
         # for i in range(len(p_x)):
         #     cloud_arr[p_x[i], p_y[i]] = 1
-
         btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.1, out_sig=0.1, nel=1e5)     
         mask = get_cme_mask(btot_mask)
         mask[r <= size_occ[sat]] = 0  
