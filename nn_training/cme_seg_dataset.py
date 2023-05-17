@@ -67,10 +67,10 @@ ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like head
 # level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[8,14],[0.2,0.6], [10,60],[5e1,2e2]] # [5e1,1e2] min-max ranges of each parameter in par_names
+par_rng = [[-180,180],[-70,70],[-90,90],[8,20],[0.2,0.6], [10,60],[5e1,2e2]] # min-max ranges of each parameter in par_names
 par_num = 10  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
 #par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[9e4,10e4]] # example used for script development
-rnd_par=True # set to randomnly shuffle the generated parameters linspace 
+rnd_par=False # set to randomnly shuffle the generated parameters linspace 
 
 
 # Syntethic image options
@@ -83,7 +83,7 @@ mesh=False # set to also save a png with the GCSmesh
 otype="png" # set the ouput file type: 'png' or 'fits'
 im_range=1. # range of the color scale of the output final syntethyc image in std dev around the mean
 back_rnd_rot=True # set to randomly rotate the background image around its center
-inner_cme=False
+inner_cme=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
 
 ## main
 par_num = [par_num] * len(par_rng)
@@ -111,7 +111,7 @@ if LascoC2 is not None:
             myfitsL2[0].header['HGLT_OBS'] = coordL2ston.lat.deg
             myfitsL2[0].header['HGLN_OBS'] = coordL2ston.lon.deg
             hdrL2 = myfitsL2[0].header
-    headers = [hdra2, hdrL2, hdrb2]
+    headers = [hdra2, hdrb2, hdrL2]
 else:
     headers = [hdra2, hdrb2]
     ims = [ima2, imb2]
@@ -142,7 +142,8 @@ same_corona = [get_corona(0,imsize=imsize), get_corona(1,imsize=imsize)]
 for row in range(len(df)):
     print(f'Saving image pair {row} of {len(df)-1}')
     for sat in range(len(satpos)):
-
+        # if row !=8 :
+        #     break
         #defining ranges and radius of the occulter
         x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
         y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
@@ -160,8 +161,16 @@ for row in range(len(df)):
         # p_x,p_y=deg2px(x,y,plotranges,imsize)
         # for i in range(len(p_x)):
         #     cloud_arr[p_x[i], p_y[i]] = 1
-        btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.1, out_sig=0.1, nel=1e5)     
-        mask = get_cme_mask(btot_mask)
+        btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.1, nel=1e5)     
+        mask = get_cme_mask(btot_mask,inner_cme=inner_cme)
+        
+        #check for too small mask
+        cme_npix= len(btot_mask[btot_mask>0].flatten())
+        mask_npix= len(mask[mask>0].flatten())
+        if mask_npix/cme_npix<0.9:
+            print(f'WARNINGN: CME number {row} mask is too small compared to cme brigthness image, skipping all views...')
+            break
+        #check for null mask
         mask[r <= size_occ[sat]] = 0  
         if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
             print(f'WARNINGN: CME number {row} mask is null because it is probably behind the occulter, skipping all views...')
@@ -171,10 +180,10 @@ for row in range(len(df)):
         btot0 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.5, out_sig=0.25, nel=1e5)
                       
         #adds a flux rope-like structure
-        height_diff = np.random.uniform(low=0.55, high=0.65)
+        height_diff = np.random.uniform(low=0.55, high=0.85)
         aspect_ratio_frope = np.random.uniform(low=0.9, high=0.14)
-        btot1 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*height_diff, 0.13, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.7, out_sig=0.3, nel=1e5)
-        btot = btot0 + btot1
+        btot1 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*height_diff,aspect_ratio_frope, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.7, out_sig=0.1, nel=1e5)
+        btot = btot0 + np.random.uniform(low=-1, high=1)*btot1
 
         #mask for occulter
         arr = np.zeros(xx.shape)
@@ -242,6 +251,7 @@ for row in range(len(df)):
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig_occ.get_facecolor())            
             plt.close(fig_occ)
             #full image
+            #btot=btot_mask
             m = np.mean(btot[mask>0])
             sd = np.std(btot[mask>0])
             fig = plt.figure(figsize=(4,4), facecolor='black')
