@@ -14,13 +14,18 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath
 from ext_libs.rebin import rebin
 import csv
 
-def convert_string(s):
+def correct_path(s):
     s = s.replace("(1)", "")
-    s = s.replace("preped/", "")
-    s = s.replace("L0", "L1")
-    s = s.replace("_0B", "_1B")
-    s = s.replace("_04", "_14")
-    s = s.replace("level1/", "")    
+    s = s.replace("(2)", "")
+    return s
+
+def convert_string(s):
+    # uncomment to use proper L1 path for Cor images    
+    # s = s.replace("preped/", "")
+    # s = s.replace("L0", "L1")
+    # s = s.replace("_0B", "_1B")
+    # s = s.replace("_04", "_14")
+    # s = s.replace("level1/", "")    
     return s
 
 def get_paths_cme_exp_sources():
@@ -125,6 +130,7 @@ def get_paths_cme_exp_sources():
                             cor = 'cor2'
                         cdate = cline[cline.find('/preped/')+8:cline.find('/preped/')+16]
                         cline = convert_string(cline)
+                        cline = correct_path(cline)
                         cdict['ima1'].append(cline)
                         ok_pro_files.append(f)                           
                         cpre = [s for s in pre_event if (cdate in s and cor in s and '/a/' in s )]
@@ -135,15 +141,19 @@ def get_paths_cme_exp_sources():
                         cdict['pre_imb'].append([s for s in pre_event if (cdate in s and  cor in s and '/a/' in s )][0])
                     if 'imaprev=sccreadfits(' in line:
                         cline = convert_string(secchipath +line.split('\'')[1])
+                        cline = correct_path(cline)
                         cdict['ima0'].append(cline)
                     if 'imb=sccreadfits(' in line:
                         cline = convert_string(secchipath +line.split('\'')[1])
+                        cline = correct_path(cline)
                         cdict['imb1'].append(cline)
                     if 'imbprev=sccreadfits(' in line:
                         cline = convert_string(secchipath +line.split('\'')[1])
+                        cline = correct_path(cline)
                         cdict['imb0'].append(cline)          
                     if 'lasco1=readfits' in line:
                         cline = lasco_path +line.split('\'')[1]
+                        cline = correct_path(cline)
                         cdict['lasco1'].append(cline)  
                         cdate = cline[cline.find('/preped/')+8:cline.find('/preped/')+16]
                         cpre= [s for s in pre_event if (cdate in s and '/c2/' in s)]
@@ -152,7 +162,9 @@ def get_paths_cme_exp_sources():
                             breakpoint()                        
                         cdict['pre_lasco'].append(cpre[0])                                           
                     if 'lasco0=readfits' in line:
-                        cdict['lasco0'].append(lasco_path +line.split('\'')[1]) 
+                        cline = lasco_path +line.split('\'')[1]
+                        cline = correct_path(cline)
+                        cdict['lasco0'].append(cline) 
         cdict['date']=ev
         cdict['pro_files']=ok_pro_files
         cdict['sav_files']=ok_sav_files                                                      
@@ -252,14 +264,14 @@ def plot_to_png(ofile,orig_img, masked_img, title=None):
       
 #main
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new/"
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_with_hole/"
 opath= model_path + "/infer_neural_cme_seg_exp_paper"
 file_ext=".png"
 trained_model = '19999.torch'
 do_run_diff = True # set to use running diff instead of base diff (False)
 
 #main
-gpu=0 # GPU to use
+gpu=1 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 print(f'Using device:  {device}')
 
@@ -287,7 +299,6 @@ for ev in event:
             img = read_fits(cimga) -read_fits(cprea) 
             orig_imga, masked_imga, maska, scra, labelsa  = neural_cme_segmentation(model_param, img, device)
         except:
-            orig_imga, masked_imga, maska, scra, labelsa  = neural_cme_segmentation(model_param, img, device)
             orig_imga = masked_imga =np.zeros((512,512))
             print(f'Inference skipped')
 

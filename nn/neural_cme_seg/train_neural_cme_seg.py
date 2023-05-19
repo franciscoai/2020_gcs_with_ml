@@ -11,14 +11,16 @@ import pickle
 import matplotlib as mpl
 mpl.use('Agg')
 #------------------------------------------------------------trainign of the CNN--------------------------------------------------------------------------------------#
-dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_new'
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new"
+dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training'
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_no_hole"
+# set to the full path of a model such to use it as initial condition, use None for random init
+pre_trained_model="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_with_hole/19999.torch"
 file_ext=".png"
 trainDir=  dataDir 
 testDir=  dataDir 
 batchSize=8 #number of images used in each iteration
 imageSize=[512,512] 
-train_ncases=20000 # Total no. of epochs
+train_ncases=4000 # Total no. of epochs
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 
@@ -94,8 +96,11 @@ def normalize(image):
 model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)   # load an instance segmentation model pre-trained on COCO dataset
 in_features = model.roi_heads.box_predictor.cls_score.in_features # get number of input features for the classifier
 model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=2) # replace the pre-trained head with a new one
-model.to(device) # move model to the right device
-optimizer = torch.optim.AdamW(params=model.parameters(), lr=1e-5) # optimization technique that comes under gradient decent algorithm
+if pre_trained_model is not None:
+    model_param = torch.load(pre_trained_model)
+    model.load_state_dict(model_param) #loads the last iteration of training 
+model.to(device) # move model to the right device    
+optimizer = torch.optim.AdamW(params=model.parameters(), lr=1e-6) # optimization technique that comes under gradient decent algorithm    
 model.train()#sets the model to train mode
 
 all_loss=[]
