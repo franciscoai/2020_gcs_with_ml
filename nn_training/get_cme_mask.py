@@ -13,10 +13,9 @@ def get_cme_mask(sample_image, inner_cme=True):
     edges = cv2.dilate(cv2.Canny(thresh.astype("uint8"),0,255),None,cv2.BORDER_CONSTANT, borderValue=1)
     
     cnt = sorted(cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)[-2], key=cv2.contourArea)
-
-    print(len(cnt))
+    
     cnt= [i for i in cnt if np.size(i)<(img_sz*8-50)]#deletes the image outer border
-    print(len(cnt))
+
     if len(cnt) == 0:
         mask = np.zeros((np.shape(sample_image)[0],np.shape(sample_image)[0]))
     else:

@@ -36,7 +36,7 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     if sat==0:
         p0 = ['/a/img/cor2/20110317/20110317_115400_14c2A.fts', '/a/img/cor2/20130424/20130424_055400_14c2A.fts']
         p1 = ['/a/img/cor2/20110317/20110317_122400_14c2A.fts', '/a/img/cor2/20130424/20130424_062400_14c2A.fts']           
-        i = np.random.randint(low=0, high=len(p0))
+        i = np.random.randint(low=0, high=len(p0)-1)
         p0=secchipath + p0[i]
         p1=secchipath + p1[i]
         i0, h0 = sunpy.io._fits.read(p0)[0]
@@ -49,7 +49,7 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     elif sat==1:
         p0 = ['/b/img/cor2/20110317/20110317_123900_14c2B.fts', '/b/img/cor2/20130424/20130424_065400_14c2B.fts']
         p1 = ['/b/img/cor2/20110317/20110317_125400_14c2B.fts', '/b/img/cor2/20130424/20130424_072400_14c2B.fts']        
-        i = np.random.randint(low=0, high=len(p0))           
+        i = np.random.randint(low=0, high=len(p0)-1)           
         p0=secchipath + p0[i]
         p1=secchipath + p1[i]    
         i0, h0 = sunpy.io._fits.read(p0)[0]

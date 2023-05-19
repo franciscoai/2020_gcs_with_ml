@@ -52,7 +52,7 @@ def deg2px(x,y,plotranges,imsize):
 #files
 exec_path = os.getcwd()
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/outer_cme' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
 
 #sattelite positions
 secchipath = DATA_PATH + '/stereo/secchi/L1'
@@ -67,10 +67,10 @@ ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like head
 # level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[8,20],[0.2,0.6], [10,60],[5e1,2e2]] # min-max ranges of each parameter in par_names
-par_num = 10  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
+par_rng = [[-180,180],[-70,70],[-90,90],[8,20],[0.2,0.6], [10,60],[9e1,3e2]] # min-max ranges of each parameter in par_names
+par_num = 3000  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
 #par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[9e4,10e4]] # example used for script development
-rnd_par=False # set to randomnly shuffle the generated parameters linspace 
+rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 
 
 # Syntethic image options
@@ -78,7 +78,7 @@ imsize=np.array([512, 512], dtype='int32') # output image size
 size_occ = [2.6, 3.7, 2] # Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
 level_occ=0. #mean level of the occulter relative to the background level
 cme_noise= [0,5.] #gaussian noise level of cme image. [mean, sd], both expressed in fractions of the cme-only image mean level. Set mean to None to avoid
-occ_noise = [0,20.] # occulter gaussian noise. [mean, sd] both expressed in fractions of the abs mean background level. Set mean to None to avoid
+occ_noise = [0,30.] # occulter gaussian noise. [mean, sd] both expressed in fractions of the abs mean background level. Set mean to None to avoid
 mesh=False # set to also save a png with the GCSmesh
 otype="png" # set the ouput file type: 'png' or 'fits'
 im_range=1. # range of the color scale of the output final syntethyc image in std dev around the mean
@@ -181,9 +181,11 @@ for row in range(len(df)):
                       
         #adds a flux rope-like structure
         height_diff = np.random.uniform(low=0.55, high=0.85)
-        aspect_ratio_frope = np.random.uniform(low=0.9, high=0.14)
+        aspect_ratio_frope = np.random.uniform(low=0.09, high=0.14)
+        int_frope = np.random.uniform(low=2, high=10, size=2) * np.random.choice([-1,1], size=2)
         btot1 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*height_diff,aspect_ratio_frope, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.7, out_sig=0.1, nel=1e5)
-        btot = btot0 + np.random.uniform(low=-1, high=1)*btot1
+        btot11 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*height_diff*1.2,aspect_ratio_frope, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.7, out_sig=0.1, nel=1e5)
+        btot = btot0 + int_frope[0]*btot1-int_frope[1]*btot11
 
         #mask for occulter
         arr = np.zeros(xx.shape)
