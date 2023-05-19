@@ -66,6 +66,6 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
  
     if imsize is not None:
         oimg = rebin(oimg,imsize,operation='mean') 
-
-    return oimg
+        
+    return oimg,h0
 
