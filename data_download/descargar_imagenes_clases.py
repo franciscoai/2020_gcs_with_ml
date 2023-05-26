@@ -218,8 +218,8 @@ class cor1_downloader:
             self.instrumento = a.Instrument.secchi
             self.detector = a.Detector.cor1
             self.nave  = nave
-            #self.dir_descarga = '/gehme/data/stereo/'
-            self.dir_descarga = '/data_local/GCS/gcs/Imagenes/'
+            self.dir_descarga = '/gehme/data/stereo/'
+            #self.dir_descarga = '/data_local/GCS/gcs/Imagenes/'
             self.nivel = nivel
             self.indices_descarga = ''
             self.image_type = image_type #seq usualmente
