@@ -192,7 +192,7 @@ def neural_cme_segmentation(model_param, img, device):
     #loads model
     model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
     in_features = model.roi_heads.box_predictor.cls_score.in_features 
-    model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=2)
+    model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=3)
     model.load_state_dict(model_param) #loads the last iteration of training 
     model.to(device)# move model to the right device
     model.eval()#set the model to evaluation state
@@ -208,26 +208,26 @@ def neural_cme_segmentation(model_param, img, device):
     with torch.no_grad(): #runs the image through the net and gets a prediction for the object in the image.
         pred = model(images)
 
-    # mask image and saves it along with the original
+    # returns the network input image along with the infered masks, labels and scores
     orig_img =  np.array(oimages)[:,:,0]
-    masked_img = orig_img.copy()
-    masks = pred[0]['masks']
-    nmasks = len(masks)
-    color=[-255,255,-255,-255,-255,255]
+    nmasks = len(pred[0]['masks'])
     all_lbl = []
+    all_boxes = []
+    all_scores = []    
+    all_masks = [] 
     if nmasks > 0:
         for i in range(nmasks):
             msk=pred[0]['masks'][i,0].detach().cpu().numpy()
+            all_masks.append(msk)
             scr=pred[0]['scores'][i].detach().cpu().numpy()
+            all_scores.append(scr)
             lbl = pred[0]['labels'][i].detach().cpu().numpy()
             all_lbl.append(lbl)
-            if scr>0.5 : # Score threshold to consider a valid mask
-                masked_img[:, :][msk > 0.5] = color[lbl] # assumes a likelyhood threshold of 0.5
-            else:
-                scr="below_0.8" 
+            box = pred[0]['boxes'][i].detach().cpu().numpy()
+            all_boxes.append(box)              
     else:
-        scr="NO_mask"  
-    return orig_img,masked_img, masks, scr, all_lbl
+        os.error('Found no maks in the current image')
+    return orig_img, all_masks, all_scores, all_lbl, all_boxes
 
 def read_fits(file_path):
     imageSize=[512,512]
@@ -239,20 +239,46 @@ def read_fits(file_path):
         print(f'WARNING. I could not find file {file_path}')
         return None
 
-def plot_to_png(ofile,orig_img, masked_img, title=None):                    
+def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scores=None):
+    """
+    Plot the input images (orig_img) along with the infered masks, labels and scores
+    in a single image saved to ofile
+    """    
+    mask_threshold = 0.5 # value to considered a pixel belongs to the object
+    scr_threshold = 0.8 # only detections with scroe larger than this value are considered
+    color=['r','b','g','k','y']
+    obj_labels = ['Occ', 'CME']
+    #
+    cmap = mpl.colors.ListedColormap(color)  
+    nans = np.full(np.shape(orig_img[0]), np.nan)
     fig, axs = plt.subplots(2, 3, figsize=[20,10])
     axs = axs.ravel()
     for i in range(len(orig_img)):
         axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
         axs[i].axis('off')
-        axs[i+3].imshow(masked_img[i], vmin=0, vmax=1, cmap='gray')
-        axs[i+3].axis('off')
-    axs[0].set_title('Cor A')  
-    axs[1].set_title('Cor B')             
-    axs[2].set_title('Lasco')       
+        axs[i+3].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
+        axs[i+3].axis('off')        
+        if boxes is not None:
+            nb = 0
+            for b in boxes[i]:
+                if scores is not None:
+                    scr = scores[i][nb]
+                else:
+                    scr = 0   
+                if scr > scr_threshold:             
+                    masked = nans.copy()
+                    masked[:, :][masks[i][nb] > mask_threshold] = nb              
+                    axs[i+3].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
+                    box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
+                    axs[i+3].add_patch(box)
+                    if labels is not None:
+                        axs[i+3].annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
+                nb+=1
+    axs[0].set_title(f'Cor A: {len(boxes[0])} objects detected') 
+    axs[1].set_title(f'Cor B: {len(boxes[1])} objects detected')               
+    axs[2].set_title(f'Lasco: {len(boxes[2])} objects detected')     
     if title is not None:
         fig.suptitle('\n'.join([title[i]+' ; '+title[i+1] for i in range(0,len(title),2)]) , fontsize=16)   
-
 
     plt.tight_layout()
     plt.savefig(ofile)
@@ -264,10 +290,10 @@ def plot_to_png(ofile,orig_img, masked_img, title=None):
       
 #main
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_with_hole/"
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v2_running_diff"
 opath= model_path + "/infer_neural_cme_seg_exp_paper"
 file_ext=".png"
-trained_model = '19999.torch'
+trained_model = '3999.torch'
 do_run_diff = True # set to use running diff instead of base diff (False)
 
 #main
@@ -297,9 +323,9 @@ for ev in event:
         print('Inference of imge:'+cimga)     
         try:
             img = read_fits(cimga) -read_fits(cprea) 
-            orig_imga, masked_imga, maska, scra, labelsa  = neural_cme_segmentation(model_param, img, device)
+            orig_imga, maska, scra, labelsa, boxesa  = neural_cme_segmentation(model_param, img, device)
         except:
-            orig_imga = masked_imga =np.zeros((512,512))
+            orig_imga = np.zeros((512,512))
             print(f'Inference skipped')
 
         #corb
@@ -311,9 +337,9 @@ for ev in event:
         print('Inference of imge:'+cimgb)
         try:
             img = read_fits(cimgb) - read_fits(cpreb)
-            orig_imgb, masked_imgb, maskb, scrb, labelsb = neural_cme_segmentation(model_param, img, device)
+            orig_imgb, maskb, scrb, labelsb, boxesb = neural_cme_segmentation(model_param, img, device)
         except:
-            orig_imgb = masked_imgb =np.zeros((512,512))
+            orig_imgb = np.zeros((512,512))
             print(f'Inference skipped')
                 
         #lasco
@@ -325,10 +351,12 @@ for ev in event:
         print('Inference of imge:'+cimgl)
         try:
             img = read_fits(cimgl) - read_fits(cprel)
-            orig_imgl, masked_imgl, maskl, scrl, labelsl = neural_cme_segmentation(model_param, img, device)
+            orig_imgl, maskl, scrl, labelsl, boxesl = neural_cme_segmentation(model_param, img, device)
         except:
-            orig_imgl = masked_imgl =np.zeros((512,512))
+            orig_imgl = np.zeros((512,512))
             print(f'Inference skipped')   
 
         ofile = os.path.join(opath,os.path.basename(ev['pro_files'][t])+'.png')
-        plot_to_png(ofile, [orig_imga,orig_imgb, orig_imgl], [masked_imga,masked_imgb,masked_imgl], title=[cimga, cprea, cimgb, cpreb, cimgl, cprel])
+        plot_to_png(ofile, [orig_imga,orig_imgb, orig_imgl], [maska,maskb,maskl], \
+                    title=[cimga, cprea, cimgb, cpreb, cimgl, cprel], labels=[labelsa,labelsb, labelsl], \
+                    boxes=[boxesa, boxesb, boxesl], scores=[scra, scrb, scrl])

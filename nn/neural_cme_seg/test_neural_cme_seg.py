@@ -27,14 +27,14 @@ def normalize(image):
 
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_dataset_new_test'
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new"
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_new/test_output_8000"
+dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_testing'
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_no_hole"
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_no_hole/test_output"
 file_ext=".png"
-trained_model = '19999.torch'
+trained_model = '3999.torch'
 testDir=  dataDir 
 imageSize=[512,512]
-test_ncases = 100
+test_ncases = 500
 
 
 #main
@@ -51,7 +51,7 @@ for num in test_dirs:
     #loads model
     model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
     in_features = model.roi_heads.box_predictor.cls_score.in_features 
-    model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=2)
+    model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=3)
     model.load_state_dict(torch.load(model_path + "/"+ trained_model)) #loads the last iteration of training 
     model.to(device)# move model to the right device
     model.eval()#set the model to evaluation state
