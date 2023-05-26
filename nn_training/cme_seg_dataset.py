@@ -7,7 +7,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from pyGCS_raytrace import pyGCS
 from pyGCS_raytrace.rtraytracewcs import rtraytracewcs
-from nn_training.get_cme_mask import get_cme_mask
+from nn_training.get_cme_mask import get_cme_mask,get_mask_cloud
 from nn_training.corona_background.get_corona import get_corona
 import numpy as np
 import datetime
@@ -49,11 +49,6 @@ def deg2px(x,y,plotranges,imsize):
     return(y_px,x_px)
 
 
-def pnt2arr(points,imsize):
-    arr=np.zeros(imsize)
-    for i in range(len(points)):
-        arr[points[i][0], points[i][1]] = 1
-    return arr
 
 
 
@@ -80,10 +75,10 @@ n_sat = 2 if LascoC2 is None else 3 #number of satellites
 # level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[8,20],[0.2,0.6], [10,60],[9e1,3e2]] # min-max ranges of each parameter in par_names
-par_num = 5  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
+par_rng = [[-180,180],[-70,70],[-90,90],[8,25],[0.2,0.6], [10,60],[9e3,3e3]] # min-max ranges of each parameter in par_names
+par_num = 10  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
 #par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[9e4,10e4]] # example used for script development
-rnd_par=True # set to randomnly shuffle the generated parameters linspace 
+rnd_par=False # set to randomnly shuffle the generated parameters linspace 
 
 
 # Syntethic image options
@@ -92,12 +87,12 @@ size_occ = [2.6, 3.7, 2] # Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
 level_occ=0. #mean level of the occulter relative to the background level
 cme_noise= [0,5.] #gaussian noise level of cme image. [mean, sd], both expressed in fractions of the cme-only image mean level. Set mean to None to avoid
 occ_noise = [0,30.] # occulter gaussian noise. [mean, sd] both expressed in fractions of the abs mean background level. Set mean to None to avoid
-mesh=False # set to also save a png with the GCSmesh
+mesh=True # set to also save a png with the GCSmesh
 otype="png" # set the ouput file type: 'png' or 'fits'
 im_range=1. # range of the color scale of the output final syntethyc image in std dev around the mean
 back_rnd_rot=True # set to randomly rotate the background image around its center
 inner_cme=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
-
+mask_from_cloud=True #Set to True it calculetes mask from clouds else from ratraycing
 ## main
 par_num = [par_num] * len(par_rng)
 #read headers
@@ -172,42 +167,23 @@ for row in range(len(df)):
         x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)  
         r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
 
-
-        #mask for cme outer envelope
-        #mask from GCS cloud points TBD!!
-        clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)                
-        x = clouds[sat, :, 1]
-        y = clouds[0, :, 2]
-        p_x,p_y=deg2px(x,y,plotranges,imsize)
-        points=[]
-        for i in range(len(p_x)):
-            points.append([p_x[i],p_y[i]])
-        arr_cloud=pnt2arr(points,imsize)
-        n_mask= np.ones(len(p_x))
-        # cloud_box=[[np.min(p_x),np.max(p_x)],[np.min(p_y),np.max(p_y)]]
-        args=[slice(min(p_x), max(p_x) + 1),slice(min(p_y), max(p_y) + 1)]
-        grid=np.mgrid[args]#not working gives 3 args one of them for dimension 
-        breakpoint()
+        if mask_from_cloud:
+            #mask for cme outer envelope
+            clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)                
+            x = clouds[sat, :, 1]
+            y = clouds[0, :, 2]
+            p_x,p_y=deg2px(x,y,plotranges,imsize)
+            mask=get_mask_cloud(p_x,p_y,imsize,OPATH)
+        else:
+            btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.1, nel=1e5)     
+            mask = get_cme_mask(btot_mask,inner_cme=inner_cme)
+            #check for too small mask
+            cme_npix= len(btot_mask[btot_mask>0].flatten())
+            mask_npix= len(mask[mask>0].flatten())
+            if mask_npix/cme_npix<0.9:
+                print(f'WARNINGN: CME number {row} mask is too small compared to cme brigthness image, skipping all views...')
+                break
         
-        #scipy.interpolate.griddata(points,n_mask,)
-        
-        fig = plt.figure(figsize=(4,4), facecolor='black')
-        ax = fig.add_subplot() 
-        ax1 = fig.add_subplot()       
-        ax.imshow(arr_cloud)
-        ax1.imshow(grid)
-        fig.savefig(OPATH+"/clouds"+"/"+"cloud.png")        
-
-
-        btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.1, nel=1e5)     
-        mask = get_cme_mask(btot_mask,inner_cme=inner_cme)
-        
-        #check for too small mask
-        cme_npix= len(btot_mask[btot_mask>0].flatten())
-        mask_npix= len(mask[mask>0].flatten())
-        if mask_npix/cme_npix<0.9:
-            print(f'WARNINGN: CME number {row} mask is too small compared to cme brigthness image, skipping all views...')
-            break
         #check for null mask
         mask[r <= size_occ[sat]] = 0  
         if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
@@ -297,9 +273,9 @@ for row in range(len(df)):
             fig = plt.figure(figsize=(4,4), facecolor='black')
             ax = fig.add_subplot()                
             ax.imshow(btot, origin='lower', cmap='gray', vmin=m-im_range*sd, vmax=m+im_range*sd,extent=plotranges[sat])
-            fig.savefig(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
             if not mesh:
+                fig.savefig(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
+                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
                 plt.close(fig)
         else:
             print("otype value not recognized")    
@@ -311,7 +287,7 @@ for row in range(len(df)):
             y = clouds[0, :, 2]
             plt.scatter(x, y, s=0.5, c='green', linewidths=0)
             plt.axis('off')
-            fig.savefig(OPATH+ '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_mesh.png'.format(
+            fig.savefig(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
             plt.close(fig)
 
