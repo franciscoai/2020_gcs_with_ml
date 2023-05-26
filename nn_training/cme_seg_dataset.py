@@ -14,11 +14,11 @@ import datetime
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import sunpy
-from sunpy.coordinates.ephemeris import get_horizons_coord
+#from sunpy.coordinates.ephemeris import get_horizons_coord
 import sunpy.map
 import pandas as pd
-from sunpy.sun.constants import radius as _RSUN
-from ext_libs.rebin import rebin
+#from sunpy.sun.constants import radius as _RSUN
+#from ext_libs.rebin import rebin
 from nn_training.low_freq_map import low_freq_map
 import scipy
 
@@ -48,83 +48,76 @@ def deg2px(x,y,plotranges,imsize):
             y_px.append(v_y)
     return(y_px,x_px)
 
+def save_png(array, ofile=None, range=None):
+    '''
+    pltos array to an image in ofile without borders axes or anything else
+    ofile: if not give only the image object is generated and returned
+    range: defines color scale limits [vmin,vmax]
+    '''    
+    fig = plt.figure(figsize=(4,4), facecolor='white')
+    if range is not None:
+        vmin=range[0]
+        vmax=range[1]
+    else:
+        vmin=None
+        vmax=None
+    plt.imshow(array, origin='lower', cmap='gray', vmin=vmin, vmax=vmax)#, aspect='auto')#,extent=plotranges[sat])
+    plt.axis('off')         
+    if ofile is not None:
+        fig.savefig(ofile, facecolor='white', bbox_inches='tight', pad_inches=0)
+        plt.close(fig)
+        return 1
+    else:
+        return fig
 
-
-
-
-
+def pnt2arr(x,y,plotranges,imsize):
+    '''
+    Returns an array
+    points:list of (x,y) points
+    imsize: size of the output array
+    '''
+    p_x,p_y=deg2px(x,y,plotranges,imsize)
+    points=[]
+    for i in range(len(p_x)):
+        points.append([p_x[i],p_y[i]])       
+    arr=np.zeros(imsize)
+    for i in range(len(points)):
+        arr[points[i][0], points[i][1]] = 1
+    return arr
 
 ######Main
+
 # CONSTANTS
 #files
-exec_path = os.getcwd()
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_flor' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
-
-#sattelite positions
-secchipath = DATA_PATH + '/stereo/secchi/L1'
-CorA    = secchipath + '/a/img/cor2/20110317/20110317_133900_14c2A.fts' # sat1
-CorB    = secchipath + '/b/img/cor2/20110317/20110317_133900_14c2B.fts' # sat2
-lascopath = DATA_PATH + '/soho/lasco/level_1/c2' # sat3
-LascoC2 = None # lascopath + '/20110317/25365451.fts'
-ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like headers already
-n_sat = 2 if LascoC2 is None else 3 #number of satellites
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_v3' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
+n_sat = 2 #number of satellites to  use [Cor A, Cor B, Lasco]
 
 # GCS parameters [first 6]
 # The other parameters are:
 # level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[8,25],[0.2,0.6], [10,60],[9e3,3e3]] # min-max ranges of each parameter in par_names
-par_num = 10  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
-#par_rng = [[165,167],[-22,-20],[-66,-64],[10,15],[0.21,0.23], [19,21],[9e4,10e4]] # example used for script development
-rnd_par=False # set to randomnly shuffle the generated parameters linspace 
-
+par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names
+par_num = 2000  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
+rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 
 # Syntethic image options
 imsize=np.array([512, 512], dtype='int32') # output image size
 size_occ = [2.6, 3.7, 2] # Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
 level_occ=0. #mean level of the occulter relative to the background level
-cme_noise= [0,5.] #gaussian noise level of cme image. [mean, sd], both expressed in fractions of the cme-only image mean level. Set mean to None to avoid
+cme_noise= [0,2.] #gaussian noise level of cme image. [mean, sd], both expressed in fractions of the cme-only image mean level. Set mean to None to avoid
 occ_noise = [0,30.] # occulter gaussian noise. [mean, sd] both expressed in fractions of the abs mean background level. Set mean to None to avoid
-mesh=True # set to also save a png with the GCSmesh
+mesh=False # set to also save a png with the GCSmesh (only for otype='png')
 otype="png" # set the ouput file type: 'png' or 'fits'
-im_range=1. # range of the color scale of the output final syntethyc image in std dev around the mean
+im_range=2. # range of the color scale of the output final syntethyc image in std dev around the mean
 back_rnd_rot=True # set to randomly rotate the background image around its center
 inner_cme=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
-mask_from_cloud=True #Set to True it calculetes mask from clouds else from ratraycing
-## main
-par_num = [par_num] * len(par_rng)
-#read headers
-# STEREO A
-ima2, hdra2 = sunpy.io._fits.read(CorA)[0]
-# STEREO B
-imb2, hdrb2 = sunpy.io._fits.read(CorB)[0]
-# LASCO
-# if LascoC2 is not None:
-#     if ISSIflag:
-#         imL2, hdrL2 = sunpy.io._fits.read(LascoC2)[0]
-#     else:
-#         with fits.open(LascoC2) as myfitsL2:
-#             imL2 = myfitsL2[0].data
-#             myfitsL2[0].header['OBSRVTRY'] = 'SOHO'
-#             coordL2 = get_horizons_coord(-21, datetime.datetime.strptime(
-#                 myfitsL2[0].header['DATE-OBS'], "%Y-%m-%dT%H:%M:%S.%f"), 'id')
-#             coordL2carr = coordL2.transform_to(
-#                 sunpy.coordinates.frames.HeliographicCarrington)
-#             coordL2ston = coordL2.transform_to(
-#                 sunpy.coordinates.frames.HeliographicStonyhurst)
-#             myfitsL2[0].header['CRLT_OBS'] = coordL2carr.lat.deg
-#             myfitsL2[0].header['CRLN_OBS'] = coordL2carr.lon.deg
-#             myfitsL2[0].header['HGLT_OBS'] = coordL2ston.lat.deg
-#             myfitsL2[0].header['HGLN_OBS'] = coordL2ston.lon.deg
-#             hdrL2 = myfitsL2[0].header
-#     headers = [hdra2, hdrb2, hdrL2]
-# else:
-#     headers = [hdra2, hdrb2]
-#     ims = [ima2, imb2]
+mask_from_cloud=False #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
+two_cmes = True # set to include two cme per image on some (random) cases
 
 # generate param arrays
+par_num = [par_num] * len(par_rng)
 all_par = []
 for (rng, num) in zip(par_rng, par_num):
     cpar = np.linspace(rng[0],rng[1], num)
@@ -132,19 +125,15 @@ for (rng, num) in zip(par_rng, par_num):
         np.random.shuffle(cpar)
     all_par.append(cpar)
 
-# Save configuración en .CSV
+# Save configuration to .CSV
 os.makedirs(OPATH, exist_ok=True)
 date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
 configfile_name = OPATH + '/' + date_str+'Set_Parameters.csv'
 set = pd.DataFrame(np.column_stack(all_par), columns=par_names)
 set.to_csv(configfile_name)
-
-
 df = pd.DataFrame(pd.read_csv(configfile_name))
 sat_info=[]
-    
-
-
+mask_prev = None
 # generate views
 for row in range(len(df)):
     for sat in range(n_sat):
@@ -181,13 +170,13 @@ for row in range(len(df)):
             cme_npix= len(btot_mask[btot_mask>0].flatten())
             mask_npix= len(mask[mask>0].flatten())
             if mask_npix/cme_npix<0.9:
-                print(f'WARNINGN: CME number {row} mask is too small compared to cme brigthness image, skipping all views...')
+                print(f'WARNING: CME number {row} mask is too small compared to cme brigthness image, skipping all views...')
                 break
         
         #check for null mask
         mask[r <= size_occ[sat]] = 0  
         if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
-            print(f'WARNINGN: CME number {row} mask is null because it is probably behind the occulter, skipping all views...')
+            print(f'WARNING: CME number {row} mask is null because it is probably behind the occulter, skipping all views...')
             break
 
         #Total intensity (Btot) figure from raytrace:               
@@ -220,6 +209,20 @@ for row in range(len(df)):
             m = np.mean(btot)
             noise=np.random.normal(loc=cme_noise[0]*m, scale=cme_noise[1]*np.abs(m), size=imsize)
             btot[btot > 0]+=noise[btot > 0]    
+        #Randomly adds the previous CME to have two in one image
+        sceond_mask = None
+        if two_cmes and np.random.choice([True,False,False]): # only for sat 0 for now
+            if mask_prev is None:
+                btot_prev = btot
+                mask_prev = mask
+            else:
+                cbtot = np.array(btot)
+                btot += btot_prev
+                btot_prev = cbtot
+                cbtot = 0
+                sceond_mask = np.array(mask_prev)
+                mask_prev = mask
+
         #adds background
         btot+=back
         #adds occulter
@@ -242,6 +245,10 @@ for row in range(len(df)):
             cme_mask = fits.PrimaryHDU(mask)
             cme_mask.writeto(mask_folder +'/2.fits'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), overwrite=True)
+            if sceond_mask is not None:
+                cme_mask = fits.PrimaryHDU(sceond_mask)
+                cme_mask.writeto(mask_folder +'/3.fits'.format(
+                    df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), overwrite=True)               
             #cme
             cme = fits.PrimaryHDU(btot)
             cme.writeto(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.fits'.format(
@@ -253,42 +260,36 @@ for row in range(len(df)):
             
         elif otype =="png":       
             #mask for cme
-            fig3 = plt.figure(figsize=(4,4), facecolor='black')
-            ax3 = fig3.add_subplot()        
-            ax3.imshow(mask, origin='lower', cmap='gray',vmax=1, vmin=0, extent=plotranges[sat])
-            fig3.savefig(mask_folder +'/2.png'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig3.get_facecolor())
-            plt.close(fig3)
+            ofile = mask_folder +'/2.png'.format(
+                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)
+            fig=save_png(mask,ofile=ofile, range=[0, 1])
+            if sceond_mask is not None:      
+                ofile = mask_folder +'/3.png'.format(
+                    df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)
+                fig=save_png(sceond_mask,ofile=ofile, range=[0, 1])                      
             #mask for occulter
-            fig_occ = plt.figure(figsize=(4,4), facecolor='black')
-            ax_occ = fig_occ.add_subplot()  
-            ax_occ.imshow(arr, cmap='gray',extent=plotranges[sat],origin='lower', vmax=1, vmin=0)
-            fig_occ.savefig(mask_folder +'/1.png'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig_occ.get_facecolor())            
-            plt.close(fig_occ)
+            ofile = mask_folder +'/1.png'.format(
+                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)       
+            fig=save_png(arr,ofile=ofile, range=[0, 1])
             #full image
-            #btot=btot_mask
             m = np.mean(btot[mask>0])
             sd = np.std(btot[mask>0])
-            fig = plt.figure(figsize=(4,4), facecolor='black')
-            ax = fig.add_subplot()                
-            ax.imshow(btot, origin='lower', cmap='gray', vmin=m-im_range*sd, vmax=m+im_range*sd,extent=plotranges[sat])
-            if not mesh:
-                fig.savefig(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
-                plt.close(fig)
+            vmin=m-im_range*sd
+            vmax=m+im_range*sd
+            ofile=folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
+                  df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)
+            fig=save_png(btot,ofile=ofile, range=[vmin, vmax])
         else:
             print("otype value not recognized")    
 
-        if mesh:
+        if mesh and otype=='png':
             # overplot  GCS mesh to cme figure
             clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)                
             x = clouds[sat, :, 1]
-            y = clouds[0, :, 2]
-            plt.scatter(x, y, s=0.5, c='green', linewidths=0)
-            plt.axis('off')
-            fig.savefig(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.png'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), facecolor=fig.get_facecolor())
-            plt.close(fig)
+            y = clouds[0, :, 2]         
+            arr_cloud=pnt2arr(x,y,plotranges,imsize)
+            ofile = folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_mesh.png'.format(
+                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)
+            fig=save_png(arr_cloud,ofile=ofile, range=[0, 1])     
 
-#os.system("chgrp -R gehme " + OPATH)
+

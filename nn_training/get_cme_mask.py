@@ -67,7 +67,7 @@ def get_mask_cloud(p_x,p_y,imsize,OPATH):
         points.append([p_x[i],p_y[i]])
     arr_cloud=pnt2arr(points,imsize)
 
-    #creates a bounding box arround the cme 
+    #creates a bounding box arround the cme cloud
     square = np.zeros_like(arr_cloud)
     square[np.min(p_x):np.max(p_x),np.min(p_y)] = 1 # Right edge
     square[np.min(p_x):np.max(p_x),np.max(p_y)] = 1 # Left edge
@@ -75,31 +75,14 @@ def get_mask_cloud(p_x,p_y,imsize,OPATH):
     square[np.max(p_x),np.min(p_y):np.max(p_y)] = 1 # Left edge
     result = arr_cloud+square
 
-    #interpolation of the cme
-    n_mask= np.ones(len(p_x))
+    #interpolation of the cme cloud points
     box=[[np.min(p_x),np.max(p_x)],[np.min(p_y),np.max(p_y)]]
-    args=[slice(min(p_x), max(p_x) + 1),slice(min(p_y), max(p_y) + 1)]
-    # grid=np.mgrid[args]#not working gives 3 args one of them for dimension
-    # breakpoint() 
     x_len=box[0][1]-box[0][0]
     y_len=box[1][1]-box[1][0]
-    # x_points, y_points = np.mgrid[box[0][0]:box[0][1]:100j, box[1][0]:box[1][1]:100j]
-    # x_points.flatten()
-    # y_points.flatten()
-    # breakpoint()
-    # if len(x_points>=y_points):
-    #     lenght=len(x_points)
-    # else:
-    #     lenght=len(y_points)
-    # p_grid=[]      
-    # for i in range(lenght):
-    #     p_grid.append([x_points[i],y_points[i]])
-    
     grid = np.indices((x_len,y_len))
     values = np.ones(len(p_x))
     xi = np.transpose(np.array([grid[0].flatten()+box[0][0], grid[1].flatten()+box[1][0]]))
     mask = scipy.interpolate.griddata(points, values, xi, method='linear',fill_value=0)
-    
     arr_mask=np.zeros(imsize)
 
     for i in range(len(xi)):
