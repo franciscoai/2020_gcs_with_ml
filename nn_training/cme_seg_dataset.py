@@ -99,7 +99,7 @@ n_sat = 2 #number of satellites to  use [Cor A, Cor B, Lasco]
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names
-par_num = 2000  # total number of samples that will be generated for each param (ther are 2 or 3 images (satellites) per param combination)
+par_num = 2000  # total number of samples that will be generated for each param (there are nsat images per param combination)
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 
 # Syntethic image options
