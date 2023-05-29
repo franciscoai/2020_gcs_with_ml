@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
-tabla = pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/Lista_Final_CMEs.txt", sep='\t', engine='python',encoding="utf-8", header=0)
+tabla = pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/Lista_Final_CMEs.csv", sep='\t', engine='python',encoding="utf-8", header=0)
 tabla['pre_a_1h_download'] = ''
 tabla['pre_b_1h_download'] = ''
 tabla['pre_a_2h_download'] = ''
@@ -32,7 +32,8 @@ for i in range(len(tabla)):
             asd.indices_descarga = [indice_fecha_cercana] #necesito que sea una lista para que el download itere sobre ella
 #            breakpoint()
             asd.download()
-            tabla['pre_a_1h_download'][i] = asd.search_cor2[asd.indices_descarga]['fileid']
+            #tabla['pre_a_1h_download'][i] = asd.search_cor2[asd.indices_descarga]['fileid']
+            tabla['pre_a_1h_download'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
         else:
             tabla['pre_a_1h_download'][i] = 'No img/double data'
     else:
@@ -58,7 +59,8 @@ for i in range(len(tabla)):
             asd.indices_descarga = [indice_fecha_cercana]
         
             asd.download()
-            tabla['pre_a_2h_download'][i] = asd.search_cor2[asd.indices_descarga]['fileid']
+            #tabla['pre_a_2h_download'][i] = asd.search_cor2[asd.indices_descarga]['fileid']
+            tabla['pre_a_2h_download'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
         else:
             tabla['pre_a_2h_download'][i] = 'No img/double data'
     else:
@@ -84,7 +86,8 @@ for i in range(len(tabla)):
             asd.indices_descarga = [indice_fecha_cercana]
         
             asd.download()
-            tabla['pre_b_1h_download'][i] = asd.search_cor2[asd.indices_descarga]['fileid']
+            #tabla['pre_b_1h_download'][i] = asd.search_cor2[asd.indices_descarga]['fileid']
+            tabla['pre_b_1h_download'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
 #            breakpoint()
         else:
             tabla['pre_b_1h_download'][i] = 'No img/double data'
@@ -110,7 +113,8 @@ for i in range(len(tabla)):
             asd.indices_descarga = [indice_fecha_cercana]
         
             asd.download()
-            tabla['pre_b_2h_download'][i] = asd.search_cor2[asd.indices_descarga]['fileid']
+            #tabla['pre_b_2h_download'][i] = asd.search_cor2[asd.indices_descarga]['fileid']
+            tabla['pre_b_1h_download'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
         else:
             tabla['pre_b_2h_download'][i] = 'No img/double data'
     else:

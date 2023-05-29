@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
-tabla = pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/Lista_Final_CMEs.txt", sep='\t', engine='python',encoding="utf-8", header=0)
+tabla = pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/Lista_Final_CMEs.csv", sep='\t', engine='python',encoding="utf-8", header=0)
 tabla['pre_a_3h_download_cor1'] = ''
 tabla['pre_b_3h_download_cor1'] = ''
 tabla['preevento_a_3h'] = '' #debo crearlas
@@ -58,7 +58,16 @@ for i in range(len(tabla)):
                         if abs(resultado[0]-resultado[1])<= timedelta(seconds=30):
                             print("vamos a descargar")
                             asd.indices_descarga = [lista_strings_times2.index(elemento) for elemento in trio]
-                    tabla['pre_a_3h_download_cor1'][i] = asd.search_cor1[asd.indices_descarga]['fileid']
+                    #tabla['pre_a_3h_download_cor1'][i] = asd.search_cor1[asd.indices_descarga]['fileid']
+                    suffix = "/".join(str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[1:-1])
+                    list_downloaded_fileid=[]
+                    for j in range(3):
+                        list_downloaded_fileid.append("/".join(str(asd.search_lascoc2[asd.indices_descarga[j]]['fileid']).split('/')[-1]))
+
+
+                    tabla['pre_a_3h_download_cor1'][i] = list_downloaded_fileid
+                    #"/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
+                breakpoint()
                 asd.download()
 
             #breakpoint()
@@ -114,7 +123,14 @@ for i in range(len(tabla)):
                         if abs(resultado[0]-resultado[1])<= timedelta(seconds=30):
                             print("vamos a descargar")
                             asd.indices_descarga = [lista_strings_times2.index(elemento) for elemento in trio]
-                    tabla['pre_a_2h_download_cor1'][i] = asd.search_cor1[asd.indices_descarga]['fileid']
+                    #tabla['pre_a_2h_download_cor1'][i] = asd.search_cor1[asd.indices_descarga]['fileid']
+                    list_downloaded_fileid=[]
+                    for j in range(3):
+                        list_downloaded_fileid.append("/".join(str(asd.search_lascoc2[asd.indices_descarga[j]]['fileid']).split('/')[-1]))
+
+
+                    tabla['pre_a_2h_download_cor1'][i] = list_downloaded_fileid
+                    #tabla['pre_a_2h_download_cor1'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
                 asd.download()
 
             #breakpoint()
@@ -168,7 +184,14 @@ for i in range(len(tabla)):
                         if abs(resultado[0]-resultado[1])<= timedelta(seconds=30):
                             print("vamos a descargar")
                             asd.indices_descarga = [lista_strings_times2.index(elemento) for elemento in trio]
-                    tabla['pre_b_3h_download_cor1'][i] = asd.search_cor1[asd.indices_descarga]['fileid']
+                    #tabla['pre_b_3h_download_cor1'][i] = asd.search_cor1[asd.indices_descarga]['fileid']
+                    list_downloaded_fileid=[]
+                    for j in range(3):
+                        list_downloaded_fileid.append("/".join(str(asd.search_lascoc2[asd.indices_descarga[j]]['fileid']).split('/')[-1]))
+
+
+                    tabla['pre_b_3h_download_cor1'][i] = list_downloaded_fileid
+                    #tabla['pre_b_3h_download_cor1'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
                 asd.download()
             #breakpoint()
         else:
@@ -220,7 +243,14 @@ for i in range(len(tabla)):
                         if abs(resultado[0]-resultado[1])<= timedelta(seconds=30):
                             print("vamos a descargar")
                             asd.indices_descarga = [lista_strings_times2.index(elemento) for elemento in trio]
-                    tabla['pre_b_2h_download_cor1'][i] = asd.search_cor1[asd.indices_descarga]['fileid']
+                    #tabla['pre_b_2h_download_cor1'][i] = asd.search_cor1[asd.indices_descarga]['fileid']
+                    list_downloaded_fileid=[]
+                    for j in range(3):
+                        list_downloaded_fileid.append("/".join(str(asd.search_lascoc2[asd.indices_descarga[j]]['fileid']).split('/')[-1]))
+
+
+                    tabla['pre_b_2h_download_cor1'][i] = list_downloaded_fileid
+                    #tabla['pre_b_2h_download_cor1'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
                 asd.download()
         
             #breakpoint()
