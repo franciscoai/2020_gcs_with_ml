@@ -19,13 +19,13 @@ def correct_path(s):
     s = s.replace("(2)", "")
     return s
 
-def convert_string(s):
-    # uncomment to use proper L1 path for Cor images    
-    # s = s.replace("preped/", "")
-    # s = s.replace("L0", "L1")
-    # s = s.replace("_0B", "_1B")
-    # s = s.replace("_04", "_14")
-    # s = s.replace("level1/", "")    
+def convert_string(s, level):   
+    if level==1:
+        s = s.replace("preped/", "")
+        s = s.replace("L0", "L1")
+        s = s.replace("_0B", "_1B")
+        s = s.replace("_04", "_14")
+        s = s.replace("level1/", "")            
     return s
 
 def get_paths_cme_exp_sources():
@@ -36,6 +36,7 @@ def get_paths_cme_exp_sources():
     gcs_path='/gehme/projects/2019_cme_expansion/Polar_Observations/Polar_Documents/francisco/GCSs'     #Path with our GCS data directories
     lasco_path=data_path+'/soho/lasco/level_1/c2'     #LASCO proc images Path
     secchipath=data_path+'/stereo/secchi/L0'
+    level=0 # set the reduction level of the images
     #events to read
     dates =  ['20101212', '20101214', '20110317', '20110605', '20130123', '20130129',
              '20130209', '20130424', '20130502', '20130517', '20130527', '20130608']
@@ -129,7 +130,7 @@ def get_paths_cme_exp_sources():
                         if 'cor2' in cline:
                             cor = 'cor2'
                         cdate = cline[cline.find('/preped/')+8:cline.find('/preped/')+16]
-                        cline = convert_string(cline)
+                        cline = convert_string(cline, level)
                         cline = correct_path(cline)
                         cdict['ima1'].append(cline)
                         ok_pro_files.append(f)                           
@@ -140,15 +141,15 @@ def get_paths_cme_exp_sources():
                         cdict['pre_ima'].append(cpre[0])
                         cdict['pre_imb'].append([s for s in pre_event if (cdate in s and  cor in s and '/a/' in s )][0])
                     if 'imaprev=sccreadfits(' in line:
-                        cline = convert_string(secchipath +line.split('\'')[1])
+                        cline = convert_string(secchipath +line.split('\'')[1], level)
                         cline = correct_path(cline)
                         cdict['ima0'].append(cline)
                     if 'imb=sccreadfits(' in line:
-                        cline = convert_string(secchipath +line.split('\'')[1])
+                        cline = convert_string(secchipath +line.split('\'')[1], level)
                         cline = correct_path(cline)
                         cdict['imb1'].append(cline)
                     if 'imbprev=sccreadfits(' in line:
-                        cline = convert_string(secchipath +line.split('\'')[1])
+                        cline = convert_string(secchipath +line.split('\'')[1], level)
                         cline = correct_path(cline)
                         cdict['imb0'].append(cline)          
                     if 'lasco1=readfits' in line:
