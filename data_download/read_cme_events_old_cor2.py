@@ -1,4 +1,4 @@
-from descargar_imagenes_clases_old_cor2 import cor2_downloader
+from descargar_imagenes_clases import cor2_downloader
 import pandas as pd
 from datetime import datetime, timedelta
 
@@ -33,7 +33,7 @@ for i in range(len(tabla)):
 #            breakpoint()
             asd.download()
             #tabla['pre_a_1h_download'][i] = asd.search_cor2[asd.indices_descarga]['fileid']
-            tabla['pre_a_1h_download'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
+            tabla['pre_a_1h_download'][i] = "/".join(str(asd.search_cor2[asd.indices_descarga]['fileid']).split('/')[1:])
         else:
             tabla['pre_a_1h_download'][i] = 'No img/double data'
     else:
@@ -60,7 +60,7 @@ for i in range(len(tabla)):
         
             asd.download()
             #tabla['pre_a_2h_download'][i] = asd.search_cor2[asd.indices_descarga]['fileid']
-            tabla['pre_a_2h_download'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
+            tabla['pre_a_2h_download'][i] = "/".join(str(asd.search_cor2[asd.indices_descarga]['fileid']).split('/')[1:])
         else:
             tabla['pre_a_2h_download'][i] = 'No img/double data'
     else:
@@ -87,7 +87,7 @@ for i in range(len(tabla)):
         
             asd.download()
             #tabla['pre_b_1h_download'][i] = asd.search_cor2[asd.indices_descarga]['fileid']
-            tabla['pre_b_1h_download'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
+            tabla['pre_b_1h_download'][i] = "/".join(str(asd.search_cor2[asd.indices_descarga]['fileid']).split('/')[1:])
 #            breakpoint()
         else:
             tabla['pre_b_1h_download'][i] = 'No img/double data'
@@ -114,12 +114,12 @@ for i in range(len(tabla)):
         
             asd.download()
             #tabla['pre_b_2h_download'][i] = asd.search_cor2[asd.indices_descarga]['fileid']
-            tabla['pre_b_1h_download'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
+            tabla['pre_b_2h_download'][i] = "/".join(str(asd.search_cor2[asd.indices_descarga]['fileid']).split('/')[1:])
         else:
             tabla['pre_b_2h_download'][i] = 'No img/double data'
     else:
         tabla['pre_b_2h_download'][i] = '*'
         
 breakpoint()
-tabla.to_csv('/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/Lista_Final_CMEs_downloads_cor2.txt', sep='\t', index=False)
+tabla.to_csv('/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/Lista_Final_CMEs_downloads_cor2.csv', sep='\t', index=False)
 breakpoint()
