@@ -27,14 +27,14 @@ def normalize(image):
 
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_testing'
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_no_hole"
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_no_hole/test_output"
+dataDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_v3'
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3"
+opath= model_path+"/test_output"
 file_ext=".png"
 trained_model = '3999.torch'
 testDir=  dataDir 
 imageSize=[512,512]
-test_ncases = 500
+test_ncases = 100
 
 
 #main

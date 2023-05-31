@@ -192,7 +192,7 @@ def neural_cme_segmentation(model_param, img, device):
     #loads model
     model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
     in_features = model.roi_heads.box_predictor.cls_score.in_features 
-    model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=3)
+    model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=2)
     model.load_state_dict(model_param) #loads the last iteration of training 
     model.to(device)# move model to the right device
     model.eval()#set the model to evaluation state
@@ -244,10 +244,10 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
     """    
-    mask_threshold = 0.5 # value to considered a pixel belongs to the object
-    scr_threshold = 0.8 # only detections with scroe larger than this value are considered
+    mask_threshold = 0.5 # value to consider a pixel belongs to the object
+    scr_threshold = 0.5 # only detections with score larger than this value are considered
     color=['r','b','g','k','y']
-    obj_labels = ['Occ', 'CME']
+    obj_labels = ['Occ', 'CME','N/A','N/A']
     #
     cmap = mpl.colors.ListedColormap(color)  
     nans = np.full(np.shape(orig_img[0]), np.nan)
