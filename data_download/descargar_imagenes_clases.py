@@ -184,7 +184,7 @@ class lascoc2_downloader:
             if not os.path.isfile(download_path+self.search_lascoc2[w]['fileid'].split('/')[-1]):#Si archivo no descargado entonces que descargue.
                 downloaded_files = Fido.fetch(self.search_lascoc2[w],path=download_path, max_conn=5, progress=True) 
       
-            #os.system('chgrp -R gehme {}'.format(download_path))
+            os.system('chgrp -R gehme {}'.format(download_path))
             os.system('chmod -R 775 {}'.format(download_path))
 
         print(f'Archivos descargados en: {download_path}')
@@ -220,7 +220,7 @@ class cor1_downloader:
             self.nave  = nave
             self.dir_descarga = '/gehme/data/stereo/'
             #self.dir_descarga = '/data_local/GCS/gcs/Imagenes/'
-            self.nivel = nivel
+            self.nivel = nivel #'s4c' es la calibracion sugerida que viene de a tríos
             self.indices_descarga = ''
             self.image_type = image_type #seq usualmente
             self.size = size #2M usualmente
@@ -279,8 +279,10 @@ class cor1_downloader:
         Definicion del metodo filtro
         """
         match self.nivel:
-            case 'sequence':
+            case 's4c':
                 string_search_nivel = "s4c"
+            case 's5c':
+                string_search_nivel = "s5c"
             case '':
                 string_search_nivel = ""
         match self.image_type:
@@ -353,8 +355,8 @@ class cor2_downloader:
             self.instrumento = a.Instrument.secchi
             self.detector = a.Detector.cor2
             self.nave  = nave
-            #self.dir_descarga = '/gehme/data/stereo/'
-            self.dir_descarga = '/data_local/GCS/gcs/Imagenes/'
+            self.dir_descarga = '/gehme/data/stereo/'
+            #self.dir_descarga = '/data_local/GCS/gcs/Imagenes/'
             self.nivel = nivel
             self.indices_descarga = ''
             self.image_type = image_type #puede ser img o seq
