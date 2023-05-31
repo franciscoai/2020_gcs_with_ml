@@ -23,18 +23,28 @@ for i in range(len(tabla)):
         #breakpoint()
         asd.search()
         if len(asd.search_lascoc2) >= 1:
-            start_times = asd.search_lascoc2['Start Time']#[0:-1]
+            start_times = asd.search_lascoc2['Start Time']
             lista_strings_times = [t.iso for t in start_times]
             lista_strings_times2 = [datetime.strptime(t, '%Y-%m-%d %H:%M:%S.%f') for t in lista_strings_times]
             fecha_cercana = min(lista_strings_times2, key=lambda x: abs(x - dt))
             indice_fecha_cercana = lista_strings_times2.index(fecha_cercana)
-            asd.indices_descarga = [indice_fecha_cercana] #necesito que sea una lista para que el download itere sobre ella
+            asd.indices_descarga = [indice_fecha_cercana] 
 #            breakpoint()
             asd.download()
-            #tabla['pre_a_1h_download_c2'][i] = asd.search_lascoc2[asd.indices_descarga]['fileid']
-            tabla['pre_a_1h_download_c2'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
+            #breakpoint()
+            folder_year_month_day = asd.search_lascoc2[asd.indices_descarga[0]]['fileid'].split('/')[8]
+            folder = asd.search_lascoc2['fileid'][asd.indices_descarga[0]].split('/')[-3]
+            if int(folder[0:2]) < 50:
+                suffix = str(2000+int(folder[0:2]))
+            else:
+                suffix = str(1900+int(folder[0:2])) 
+            folder_full = suffix+folder[3:]+"/"
+            download_path = asd.dir_descarga+"level_05/c2/"+folder_full
+            fileid = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
+            tabla['pre_a_1h_download_c2'][i] = download_path+fileid
+            #"/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
             
-#            breakpoint()
+            #breakpoint()
         else:
             tabla['pre_a_1h_download_c2'][i] = 'No data'
     else:
@@ -59,9 +69,18 @@ for i in range(len(tabla)):
             indice_fecha_cercana = lista_strings_times2.index(fecha_cercana)
             asd.indices_descarga = [indice_fecha_cercana]
         
-            asd.download()
-            #tabla['pre_a_2h_download_c2'][i] = asd.search_lascoc2[asd.indices_descarga]['fileid']
-            tabla['pre_a_2h_download_c2'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
+            asd.download()            
+            folder_year_month_day = asd.search_lascoc2[asd.indices_descarga[0]]['fileid'].split('/')[8]
+            folder = asd.search_lascoc2['fileid'][asd.indices_descarga[0]].split('/')[-3]
+            if int(folder[0:2]) < 50:
+                suffix = str(2000+int(folder[0:2]))
+            else:
+                suffix = str(1900+int(folder[0:2])) 
+            folder_full = suffix+folder[3:]+"/"
+            download_path = asd.dir_descarga+"level_05/c2/"+folder_full
+            fileid = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
+            tabla['pre_a_2h_download_c2'][i] = download_path+fileid
+            #"/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
  #           breakpoint()
         else:
             tabla['pre_a_2h_download_c2'][i] = 'No data'
@@ -88,8 +107,17 @@ for i in range(len(tabla)):
             asd.indices_descarga = [indice_fecha_cercana]
         
             asd.download()
-            #tabla['pre_b_1h_download_c2'][i] = asd.search_lascoc2[asd.indices_descarga]['fileid']
-            tabla['pre_b_1h_download_c2'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
+            folder_year_month_day = asd.search_lascoc2[asd.indices_descarga[0]]['fileid'].split('/')[8]
+            folder = asd.search_lascoc2['fileid'][asd.indices_descarga[0]].split('/')[-3]
+            if int(folder[0:2]) < 50:
+                suffix = str(2000+int(folder[0:2]))
+            else:
+                suffix = str(1900+int(folder[0:2])) 
+            folder_full = suffix+folder[3:]+"/"
+            download_path = asd.dir_descarga+"level_05/c2/"+folder_full
+            fileid = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
+            tabla['pre_b_1h_download_c2'][i] = download_path+fileid
+            #"/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
   #          breakpoint()
         else:
             tabla['pre_b_1h_download_c2'][i] = 'No data'
@@ -115,8 +143,17 @@ for i in range(len(tabla)):
             asd.indices_descarga = [indice_fecha_cercana]
         
             asd.download()
-            #tabla['pre_b_2h_download_c2'][i] = asd.search_lascoc2[asd.indices_descarga]['fileid']
-            tabla['pre_b_2h_download_c2'][i] = "/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
+            folder_year_month_day = asd.search_lascoc2[asd.indices_descarga[0]]['fileid'].split('/')[8]
+            folder = asd.search_lascoc2['fileid'][asd.indices_descarga[0]].split('/')[-3]
+            if int(folder[0:2]) < 50:
+                suffix = str(2000+int(folder[0:2]))
+            else:
+                suffix = str(1900+int(folder[0:2])) 
+            folder_full = suffix+folder[3:]+"/"
+            download_path = asd.dir_descarga+"level_05/c2/"+folder_full
+            fileid = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
+            tabla['pre_b_2h_download_c2'][i] = download_path+fileid
+            #"/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
    #         breakpoint()
         else:
             tabla['pre_b_2h_download_c2'][i] = 'No data'
