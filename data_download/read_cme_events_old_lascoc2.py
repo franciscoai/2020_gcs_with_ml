@@ -162,5 +162,5 @@ for i in range(len(tabla)):
 
 #    breakpoint()
 breakpoint()
-tabla.to_csv('/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/Lista_Final_CMEs_downloads_lascoc2.txt', sep='\t', index=False)
+tabla.to_csv('/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/Lista_Final_CMEs_downloads_lascoc2.csv', sep='\t', index=False)
 breakpoint()
