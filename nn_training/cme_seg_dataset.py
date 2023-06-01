@@ -91,7 +91,7 @@ def pnt2arr(x,y,plotranges,imsize):
 #files
 DATA_PATH = '/gehme/data'
 OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_v3' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
-n_sat = 2 #number of satellites to  use [Cor A, Cor B, Lasco]
+n_sat = 3 #number of satellites to  use [Cor A, Cor B, Lasco]
 
 # GCS parameters [first 6]
 # The other parameters are:
