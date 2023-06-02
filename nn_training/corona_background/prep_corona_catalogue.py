@@ -15,8 +15,17 @@ cor2_downloads=["pre_a_1h_download","pre_b_1h_download","pre_a_2h_download","pre
 
 lasco= pd.read_csv(lasco_path , sep="\t")
 lasco.name='lasco'
+
 cor2= pd.read_csv(cor2_path , sep="\t")
 cor2.name='cor2'
+for i in range(len(cor2.index)):
+    for j in cor2_downloads:
+        if cor2.loc[i,j] != "No data" and cor2.loc[i,j] != "*" and cor2.loc[i,j] != "No img/double data":
+            cor2.at[i, j] = "/gehme/data/stereo/secchi/"+ cor2.at[i, j]
+            if j== cor2_downloads[0] or j==cor2_downloads[2]:
+                cor2.at[i,j]=cor2.at[i,j].replace("A","a")
+            else:  
+                cor2.at[i,j]=cor2.at[i,j].replace("B","b")
 
 def pathlist(df):
     paths=[]
@@ -32,7 +41,7 @@ def pathlist(df):
                 paths.append(element)
 
         # for k in range(0,2):        #repetir para evento b
-        #     if (df.loc[i,downloads[k]] != "No data" and df.loc[i,downloads[0]] != "*") and (df.loc[i,downloads[k+2]] != "No data" and df.loc[i,downloads[2]] != "*"):
+        #     if (df.loc[i,downloads[k]] != "No data" and df.loc[i,downloads[k]] != "*" and df.loc[i,downloads[k]] != "No img/double data") and (df.loc[i,downloads[k+2]] != "No data" and df.loc[i,downloads[k+2]] != "*" and df.loc[i,downloads[k+2]] != "No img/double data"):
         #         path_1h=(df.loc[i,downloads[k]])#.replace("level_05","level_1")
         #         path_2h=(df.loc[i,downloads[k+2]])#.replace("level_05","level_1")
         #         im1= fits.open(path_1h)
@@ -41,15 +50,15 @@ def pathlist(df):
         #         header= fits.getheader(path_1h)
         #         final_img = fits.PrimaryHDU(im, header=header[0:-3])
 
-        #         final_img.writeto('gehme/projects/2020_gcs_with_ml/data/corona_back_database/'+df.name+'/'+os.path.basename(path_1h)) 
+        #         final_img.writeto('/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'+df.name+'/'+os.path.basename(path_1h),overwrite=True) 
 
     paths=pd.DataFrame(paths,columns=['paths'])
     paths = paths.drop_duplicates()
-    paths.to_csv(exec_path+'/'+df.name+'_path_list.csv',sep='\t', header=True,index=False)
+    paths.to_csv(exec_path+"/"+name+"_path_list.csv", index=False)
 
 
 
-pathlist(cor2)
+pathlist(lasco)
 
 
 
