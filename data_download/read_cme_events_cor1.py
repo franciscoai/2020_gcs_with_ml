@@ -3,16 +3,17 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
-tabla = pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/Lista_Final_CMEs.csv", sep='\t', engine='python',encoding="utf-8", header=0)
+tabla = pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/catalogues/Lista_Final_CMEs.csv", sep='\t', engine='python',encoding="utf-8", header=0)
 tabla['pre_a_3h_download_cor1'] = ''
 tabla['pre_b_3h_download_cor1'] = ''
 tabla['preevento_a_3h'] = '' #debo crearlas
 tabla['preevento_b_3h'] = ''
 tabla['pre_a_2h_download_cor1'] = ''
 tabla['pre_b_2h_download_cor1'] = ''
+pre_suffix = '/gehme/data/stereo/'
 
 for i in range(len(tabla)):
-    breakpoint()
+    if i == 15: breakpoint()
     print("chequeando elemento Numero {}".format(i))
     pre_even_a_1h = tabla['preevento_a_1h'][i]
     if (pre_even_a_1h != '*' and pre_even_a_1h != 'NaT'): 
@@ -25,8 +26,10 @@ for i in range(len(tabla)):
         fin = dt_fin.strftime('%Y/%m/%d %H:%M:%S')
         
         asd = cor1_downloader(start_time=ini,end_time=fin,size=2,image_type='seq',nave='STEREO_A',nivel='s4c')
-        
         asd.search()
+        if len(asd.search_cor1) ==0:#a partir del 2009 aprox, practicamente todas las imagenes son size=0.5Mb 
+            asd.size=0.5
+            asd.search()
         if len(asd.search_cor1) >= 1:
             start_times = asd.search_cor1['Start Time']
             lista_strings_times = [t.iso for t in start_times]
@@ -39,7 +42,7 @@ for i in range(len(tabla)):
                 asd.indices_descarga=[0,1,2]
                 asd.download()
                 suffix = "/".join(str(asd.search_cor1[asd.indices_descarga[0]]['fileid']).split('/')[:-1])+"/"
-                list_downloaded_fileid=[suffix]
+                list_downloaded_fileid=[pre_suffix+suffix]
                 for j in range(3):
                     list_downloaded_fileid.append(str(asd.search_cor1[asd.indices_descarga[j]]['fileid']).split('/')[-1])
                 tabla['pre_a_3h_download_cor1'][i] = list_downloaded_fileid
@@ -53,15 +56,15 @@ for i in range(len(tabla)):
                 if indice_fecha_cercana == len(asd.search_cor1)-1:
                     trio = lista_strings_times2[-3:]
                 if indice_fecha_cercana != 0 and indice_fecha_cercana != len(asd.search_cor1)-1:
-                    for i in range(3):
-                        trio = lista_strings_times2[indice_fecha_cercana-i:indice_fecha_cercana+3-i]
-                        resultado = [trio[i] - trio[i+1] for i in range(len(trio)-1)]
+                    for ii in range(3):
+                        trio = lista_strings_times2[indice_fecha_cercana-ii:indice_fecha_cercana+3-ii]
+                        resultado = [trio[w] - trio[w+1] for w in range(len(trio)-1)]
                         if abs(resultado[0]-resultado[1])<= timedelta(seconds=30):
                             print("vamos a descargar")
                             asd.indices_descarga = [lista_strings_times2.index(elemento) for elemento in trio]
 
                     suffix = "/".join(str(asd.search_cor1[asd.indices_descarga[0]]['fileid']).split('/')[:-1])+"/"
-                    list_downloaded_fileid=[suffix]
+                    list_downloaded_fileid=[pre_suffix+suffix]
                     for j in range(3):
                         list_downloaded_fileid.append(str(asd.search_cor1[asd.indices_descarga[j]]['fileid']).split('/')[-1])
 
@@ -69,7 +72,7 @@ for i in range(len(tabla)):
                     #"/".join(str(asd.search_cor1[asd.indices_descarga]['fileid']).split('/')[1:])
                 
                 asd.download()
-            breakpoint()
+            #breakpoint()
             
             
         else:
@@ -90,7 +93,9 @@ for i in range(len(tabla)):
 
         asd = cor1_downloader(start_time=ini,end_time=fin,size=2,image_type='seq',nave='STEREO_A',nivel='s4c')
         asd.search()
-        
+        if len(asd.search_cor1) ==0:#a partir del 2009 aprox, practicamente todas las imagenes son size=0.5Mb 
+            asd.size=0.5
+            asd.search()
         if len(asd.search_cor1) >= 1:
             start_times = asd.search_cor1['Start Time']
             lista_strings_times = [t.iso for t in start_times]
@@ -102,7 +107,7 @@ for i in range(len(tabla)):
                 asd.indices_descarga=[0,1,2]
                 asd.download()
                 suffix = "/".join(str(asd.search_cor1[asd.indices_descarga[0]]['fileid']).split('/')[:-1])+"/"
-                list_downloaded_fileid=[suffix]
+                list_downloaded_fileid=[pre_suffix+suffix]
                 for j in range(3):
                     list_downloaded_fileid.append(str(asd.search_cor1[asd.indices_descarga[j]]['fileid']).split('/')[-1])
                 tabla['pre_a_2h_download_cor1'][i] = list_downloaded_fileid
@@ -116,19 +121,19 @@ for i in range(len(tabla)):
                 if indice_fecha_cercana == len(asd.search_cor1)-1:
                     trio = lista_strings_times2[-3:]
                 if indice_fecha_cercana != 0 and indice_fecha_cercana != len(asd.search_cor1)-1:
-                    for i in range(3):
-                        trio = lista_strings_times2[indice_fecha_cercana-i:indice_fecha_cercana+3-i]
-                        resultado = [trio[i] - trio[i+1] for i in range(len(trio)-1)]
+                    for ii in range(3):
+                        trio = lista_strings_times2[indice_fecha_cercana-ii:indice_fecha_cercana+3-ii]
+                        resultado = [trio[w] - trio[w+1] for w in range(len(trio)-1)]
                         if abs(resultado[0]-resultado[1])<= timedelta(seconds=30):
                             print("vamos a descargar")
                             asd.indices_descarga = [lista_strings_times2.index(elemento) for elemento in trio]
                     suffix = "/".join(str(asd.search_cor1[asd.indices_descarga[0]]['fileid']).split('/')[:-1])+"/"
-                    list_downloaded_fileid=[suffix]
+                    list_downloaded_fileid=[pre_suffix+suffix]
                     for j in range(3):
                         list_downloaded_fileid.append(str(asd.search_cor1[asd.indices_descarga[j]]['fileid']).split('/')[-1])
                     tabla['pre_a_2h_download_cor1'][i] = list_downloaded_fileid
                 asd.download()
-            breakpoint()
+            #breakpoint()
             
         else:
             tabla['pre_a_2h_download_cor1'][i] = 'No data'
@@ -149,7 +154,9 @@ for i in range(len(tabla)):
 
         asd = cor1_downloader(start_time=ini,end_time=fin,size=2,image_type='seq',nave='STEREO_B',nivel='s4c')
         asd.search()
-        
+        if len(asd.search_cor1) ==0:#a partir del 2009 aprox, practicamente todas las imagenes son size=0.5Mb 
+            asd.size=0.5
+            asd.search()        
         if len(asd.search_cor1) >= 1:
             start_times = asd.search_cor1['Start Time']
             lista_strings_times = [t.iso for t in start_times]
@@ -160,7 +167,7 @@ for i in range(len(tabla)):
                 asd.indices_descarga=[0,1,2]
                 asd.download()
                 suffix = "/".join(str(asd.search_cor1[asd.indices_descarga[0]]['fileid']).split('/')[:-1])+"/"
-                list_downloaded_fileid=[suffix]
+                list_downloaded_fileid=[pre_suffix+suffix]
                 for j in range(3):
                     list_downloaded_fileid.append(str(asd.search_cor1[asd.indices_descarga[j]]['fileid']).split('/')[-1])
                 tabla['pre_b_3h_download_cor1'][i] = list_downloaded_fileid
@@ -175,19 +182,19 @@ for i in range(len(tabla)):
                 if indice_fecha_cercana == len(asd.search_cor1)-1:
                     trio = lista_strings_times2[-3:]
                 if indice_fecha_cercana != 0 and indice_fecha_cercana != len(asd.search_cor1)-1:
-                    for i in range(3):
-                        trio = lista_strings_times2[indice_fecha_cercana-i:indice_fecha_cercana+3-i]
-                        resultado = [trio[i] - trio[i+1] for i in range(len(trio)-1)]
+                    for ii in range(3):
+                        trio = lista_strings_times2[indice_fecha_cercana-ii:indice_fecha_cercana+3-ii]
+                        resultado = [trio[w] - trio[w+1] for w in range(len(trio)-1)]
                         if abs(resultado[0]-resultado[1])<= timedelta(seconds=30):
                             print("vamos a descargar")
                             asd.indices_descarga = [lista_strings_times2.index(elemento) for elemento in trio]
                     suffix = "/".join(str(asd.search_cor1[asd.indices_descarga[0]]['fileid']).split('/')[:-1])+"/"
-                    list_downloaded_fileid=[suffix]
+                    list_downloaded_fileid=[pre_suffix+suffix]
                     for j in range(3):
                         list_downloaded_fileid.append(str(asd.search_cor1[asd.indices_descarga[j]]['fileid']).split('/')[-1])
                     tabla['pre_b_3h_download_cor1'][i] = list_downloaded_fileid
                 asd.download()
-            breakpoint()
+            #breakpoint()
         else:
             tabla['pre_b_3h_download_cor1'][i] = 'No data'
     else:
@@ -206,6 +213,9 @@ for i in range(len(tabla)):
 
         asd = cor1_downloader(start_time=ini,end_time=fin,size=2,image_type='seq',nave='STEREO_B',nivel='s4c')
         asd.search()
+        if len(asd.search_cor1) ==0:#a partir del 2009 aprox, practicamente todas las imagenes son size=0.5Mb 
+            asd.size=0.5
+            asd.search()        
         if len(asd.search_cor1) >= 1:
             start_times = asd.search_cor1['Start Time']
             lista_strings_times = [t.iso for t in start_times]
@@ -216,7 +226,7 @@ for i in range(len(tabla)):
                 asd.indices_descarga=[0,1,2]
                 asd.download()
                 suffix = "/".join(str(asd.search_cor1[asd.indices_descarga[0]]['fileid']).split('/')[:-1])+"/"
-                list_downloaded_fileid=[suffix]
+                list_downloaded_fileid=[pre_suffix+suffix]
                 for j in range(3):
                     list_downloaded_fileid.append(str(asd.search_cor1[asd.indices_descarga[j]]['fileid']).split('/')[-1])
                 tabla['pre_b_2h_download_cor1'][i] = list_downloaded_fileid
@@ -231,20 +241,20 @@ for i in range(len(tabla)):
                 if indice_fecha_cercana == len(asd.search_cor1)-1:
                     trio = lista_strings_times2[-3:]
                 if indice_fecha_cercana != 0 and indice_fecha_cercana != len(asd.search_cor1)-1:
-                    for i in range(3):
-                        trio = lista_strings_times2[indice_fecha_cercana-i:indice_fecha_cercana+3-i]
-                        resultado = [trio[i] - trio[i+1] for i in range(len(trio)-1)]
+                    for ii in range(3):
+                        trio = lista_strings_times2[indice_fecha_cercana-ii:indice_fecha_cercana+3-ii]
+                        resultado = [trio[w] - trio[w+1] for w in range(len(trio)-1)]
                         if abs(resultado[0]-resultado[1])<= timedelta(seconds=30):
                             print("vamos a descargar")
                             asd.indices_descarga = [lista_strings_times2.index(elemento) for elemento in trio]
                     suffix = "/".join(str(asd.search_cor1[asd.indices_descarga[0]]['fileid']).split('/')[:-1])+"/"
-                    list_downloaded_fileid=[suffix]
+                    list_downloaded_fileid=[pre_suffix+suffix]
                     for j in range(3):
                         list_downloaded_fileid.append(str(asd.search_cor1[asd.indices_descarga[j]]['fileid']).split('/')[-1])
                     tabla['pre_b_2h_download_cor1'][i] = list_downloaded_fileid
                     #tabla['pre_b_2h_download_cor1'][i] = "/".join(str(asd.search_cor1[asd.indices_descarga]['fileid']).split('/')[1:])
                 asd.download()
-            breakpoint()
+#            breakpoint()
             
         else:
             tabla['pre_b_2h_download_cor1'][i] = 'No data'
