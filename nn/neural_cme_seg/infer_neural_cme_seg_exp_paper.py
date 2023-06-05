@@ -193,7 +193,7 @@ def neural_cme_segmentation(model_param, img, device):
     #loads model
     model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
     in_features = model.roi_heads.box_predictor.cls_score.in_features 
-    model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=2)
+    model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=3)
     model.load_state_dict(model_param) #loads the last iteration of training 
     model.to(device)# move model to the right device
     model.eval()#set the model to evaluation state
@@ -291,7 +291,7 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
       
 #main
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v2_running_diff"
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3"
 opath= model_path + "/infer_neural_cme_seg_exp_paper"
 file_ext=".png"
 trained_model = '3999.torch'
@@ -299,7 +299,7 @@ do_run_diff = True # set to use running diff instead of base diff (False)
 
 #main
 gpu=1 # GPU to use
-device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
+device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
 
 os.makedirs(opath, exist_ok=True)
