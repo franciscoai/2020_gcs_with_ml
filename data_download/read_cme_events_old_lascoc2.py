@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
-tabla = pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/Lista_Final_CMEs.csv", sep='\t', engine='python',encoding="utf-8", header=0)
+tabla = pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/catalogues/Lista_Final_CMEs.csv", sep='\t', engine='python',encoding="utf-8", header=0)
 tabla['pre_a_1h_download_c2'] = ''
 tabla['pre_b_1h_download_c2'] = ''
 tabla['pre_a_2h_download_c2'] = ''
