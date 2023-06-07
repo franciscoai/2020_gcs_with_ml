@@ -5,6 +5,9 @@ from ext_libs.rebin import rebin
 from astropy.io import fits
 import pandas as pd
 import glob
+
+
+
 """
 Reads pairs of LVL1 coronograph images from various instruments and saves a differential corona for each pair.
 Images are resized
@@ -27,29 +30,21 @@ for i in range(len(cor2.index)):
     for j in cor2_downloads:
         if cor2.loc[i,j] != "No data" and cor2.loc[i,j] != "*" and cor2.loc[i,j] != "No img/double data":
             cor2.at[i, j] = "/gehme/data/stereo/secchi/"+ cor2.at[i, j]
-            if j== cor2_downloads[0] or j==cor2_downloads[2]:
-                cor2.at[i,j]=cor2.at[i,j].replace("A","a")
-            else:  
-                cor2.at[i,j]=cor2.at[i,j].replace("B","b")
 
-def pathlist(df):
+
+def pathlist(df,column_list):
+    '''
+    df=dataframe
+    column_list: list of columns to use 
+    '''
     paths=[]
     name=df.name
-    if name=='cor2':
-        downloads=cor2_downloads
-    else:
-        downloads=lasco_downloads
     for i in range(len(df.index)):
-        for j in downloads:
-            if df.loc[i,j] != "No data" and df.loc[i,j] != "*" and df.loc[i,j] != "No img/double data":
-                element= df.loc[i,j]
-                paths.append(element)
-
         for k in range(0,2):        #repetir para evento b
-            if (df.loc[i,downloads[k]] != "No data" and df.loc[i,downloads[k]] != "*" and df.loc[i,downloads[k]] != "No img/double data") and (df.loc[i,downloads[k+2]] != "No data" and df.loc[i,downloads[k+2]] != "*" and df.loc[i,downloads[k+2]] != "No img/double data"): 
+            if (df.loc[i,column_list[k]] != "No data" and df.loc[i,column_list[k]] != "*" and df.loc[i,column_list[k]] != "No img/double data") and (df.loc[i,column_list[k+2]] != "No data" and df.loc[i,column_list[k+2]] != "*" and df.loc[i,column_list[k+2]] != "No img/double data"): 
                 try:
-                        file1=glob.glob(df.loc[i,downloads[k]][0:-5]+"*")
-                        file2=glob.glob(df.loc[i,downloads[k+2]][0:-5]+"*")
+                        file1=glob.glob(df.loc[i,column_list[k]][0:-5]+"*")
+                        file2=glob.glob(df.loc[i,column_list[k+2]][0:-5]+"*")
                         path_1h=(file1[0])#.replace("level_05","level_1")
                         path_2h=(file2[0])#.replace("level_05","level_1")
                         im1= fits.open(path_1h)
@@ -61,9 +56,15 @@ def pathlist(df):
                         header['NAXIS1'] = imsize[0]   
                         header['NAXIS2'] = imsize[1]
                         final_img = fits.PrimaryHDU(im, header=header[0:-3])
-                        final_img.writeto('/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'+df.name+'/'+os.path.basename(path_1h),overwrite=True) 
-
-
+                        if name=="cor2":
+                            if path_1h.endswith("a.fts") or path_1h.endswith("A.fts"):
+                                final_img.writeto('/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'+df.name+'/'+"cor2_a"+"/"+os.path.basename(path_1h),overwrite=True) 
+                            else:
+                                final_img.writeto('/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'+df.name+'/'+"cor2_b"+"/"+os.path.basename(path_1h),overwrite=True) 
+                        else:
+                            final_img.writeto('/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'+df.name+'/'+"c2"+"/"+os.path.basename(path_1h),overwrite=True)
+                        paths.append(file1)
+                        paths.append(file2)
                 except ValueError as e:
                     print("error "+str(e)+" on "+path_1h+"  or  "+path_2h)
 
@@ -72,9 +73,9 @@ def pathlist(df):
     paths.to_csv(exec_path+"/"+name+"_path_list.csv", index=False)
 
 
-
-pathlist(cor2)
-
+#function to create corona background
+pathlist(lasco,lasco_downloads) 
+pathlist(cor2,cor2_downloads) 
 
 
 

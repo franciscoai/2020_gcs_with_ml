@@ -22,6 +22,7 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     sat=
         0: Stereo A Cor2
         1: Stereo B Cor2
+        2: Lasco C2
 
     OPTIONS:
         diff: Set to True to return a time differential corona.
@@ -31,46 +32,43 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     '''
     # CONSTANTS
     #files
-    data_path = '/gehme/data'
-    secchipath = data_path + '/stereo/secchi/L1'
+    
+    
+    cor2_path="/gehme/projects/2020_gcs_with_ml/data/corona_back_database/cor2"
+    lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_back_database/lasco"
+    size_occ=[2.6, 3.7, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
 
     # main
     # STEREO A
     if sat==0:
-        p0 = ['/a/img/cor2/20110317/20110317_115400_14c2A.fts', '/a/img/cor2/20130424/20130424_055400_14c2A.fts']
-        p1 = ['/a/img/cor2/20110317/20110317_122400_14c2A.fts', '/a/img/cor2/20130424/20130424_062400_14c2A.fts']           
-        i = np.random.randint(low=0, high=len(p0)-1)
-        p0=secchipath + p0[i]
-        p1=secchipath + p1[i]
-        i0, h0 = sunpy.io._fits.read(p0)[0]
-        if diff:
-            i1, h1 = sunpy.io._fits.read(p1)[0]
-            oimg = i1-i0
-        else:
-            oimg = i1
+        path=cor2_path+"/cor2_a"
     # STEREO B
     elif sat==1:
-        p0 = ['/b/img/cor2/20110317/20110317_123900_14c2B.fts', '/b/img/cor2/20130424/20130424_065400_14c2B.fts']
-        p1 = ['/b/img/cor2/20110317/20110317_125400_14c2B.fts', '/b/img/cor2/20130424/20130424_072400_14c2B.fts']        
-        i = np.random.randint(low=0, high=len(p0)-1)           
-        p0=secchipath + p0[i]
-        p1=secchipath + p1[i]    
-        i0, h0 = sunpy.io._fits.read(p0)[0]
-        if diff:
-            i1, h1 = sunpy.io._fits.read(p1)[0]
-            oimg = i1-i0
-        else:
-            oimg = i1
+        path=cor2_path+"/cor2_b"
+    elif sat==2:
+        path=lasco_path+"/c2"
     else:
         os.error('Input instrument not recognized, check value of sat')
-    
+
+    files=os.listdir(path)
+    p0= np.random.choice(files)
+    p0=path+"/"+p0
+    i0, h0 = sunpy.io._fits.read(p0)[0]
+    oimg=i0
+
+    data_path = '/gehme/data'
+    secchipath = data_path + '/stereo/secchi/L1'
+    p0 = '/a/img/cor2/20110317/20110317_115400_14c2A.fts'
+    p0=secchipath + p0
+    i1,h0 = sunpy.io._fits.read(p0)[0]
+
     if rnd_rot:
         oimg = scipy.ndimage.rotate(oimg, np.random.randint(low=0, high=360), reshape=False)
  
     if imsize is not None:
         oimg = rebin(oimg,imsize,operation='mean') 
         
-    return oimg, h0
+    return oimg, h0, size_occ[sat]
 
 
 

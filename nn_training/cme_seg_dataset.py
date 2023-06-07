@@ -90,8 +90,8 @@ def pnt2arr(x,y,plotranges,imsize):
 # CONSTANTS
 #files
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_v3' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
-n_sat = 3 #number of satellites to  use [Cor A, Cor B, Lasco]
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_flor' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
+n_sat = 2 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 
 # GCS parameters [first 6]
 # The other parameters are:
@@ -99,12 +99,11 @@ n_sat = 3 #number of satellites to  use [Cor A, Cor B, Lasco]
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names
-par_num = 2000  # total number of samples that will be generated for each param (there are nsat images per param combination)
+par_num = 20  # total number of samples that will be generated for each param (there are nsat images per param combination)
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 
 # Syntethic image options
 imsize=np.array([512, 512], dtype='int32') # output image size
-size_occ = [2.6, 3.7, 2] # Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
 level_occ=0. #mean level of the occulter relative to the background level
 cme_noise= [0,2.] #gaussian noise level of cme image. [mean, sd], both expressed in fractions of the cme-only image mean level. Set mean to None to avoid
 occ_noise = [0,30.] # occulter gaussian noise. [mean, sd] both expressed in fractions of the abs mean background level. Set mean to None to avoid
@@ -114,7 +113,7 @@ im_range=2. # range of the color scale of the output final syntethyc image in st
 back_rnd_rot=True # set to randomly rotate the background image around its center
 inner_cme=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
 mask_from_cloud=False #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
-two_cmes = True # set to include two cme per image on some (random) cases
+two_cmes = False # set to include two cme per image on some (random) cases
 
 # generate param arrays
 par_num = [par_num] * len(par_rng)
@@ -132,23 +131,24 @@ configfile_name = OPATH + '/' + date_str+'Set_Parameters.csv'
 set = pd.DataFrame(np.column_stack(all_par), columns=par_names)
 set.to_csv(configfile_name)
 df = pd.DataFrame(pd.read_csv(configfile_name))
-sat_info=[]
 mask_prev = None
+back_corona=[]
+headers=[]
+size_occ=[]
 # generate views
 for row in range(len(df)):
+    #get background corona,headers and occulter size
     for sat in range(n_sat):
-        #back corona, temporal must be change to have a different corona per image#same_corona,hdr1
-        sat_info.append(get_corona(sat,imsize=imsize))
-    same_corona = [sat_info[0][0],sat_info[1][0]]
-    headers = [sat_info[0][1],sat_info[1][1]]
+        a,b,c=get_corona(sat,imsize=imsize)
+        back_corona.append(a)
+        headers.append(b)
+        size_occ.append(c)
+    
+    # Get the location of sats and gcs:
+    satpos, plotranges = pyGCS.processHeaders(headers)
 
     print(f'Saving image pair {row} of {len(df)-1}')
     for sat in range(n_sat):
-        # Get the location of sats and gcs:
-        satpos, plotranges = pyGCS.processHeaders(headers)
-        
-        # if row !=8 :
-        #     break
         #defining ranges and radius of the occulter
         x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
         y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
@@ -165,9 +165,11 @@ for row in range(len(df)):
             mask=get_mask_cloud(p_x,p_y,imsize,OPATH)
         else:
             btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.1, nel=1e5)     
-            mask = get_cme_mask(btot_mask,inner_cme=inner_cme)
-            #check for too small mask
             cme_npix= len(btot_mask[btot_mask>0].flatten())
+            if cme_npix<=0:
+                print(f'WARNING: CME number {row} raytracing did not work')
+                break          
+            mask = get_cme_mask(btot_mask,inner_cme=inner_cme)          
             mask_npix= len(mask[mask>0].flatten())
             if mask_npix/cme_npix<0.9:
                 print(f'WARNING: CME number {row} mask is too small compared to cme brigthness image, skipping all views...')
@@ -195,7 +197,7 @@ for row in range(len(df)):
         arr[r <= size_occ[sat]] = 1    
 
         #background corona
-        back = same_corona[sat]
+        back = back_corona[sat]
         if back_rnd_rot:
             back =  scipy.ndimage.rotate(back, np.random.randint(low=0, high=360), reshape=False)
         level_back = np.mean(back)               
