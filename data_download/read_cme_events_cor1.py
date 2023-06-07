@@ -13,7 +13,7 @@ tabla['pre_b_2h_download_cor1'] = ''
 pre_suffix = '/gehme/data/stereo/'
 
 for i in range(len(tabla)):
-    if i == 15: breakpoint()
+
     print("chequeando elemento Numero {}".format(i))
     pre_even_a_1h = tabla['preevento_a_1h'][i]
     if (pre_even_a_1h != '*' and pre_even_a_1h != 'NaT'): 
@@ -62,7 +62,9 @@ for i in range(len(tabla)):
                         if abs(resultado[0]-resultado[1])<= timedelta(seconds=30):
                             print("vamos a descargar")
                             asd.indices_descarga = [lista_strings_times2.index(elemento) for elemento in trio]
-
+                    if asd.indices_descarga == '':
+                        tabla['pre_a_3h_download_cor1'][i] = "No triada"
+                        continue
                     suffix = "/".join(str(asd.search_cor1[asd.indices_descarga[0]]['fileid']).split('/')[:-1])+"/"
                     list_downloaded_fileid=[pre_suffix+suffix]
                     for j in range(3):
@@ -127,6 +129,9 @@ for i in range(len(tabla)):
                         if abs(resultado[0]-resultado[1])<= timedelta(seconds=30):
                             print("vamos a descargar")
                             asd.indices_descarga = [lista_strings_times2.index(elemento) for elemento in trio]
+                    if asd.indices_descarga == '':
+                        tabla['pre_a_2h_download_cor1'][i] = "No triada"
+                        continue
                     suffix = "/".join(str(asd.search_cor1[asd.indices_descarga[0]]['fileid']).split('/')[:-1])+"/"
                     list_downloaded_fileid=[pre_suffix+suffix]
                     for j in range(3):
@@ -188,6 +193,10 @@ for i in range(len(tabla)):
                         if abs(resultado[0]-resultado[1])<= timedelta(seconds=30):
                             print("vamos a descargar")
                             asd.indices_descarga = [lista_strings_times2.index(elemento) for elemento in trio]
+                    if asd.indices_descarga == '':
+                        tabla['pre_b_3h_download_cor1'][i] = "No triada"
+                        continue
+
                     suffix = "/".join(str(asd.search_cor1[asd.indices_descarga[0]]['fileid']).split('/')[:-1])+"/"
                     list_downloaded_fileid=[pre_suffix+suffix]
                     for j in range(3):
@@ -247,6 +256,10 @@ for i in range(len(tabla)):
                         if abs(resultado[0]-resultado[1])<= timedelta(seconds=30):
                             print("vamos a descargar")
                             asd.indices_descarga = [lista_strings_times2.index(elemento) for elemento in trio]
+                    if asd.indices_descarga == '':
+                        tabla['pre_b_2h_download_cor1'][i] = "No triada"
+                        continue
+                    
                     suffix = "/".join(str(asd.search_cor1[asd.indices_descarga[0]]['fileid']).split('/')[:-1])+"/"
                     list_downloaded_fileid=[pre_suffix+suffix]
                     for j in range(3):

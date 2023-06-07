@@ -38,7 +38,7 @@ for i in range(len(tabla)):
                 suffix = str(2000+int(folder[0:2]))
             else:
                 suffix = str(1900+int(folder[0:2])) 
-            folder_full = suffix+folder[3:]+"/"
+            folder_full = suffix+folder[2:]+"/"
             download_path = asd.dir_descarga+"level_05/c2/"+folder_full
             fileid = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
             tabla['pre_a_1h_download_c2'][i] = download_path+fileid
