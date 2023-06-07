@@ -20,7 +20,6 @@ lasco_downloads=["pre_a_1h_download_c2","pre_b_1h_download_c2","pre_a_2h_downloa
 cor2_downloads=["pre_a_1h_download","pre_b_1h_download","pre_a_2h_download","pre_b_2h_download"]
 imsize=[512,512]
 
-
 lasco= pd.read_csv(lasco_path , sep="\t")
 lasco.name='lasco'
 

@@ -171,7 +171,7 @@ class lascoc2_downloader:
                     suffix = str(2000+int(folder[0:2]))
                 else:
                     suffix = str(1900+int(folder[0:2]))                
-                folder_full = suffix+folder[3:]+"/"
+                folder_full = suffix+folder[2:]+"/"
                 download_path = self.dir_descarga+"level_05/c2/"+folder_full
 
             if not os.path.exists(download_path):
@@ -245,7 +245,7 @@ class cor1_downloader:
                 case 'STEREO_B':
                     search_cor1_ = search_cor1['vso'][search_cor1['vso']['Source'] == 'STEREO_B'].copy()        
             self.search_cor1 = search_cor1_
-            if self.nivel != '':#asumo nivel definido correctamente
+            if self.nivel != '' or self.size!='':#asumo nivel definido correctamente
                 self.filtro()
 
     def display(self):
@@ -300,7 +300,8 @@ class cor1_downloader:
         if self.size and lista_filtro: 
             lista_filtro2 = []
             for j in range(len(self.search_cor1)):
-                if self.size == int(round(self.search_cor1[j]['Size'].value)):
+                #if self.size == int(round(self.search_cor1[j]['Size'].value)):
+                if self.size == round((self.search_cor1[j]['Size'].value) * 2) / 2:
                     lista_filtro2.append(j)
             self.search_cor1 = self.search_cor1[lista_filtro2]
             if not lista_filtro2: print('Filtered images')
