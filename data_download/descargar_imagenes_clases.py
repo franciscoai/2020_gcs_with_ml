@@ -8,7 +8,7 @@ import os
 import matplotlib.pyplot as plt
 import pdb
 import numpy as np
-
+import requests
 
 class lascoc2_downloader:
     """
@@ -28,6 +28,7 @@ class lascoc2_downloader:
             self.nivel = nivel #puede ser level_05
             self.indices_descarga = ''
             self.size = size #puede ser 1 o 2
+            self.nrl_download = ''
 
         except TypeError:
             print("Be sure to add start_time, end_time, ship name, level/type of image when creating of object of this class.")
@@ -58,7 +59,7 @@ class lascoc2_downloader:
             case 'que_son':
                 string_search = "level_05"#"22"
                 #size_True_False = (self.search_lascoc2['Size'] < (1.4*u.Mibyte))
-                             
+
             case 'level_05':
                 string_search = "level_05"#"22"
                 #size_True_False = (self.search_lascoc2['Size'] < (2.5*u.Mibyte)) & (self.search_lascoc2['Size'] > (1.5*u.Mibyte))
@@ -139,21 +140,42 @@ class lascoc2_downloader:
         plt.show()
 
 
+    def nrl_navy_download(self, file_id, download_path_nrl):
+        url = "https://lasco-www.nrl.navy.mil/lz/level_1/"#101124/c2/25352163.fts.gz"  
+        
+        old_folder = file_id.split('/')[8]
+        file_name_old = file_id.split('/')[-1]
+        list_file = list(file_name_old)
+        if list_file[1]=='2':
+            list_file[1]='5'
+        file_name_download = "".join(list_file)+".gz" # Nombre con el que se buscará y guardará el archivo 
+
+        # Realizar la solicitud GET para obtener el contenido del archivo
+        respuesta = requests.get(url+'/'+old_folder+'/c2/'+file_name_download)
+        path_file = os.path.join(download_path_nrl,file_name_download)
+
+        # Verificar si la solicitud fue exitosa (código de estado 200)
+        breakpoint()
+        if respuesta.status_code == 200:
+            with open(path_file, "wb") as archivo:
+                archivo.write(respuesta.content)
+            print("El archivo se ha descargado exitosamente.")
+            comando = f"gzip -d {path_file}"
+            os.system(comando)
+            print(f"unziping {path_file}")
+            os.system(f"rm {path_file}")
+            print(f"removing {path_file}")
+            
+        else:
+            print("No se pudo descargar el archivo. Código de estado:", respuesta.status_code)
+        return "".join(list_file)
+
+
 
     def download(self, download_path=None):
         """
         Definir metodo download
         """
-        #download_path = self.dir_descarga+self.start_time+'/'+self.instrumento+'/'+self.nivel+'/'
-        #if not os.path.exists(download_path):
-        #    os.makedirs(download_path)
-        #    print(f"Se ha creado el directorio {download_path}")
-        #else:   
-        #    print(f"El directorio {download_path} ya existe")
-        #downloaded_files = Fido.fetch(self.search_lascoc2,path=download_path, max_conn=5, progress=True) 
-        #print(f'Archivos descargados en: {download_path}')
-        #print(*downloaded_files.data, sep = "\n")
-
         carpetas_creadas = []
         if getattr(self,'indices_descarga') == '': 
             cantidad = len(self.search_lascoc2)
@@ -172,7 +194,10 @@ class lascoc2_downloader:
                 else:
                     suffix = str(1900+int(folder[0:2]))                
                 folder_full = suffix+folder[2:]+"/"
-                download_path = self.dir_descarga+"level_05/c2/"+folder_full
+                if self.nrl_download:
+                    download_path = self.dir_descarga+"level_1/c2/"+folder_full
+                else:    
+                    download_path = self.dir_descarga+"level_05/c2/"+folder_full
 
             if not os.path.exists(download_path):
                 os.makedirs(download_path)
@@ -181,9 +206,13 @@ class lascoc2_downloader:
             else:   
                 print(f"El directorio {download_path} ya existe")
 
-            if not os.path.isfile(download_path+self.search_lascoc2[w]['fileid'].split('/')[-1]):#Si archivo no descargado entonces que descargue.
-                downloaded_files = Fido.fetch(self.search_lascoc2[w],path=download_path, max_conn=5, progress=True) 
-      
+            if self.nrl_download:
+                breakpoint()
+                downloaded_files = self.nrl_navy_download(self.search_lascoc2[w]['fileid'], download_path)
+            else:   
+                if not os.path.isfile(download_path+self.search_lascoc2[w]['fileid'].split('/')[-1]):#Si archivo no descargado entonces que descargue.
+                    downloaded_files = Fido.fetch(self.search_lascoc2[w],path=download_path, max_conn=5, progress=True) 
+    
             os.system('chgrp -R gehme {}'.format(download_path))
             os.system('chmod -R 775 {}'.format(download_path))
 

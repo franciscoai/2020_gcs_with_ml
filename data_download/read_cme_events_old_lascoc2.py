@@ -2,7 +2,7 @@ from descargar_imagenes_clases import lascoc2_downloader
 import pandas as pd
 from datetime import datetime, timedelta
 
-
+descarga_nrl = True
 tabla = pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/catalogues/Lista_Final_CMEs.csv", sep='\t', engine='python',encoding="utf-8", header=0)
 tabla['pre_a_1h_download_c2'] = ''
 tabla['pre_b_1h_download_c2'] = ''
@@ -29,9 +29,8 @@ for i in range(len(tabla)):
             fecha_cercana = min(lista_strings_times2, key=lambda x: abs(x - dt))
             indice_fecha_cercana = lista_strings_times2.index(fecha_cercana)
             asd.indices_descarga = [indice_fecha_cercana] 
-#            breakpoint()
-            asd.download()
-            #breakpoint()
+
+            
             folder_year_month_day = asd.search_lascoc2[asd.indices_descarga[0]]['fileid'].split('/')[8]
             folder = asd.search_lascoc2['fileid'][asd.indices_descarga[0]].split('/')[-3]
             if int(folder[0:2]) < 50:
@@ -39,12 +38,24 @@ for i in range(len(tabla)):
             else:
                 suffix = str(1900+int(folder[0:2])) 
             folder_full = suffix+folder[2:]+"/"
-            download_path = asd.dir_descarga+"level_05/c2/"+folder_full
-            fileid = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
-            tabla['pre_a_1h_download_c2'][i] = download_path+fileid
-            #"/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
             
-            #breakpoint()
+            fileid = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
+
+            asd.nrl_download = True
+            asd.download()
+            breakpoint()
+            if not asd.nrl_download:
+                asd.download()
+                download_path = asd.dir_descarga+"level_05/c2/"+folder_full
+            if asd.nrl_download:
+                file_id = asd.search_lascoc2[asd.indices_descarga[0]]['fileid']
+                download_path = asd.dir_descarga+"level_1/c2/"+folder_full
+                asd.nrl_navy_download(file_id, download_path)
+
+            breakpoint()
+
+            tabla['pre_a_1h_download_c2'][i] = download_path+fileid
+
         else:
             tabla['pre_a_1h_download_c2'][i] = 'No data'
     else:
@@ -69,7 +80,7 @@ for i in range(len(tabla)):
             indice_fecha_cercana = lista_strings_times2.index(fecha_cercana)
             asd.indices_descarga = [indice_fecha_cercana]
         
-            asd.download()            
+            #asd.download()            
             folder_year_month_day = asd.search_lascoc2[asd.indices_descarga[0]]['fileid'].split('/')[8]
             folder = asd.search_lascoc2['fileid'][asd.indices_descarga[0]].split('/')[-3]
             if int(folder[0:2]) < 50:
@@ -77,11 +88,20 @@ for i in range(len(tabla)):
             else:
                 suffix = str(1900+int(folder[0:2])) 
             folder_full = suffix+folder[2:]+"/"
-            download_path = asd.dir_descarga+"level_05/c2/"+folder_full
+            
             fileid = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
+            
+            asd.nrl_download = True
+            if not asd.nrl_download:
+                asd.download()
+                download_path = asd.dir_descarga+"level_05/c2/"+folder_full
+            if asd.nrl_download:
+                file_id = asd.search_lascoc2[asd.indices_descarga[0]]['fileid']
+                download_path = asd.dir_descarga+"level_1/c2/"+folder_full
+                asd.nrl_navy_download(file_id, download_path)
+
+            breakpoint()
             tabla['pre_a_2h_download_c2'][i] = download_path+fileid
-            #"/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
- #           breakpoint()
         else:
             tabla['pre_a_2h_download_c2'][i] = 'No data'
     else:
