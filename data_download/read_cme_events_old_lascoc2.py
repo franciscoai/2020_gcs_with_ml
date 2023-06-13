@@ -39,18 +39,24 @@ for i in range(len(tabla)):
                 suffix = str(1900+int(folder[0:2])) 
             folder_full = suffix+folder[2:]+"/"
             
-            fileid = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
+            fileid_old = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
 
             asd.nrl_download = True
-            asd.download()
+            #asd.download()
             breakpoint()
             if not asd.nrl_download:
                 asd.download()
                 download_path = asd.dir_descarga+"level_05/c2/"+folder_full
+                fileid = fileid_old
             if asd.nrl_download:
                 file_id = asd.search_lascoc2[asd.indices_descarga[0]]['fileid']
                 download_path = asd.dir_descarga+"level_1/c2/"+folder_full
-                asd.nrl_navy_download(file_id, download_path)
+                #asd.nrl_navy_download(file_id, download_path)
+                asd.download()
+                list_file = list(fileid_old)
+                if list_file[1]=='2':
+                    list_file[1]='5'
+                fileid = "".join(list_file)
 
             breakpoint()
 
@@ -89,16 +95,22 @@ for i in range(len(tabla)):
                 suffix = str(1900+int(folder[0:2])) 
             folder_full = suffix+folder[2:]+"/"
             
-            fileid = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
+            fileid_old = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
             
             asd.nrl_download = True
             if not asd.nrl_download:
                 asd.download()
                 download_path = asd.dir_descarga+"level_05/c2/"+folder_full
+                fileid = fileid_old
             if asd.nrl_download:
                 file_id = asd.search_lascoc2[asd.indices_descarga[0]]['fileid']
                 download_path = asd.dir_descarga+"level_1/c2/"+folder_full
-                asd.nrl_navy_download(file_id, download_path)
+                #asd.nrl_navy_download(file_id, download_path)
+                asd.download()
+                list_file = list(fileid_old)
+                if list_file[1]=='2':
+                    list_file[1]='5'
+                fileid = "".join(list_file)
 
             breakpoint()
             tabla['pre_a_2h_download_c2'][i] = download_path+fileid
@@ -126,7 +138,6 @@ for i in range(len(tabla)):
             indice_fecha_cercana = lista_strings_times2.index(fecha_cercana)
             asd.indices_descarga = [indice_fecha_cercana]
         
-            asd.download()
             folder_year_month_day = asd.search_lascoc2[asd.indices_descarga[0]]['fileid'].split('/')[8]
             folder = asd.search_lascoc2['fileid'][asd.indices_descarga[0]].split('/')[-3]
             if int(folder[0:2]) < 50:
@@ -134,11 +145,28 @@ for i in range(len(tabla)):
             else:
                 suffix = str(1900+int(folder[0:2])) 
             folder_full = suffix+folder[2:]+"/"
-            download_path = asd.dir_descarga+"level_05/c2/"+folder_full
-            fileid = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
+
+            fileid_old = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
+
+            asd.nrl_download = True
+            breakpoint()
+            if not asd.nrl_download:
+                asd.download()
+                download_path = asd.dir_descarga+"level_05/c2/"+folder_full
+                fileid = fileid_old
+
+            if asd.nrl_download:
+                file_id = asd.search_lascoc2[asd.indices_descarga[0]]['fileid']
+                download_path = asd.dir_descarga+"level_1/c2/"+folder_full
+                #asd.nrl_navy_download(file_id, download_path)
+                asd.download()
+                list_file = list(fileid_old)
+                if list_file[1]=='2':
+                    list_file[1]='5'
+                fileid = "".join(list_file)
+            
             tabla['pre_b_1h_download_c2'][i] = download_path+fileid
-            #"/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
-  #          breakpoint()
+            breakpoint()
         else:
             tabla['pre_b_1h_download_c2'][i] = 'No data'
     else:
@@ -161,8 +189,7 @@ for i in range(len(tabla)):
             fecha_cercana = min(lista_strings_times2, key=lambda x: abs(x - dt))
             indice_fecha_cercana = lista_strings_times2.index(fecha_cercana)
             asd.indices_descarga = [indice_fecha_cercana]
-        
-            asd.download()
+
             folder_year_month_day = asd.search_lascoc2[asd.indices_descarga[0]]['fileid'].split('/')[8]
             folder = asd.search_lascoc2['fileid'][asd.indices_descarga[0]].split('/')[-3]
             if int(folder[0:2]) < 50:
@@ -170,11 +197,28 @@ for i in range(len(tabla)):
             else:
                 suffix = str(1900+int(folder[0:2])) 
             folder_full = suffix+folder[2:]+"/"
-            download_path = asd.dir_descarga+"level_05/c2/"+folder_full
-            fileid = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
+
+            fileid_old = str(asd.search_lascoc2[asd.indices_descarga[0]]['fileid']).split('/')[-1]
+
+            asd.nrl_download = True
+            breakpoint()
+            if not asd.nrl_download:
+                asd.download()
+                download_path = asd.dir_descarga+"level_05/c2/"+folder_full
+                fileid = fileid_old
+
+            if asd.nrl_download:
+                file_id = asd.search_lascoc2[asd.indices_descarga[0]]['fileid']
+                download_path = asd.dir_descarga+"level_1/c2/"+folder_full
+                #asd.nrl_navy_download(file_id, download_path)
+                asd.download()
+                list_file = list(fileid_old)
+                if list_file[1]=='2':
+                    list_file[1]='5'
+                fileid = "".join(list_file)
+            
             tabla['pre_b_2h_download_c2'][i] = download_path+fileid
-            #"/".join(str(asd.search_lascoc2[asd.indices_descarga]['fileid']).split('/')[1:])
-   #         breakpoint()
+            breakpoint()
         else:
             tabla['pre_b_2h_download_c2'][i] = 'No data'
     else:
