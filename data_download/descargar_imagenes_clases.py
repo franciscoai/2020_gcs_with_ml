@@ -16,7 +16,7 @@ class lascoc2_downloader:
     Mencionar ejemplo.
     """
 
-    def __init__(self, start_time, end_time,nivel='',size=''):
+    def __init__(self, start_time, end_time,nivel='',size='',nrl_download=''):
         try:
             self.start_time = start_time
             self.end_time = end_time
@@ -26,9 +26,9 @@ class lascoc2_downloader:
             self.dir_descarga = '/gehme/data/soho/lasco/'
             #self.dir_descarga = '/data_local/GCS/gcs/Imagenes/'
             self.nivel = nivel #puede ser level_05
-            self.indices_descarga = ''
+            self.indices_descarga = '' #debe ser una lista
             self.size = size #puede ser 1 o 2
-            self.nrl_download = ''
+            self.nrl_download = nrl_download
 
         except TypeError:
             print("Be sure to add start_time, end_time, ship name, level/type of image when creating of object of this class.")
@@ -154,21 +154,29 @@ class lascoc2_downloader:
         respuesta = requests.get(url+'/'+old_folder+'/c2/'+file_name_download)
         path_file = os.path.join(download_path_nrl,file_name_download)
 
+        if os.path.exists(path_file):
+            print(f"El archivo comprimido {path_file} ya existe, NO se procede a descargar.")
+            return
+        
         # Verificar si la solicitud fue exitosa (código de estado 200)
-        breakpoint()
+        
         if respuesta.status_code == 200:
             with open(path_file, "wb") as archivo:
                 archivo.write(respuesta.content)
             print("El archivo se ha descargado exitosamente.")
+            if os.path.exists(path_file[:-3]):
+                print(f"El archivo a descomprimir {path_file[:-3]} ya existe, NO se procede a la descompresión del mismo.")
+                return
             comando = f"gzip -d {path_file}"
             os.system(comando)
             print(f"unziping {path_file}")
+            breakpoint()
             os.system(f"rm {path_file}")
             print(f"removing {path_file}")
-            
         else:
             print("No se pudo descargar el archivo. Código de estado:", respuesta.status_code)
-        return "".join(list_file)
+            print(f"Es posible que la imagen no se encuentre en {url+'/'+old_folder+'/c2/'+file_name_download}, o bien esté experimentando problemas de conectividad.")
+        #return "".join(list_file)
 
 
 
@@ -212,7 +220,7 @@ class lascoc2_downloader:
             else:   
                 if not os.path.isfile(download_path+self.search_lascoc2[w]['fileid'].split('/')[-1]):#Si archivo no descargado entonces que descargue.
                     downloaded_files = Fido.fetch(self.search_lascoc2[w],path=download_path, max_conn=5, progress=True) 
-    
+
             os.system('chgrp -R gehme {}'.format(download_path))
             os.system('chmod -R 775 {}'.format(download_path))
 
