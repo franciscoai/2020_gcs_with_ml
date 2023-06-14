@@ -9,7 +9,7 @@ data_path="/gehme/projects/2020_gcs_with_ml/data/corona_back_database"
 exec_path ="/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues"
 cor2_opath=data_path+"/cor2/analysis"
 
-sat="cor2_b"#"cor2_b""lasco_c2"
+sat="cor2_a"#"cor2_b""lasco_c2"
 
 
 
@@ -48,8 +48,8 @@ for i in range(len(df["contraste"])):
    if df.loc[i,"contraste"]>1:
       im= fits.open(df.loc[i,"paths"])
       img=im[0].data
-      vmin = img.min()
-      vmax = img.max()
+      vmin = df.loc[i,"mean"]-3*(df.loc[i,"std"])
+      vmax = df.loc[i,"mean"]+3*(df.loc[i,"std"])
       fig0, ax0 = plt.subplots()
       imagen = ax0.imshow(img, cmap='gray', vmin=vmin, vmax=vmax)
       filename = os.path.basename(df.loc[i,"paths"])

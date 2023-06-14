@@ -19,6 +19,10 @@ cor2_path = exec_path+'/Lista_Final_CMEs_downloads_cor2.csv'
 lasco_downloads=["pre_a_1h_download_c2","pre_b_1h_download_c2","pre_a_2h_download_c2","pre_b_2h_download_c2"]
 cor2_downloads=["pre_a_1h_download","pre_b_1h_download","pre_a_2h_download","pre_b_2h_download"]
 imsize=[512,512]
+do_write=False
+
+
+
 
 lasco= pd.read_csv(lasco_path , sep="\t")
 lasco.name='lasco'
@@ -31,7 +35,7 @@ for i in range(len(cor2.index)):
             cor2.at[i, j] = "/gehme/data/stereo/secchi/"+ cor2.at[i, j]
 
 
-def pathlist(df,column_list):
+def pathlist(df,column_list, do_write=True):
     '''
     df=dataframe
     column_list: list of columns to use 
@@ -42,8 +46,13 @@ def pathlist(df,column_list):
         for k in range(0,2):        #repetir para evento b
             if (df.loc[i,column_list[k]] != "No data" and df.loc[i,column_list[k]] != "*" and df.loc[i,column_list[k]] != "No img/double data") and (df.loc[i,column_list[k+2]] != "No data" and df.loc[i,column_list[k+2]] != "*" and df.loc[i,column_list[k+2]] != "No img/double data"): 
                 try:
+                    if name=="cor2":
                         file1=glob.glob(df.loc[i,column_list[k]][0:-5]+"*")
                         file2=glob.glob(df.loc[i,column_list[k+2]][0:-5]+"*")
+                    elif name=="lasco":
+                        file1=glob.glob(df.loc[i,column_list[k]])
+                        file2=glob.glob(df.loc[i,column_list[k+2]])
+                    if do_write==True:
                         path_1h=(file1[0])#.replace("level_05","level_1")
                         path_2h=(file2[0])#.replace("level_05","level_1")
                         im1= fits.open(path_1h)
@@ -62,19 +71,19 @@ def pathlist(df,column_list):
                                 final_img.writeto('/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'+df.name+'/'+"cor2_b"+"/"+os.path.basename(path_1h),overwrite=True) 
                         else:
                             final_img.writeto('/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'+df.name+'/'+"c2"+"/"+os.path.basename(path_1h),overwrite=True)
-                        paths.append(file1)
-                        paths.append(file2)
+                    paths.append(file1)
+                    paths.append(file2)
                 except ValueError as e:
                     print("error "+str(e)+" on "+path_1h+"  or  "+path_2h)
-
+    
     paths=pd.DataFrame(paths,columns=['paths'])
     paths = paths.drop_duplicates()
     paths.to_csv(exec_path+"/"+name+"_path_list.csv", index=False)
 
 
 #function to create corona background
-pathlist(lasco,lasco_downloads) 
-pathlist(cor2,cor2_downloads) 
+pathlist(lasco,lasco_downloads,do_write=do_write) 
+#pathlist(cor2,cor2_downloads,do_write=do_write) 
 
 
 
