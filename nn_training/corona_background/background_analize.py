@@ -54,17 +54,30 @@ def filtered(sat):
       for i, date in enumerate(df_sorted['date']):
          # Calcular la fecha límite 12 horas antes de la fecha actual
          prev_date = date - timedelta(hours=12)
-         lista=[]
          for i in range(len(df["date"])):
             if not(df.loc[i,"date"]<date and df.loc[i,"date"]>prev_date):
-               resultados.append(date)
+               resultados.append(df.loc[i,"paths"])
+      m=0
+      for path in resultados:
+         img = fits.open(path)
+         data=img[0].data
+         vmin = df.loc[m,"mean"]-3*(df.loc[m,"std"])
+         vmax = df.loc[m,"mean"]+3*(df.loc[m,"std"])
+         fig0, ax0 = plt.subplots()
+         imagen = ax0.imshow(data, cmap='gray', vmin=vmin, vmax=vmax)
+         filename = os.path.basename(df.loc[m,"paths"])
+         filename = os.path.splitext(filename)[0]
+         m=m+1
+         
+         plt.savefig(cor2_opath+"/images/"+filename+".png", format='png')
+         img.close()
                     
          
          
 
    elif sat=="lasco_c2":
       print("lasco")
-   breakpoint()     
+     
 
       
    
