@@ -1,35 +1,91 @@
+import random
+import os
+import cv2
+import numpy as np
 import torch
-import torch.nn as nn
-import torchvision.models.detection.backbone_utils as backbone_utils
-import torchvision.models as models
+import torchvision
+from torchvision.models.detection import FasterRCNN
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from mlp_resnet_model import Mlp_Resnet
+
+EPOCHS = 1000
+GPU = 1
+TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_v3'
+OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3"
 
 
-class Resnet_gcs(nn.Module):
-    def __init__(self, backbone, input_size, hidden_size, output_size) -> None:
-        super(Resnet_gcs, self).__init__()
-
-        self.backbone = backbone
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.output_size = output_size
-
-        self.fc1 = nn.Linear(self.input_size, self.hidden_size)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(self.hidden_size, self.output_size)
-
-    def forward(self, image):
-        x = self.backbone(image)
-        x = torch.flatten(x, 1)
-        x = self.fc1(x)
-        x = self.relu(x)
-        x = self.fc2(x)
-
-        return x
+def normalize(image):
+    '''
+    Normalizes the values of the model input image to have a given range (as fractions of the sd around the mean)
+    maped to [0,1]. It clips output values outside [0,1]
+    '''
+    sd_range = 1.
+    m = np.mean(image)
+    sd = np.std(image)
+    image = (image - m + sd_range * sd) / (2 * sd_range * sd)
+    image[image > 1] = 1
+    image[image < 0] = 0
+    return image
 
 
+def dataloader(imgs, batch_size=8, image_size=[512, 512], file_ext='.png'):
+    batch_imgs = []
+    targets = []
+    for i in range(batch_size):
+        idx = random.randint(0, len(imgs)-1)
+        file = os.listdir(imgs[idx])
+        file = [f for f in file if f.endswith(file_ext)]
+        img = cv2.imread(os.path.join(imgs[idx], file[0]))
+        img = cv2.resize(img, image_size, cv2.INTER_LINEAR)
+        img = normalize(img)
+        img = np.transpose(img, (2, 0, 1))
+        parameters = file[0].split('_')
+        parameters = parameters[:6]
+        parameters = [float(p) for p in parameters]
+        parameters = torch.tensor(parameters, dtype=torch.float32)
+        targets.append(parameters) # targets is a list where each element is a tensor of shape [6]
+        batch_imgs.append(img)
+    batch_imgs=torch.stack([torch.as_tensor(d) for d in batch_imgs],0).float()
+    targets = torch.stack([torch.as_tensor(d) for d in targets],0).float()
+    return batch_imgs, targets
 
 
+def optimize():
+    for epoch in range(EPOCHS):
+        batch_imgs, targets = dataloader(images)
+        batch_imgs = batch_imgs.to(device)
+        targets = targets.to(device)
+        optimizer.zero_grad()
+        features = model.backbone(batch_imgs)
+        features = torch.flatten(features, start_dim=1)
+        output = model(features)
+        loss = criterion(output, targets)
+        loss.backward()
+        optimizer.step()
+        print(f'Epoch {epoch+1}/{EPOCHS} Loss: {loss.item():.4f}')
+        # if epoch % 10 == 0:
+        #     torch.save(model.state_dict(), os.path.join(OPATH, f'model_{epoch+1}.pth'))
 
 if __name__ == "__main__":
-    backbone = backbone_utils.resnet_fpn_backbone(backbone_name='resnet50', weights=models.ResNet50_Weights.IMAGENET1K_V2)
-    model = Resnet_gcs(backbone=backbone, input_size=512, hidden_size=256, output_size=6)
+    images = []
+    dirs = os.listdir(TRAINDIR)
+    dirs= [d for d in dirs if not d.endswith(".csv")]
+    for d in dirs:
+        images.append(os.path.join(TRAINDIR, d))
+    print(f'Found {len(images)} images')
+    print(f'Using GPU {GPU}')
+    device = torch.device(f'cuda:{GPU}') if torch.cuda.is_available(
+    ) else torch.device('cpu')  # runing on gpu unles its not available
+
+    #backbone, in_features = generateBackbone()
+    backbone = torchvision.models.resnet101(weights='DEFAULT')
+    for param in backbone.parameters():
+        param.requires_grad = False
+    model = Mlp_Resnet(backbone=backbone, input_size=1000,
+                       hidden_size=256, output_size=6)
+    model.to(device)
+    criterion = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=1e-2)
+
+    optimize()
