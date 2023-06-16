@@ -90,8 +90,8 @@ def pnt2arr(x,y,plotranges,imsize):
 # CONSTANTS
 #files
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_flor' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
-n_sat = 2 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_mariano' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
+n_sat = 1 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 
 # GCS parameters [first 6]
 # The other parameters are:
@@ -99,8 +99,9 @@ n_sat = 2 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names
-par_num = 20  # total number of samples that will be generated for each param (there are nsat images per param combination)
+par_num = 10000  # total number of samples that will be generated for each param (there are nsat images per param combination)
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
+same_corona=True # Set to use a single corona back for all par_num cases
 
 # Syntethic image options
 imsize=np.array([512, 512], dtype='int32') # output image size
@@ -138,11 +139,12 @@ size_occ=[]
 # generate views
 for row in range(len(df)):
     #get background corona,headers and occulter size
-    for sat in range(n_sat):
-        a,b,c=get_corona(sat,imsize=imsize)
-        back_corona.append(a)
-        headers.append(b)
-        size_occ.append(c)
+    if not same_corona or row==0:
+        for sat in range(n_sat):
+            a,b,c=get_corona(sat,imsize=imsize)
+            back_corona.append(a)
+            headers.append(b)
+            size_occ.append(c)
     
     # Get the location of sats and gcs:
     satpos, plotranges = pyGCS.processHeaders(headers)
