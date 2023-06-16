@@ -4,14 +4,17 @@ import cv2
 import numpy as np
 import torch
 import torchvision
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+mpl.use('Agg')
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from mlp_resnet_model import Mlp_Resnet
 
 EPOCHS = 1000
 GPU = 1
-TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_v3'
-OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3"
+TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_mariano'
+OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/cme_seg_training_mariano"
 
 
 def normalize(image):
@@ -51,13 +54,14 @@ def dataloader(imgs, batch_size=8, image_size=[512, 512], file_ext='.png'):
 
 
 def optimize():
+    all_losses = []
     for epoch in range(EPOCHS):
         batch_imgs, targets = dataloader(images)
         batch_imgs = batch_imgs.to(device)
         targets = targets.to(device)
         optimizer.zero_grad()
         features = model.backbone(batch_imgs)
-        features = torch.flatten(features, start_dim=1)
+        #features = torch.flatten(features, start_dim=1)
         output = model(features)
         loss = criterion(output, targets)
         loss.backward()
@@ -65,6 +69,13 @@ def optimize():
         print(f'Epoch {epoch+1}/{EPOCHS} Loss: {loss.item():.4f}')
         # if epoch % 10 == 0:
         #     torch.save(model.state_dict(), os.path.join(OPATH, f'model_{epoch+1}.pth'))
+        all_losses.append(loss.item())
+    # plot loss
+    plt.plot(all_losses)
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.savefig(os.path.join(OPATH, 'loss.png'))
+
 
 if __name__ == "__main__":
     images = []
