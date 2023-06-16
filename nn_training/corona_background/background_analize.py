@@ -55,12 +55,13 @@ def filtered(sat):
          # Calcular la fecha límite 12 horas antes de la fecha actual
          prev_date = date - timedelta(hours=12)
          for i in range(len(df["date"])):
-            if not(df.loc[i,"date"]<date and df.loc[i,"date"]>prev_date):
+            if not(df.loc[i,"date"]<date and df.loc[i,"date"]>=prev_date):
                resultados.append(df.loc[i,"paths"])
       m=0
       for path in resultados:
          img = fits.open(path)
          data=img[0].data
+         header=img[0].header
          vmin = df.loc[m,"mean"]-3*(df.loc[m,"std"])
          vmax = df.loc[m,"mean"]+3*(df.loc[m,"std"])
          fig0, ax0 = plt.subplots()
@@ -68,8 +69,9 @@ def filtered(sat):
          filename = os.path.basename(df.loc[m,"paths"])
          filename = os.path.splitext(filename)[0]
          m=m+1
-         
-         plt.savefig(cor2_opath+"/images/"+filename+".png", format='png')
+         fits_img = fits.PrimaryHDU(data, header=header)
+         plt.savefig(cor2_opath+"/images/"+"/"+sat+"/"+filename+".png", format='png')
+         fits_img.writeto(cor2_opath+"/images/"+"/"+sat+"/"+filename+".fits",overwrite=True) 
          img.close()
                     
          
