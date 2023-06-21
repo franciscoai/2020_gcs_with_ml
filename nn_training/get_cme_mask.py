@@ -53,7 +53,7 @@ def get_cme_mask(sample_image, inner_cme=True):
     return(mask)
 
 
-def get_mask_cloud(p_x,p_y,imsize,OPATH):
+def get_mask_cloud(p_x,p_y,imsize):
     '''
     Returns a mask from the cloud points
     p_x: x values for pixels

@@ -1,37 +1,36 @@
-import torch.nn as nn
+import torch
 import torchvision.models.detection as detection
 
 
-class Mlp_Resnet(nn.Module):
-    def __init__(self, backbone, input_size, hidden_size, output_size) -> None:
+class Mlp_Resnet(torch.nn.Module):
+    def __init__(self, backbone, input_size=1000, hidden_size=512, output_size=6) -> None:
         super(Mlp_Resnet, self).__init__()
 
         self.backbone = backbone
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.output_size = output_size
+        # self.backbone = torch.nn.Sequential(*(list(backbone.children())[:-1])) # remove last layer
 
-        self.fc1 = nn.Linear(self.input_size, 256)
-        #self.fc2 = nn.Linear(512, 256)
-        self.fc3 = nn.Linear(256, 64)
-        #self.fc4 = nn.Linear(128, 64)
-        self.fc5 = nn.Linear(64, self.output_size)
-        self.relu = nn.LeakyReLU()
+        # freeze backbone parameters
+        for param in self.backbone.parameters():
+            param.requires_grad = False
 
-        # for param in self.backbone.parameters():
-        #     param.requires_grad = False # freeze backbone to test if is necessary to train it (it should not be necessary)
+        # Unfreeze last 2 conv layers and the linear layer
+        for param in self.backbone.layer4.parameters():
+            param.requires_grad = True
 
+        # regression head
+        self.regression = torch.nn.Sequential(
+            torch.nn.Linear(1000, 512),
+            torch.nn.ReLU(),
+            torch.nn.Linear(512, 6),
+            # torch.nn.ReLU(),
+            # torch.nn.Linear(512, 256),
+            # torch.nn.ReLU(),
+            # torch.nn.Linear(256, 6),
+        )
 
-    def forward(self, features):
-        x = self.fc1(features)
-        x = self.relu(x)
-        # x = self.fc2(x)
-        x = self.relu(x)
-        x = self.fc3(x)
-        x = self.relu(x)
-        # x = self.fc4(x)
-        x = self.relu(x)
-        x = self.fc5(x)
-
-
-        return x
+    def forward(self, x):
+        freatures = self.backbone(x)
+        #freatures = freatures.view(freatures.size(0), -1)
+        predictions = self.regression(freatures)
+        return predictions
+        

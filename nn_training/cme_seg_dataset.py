@@ -164,7 +164,7 @@ for row in range(len(df)):
             x = clouds[sat, :, 1]
             y = clouds[0, :, 2]
             p_x,p_y=deg2px(x,y,plotranges,imsize)
-            mask=get_mask_cloud(p_x,p_y,imsize,OPATH)
+            mask=get_mask_cloud(p_x,p_y,imsize)
         else:
             btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.1, nel=1e5)     
             cme_npix= len(btot_mask[btot_mask>0].flatten())
