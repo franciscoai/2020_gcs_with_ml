@@ -22,7 +22,7 @@ for i in range(len(tabla)):
         dt_fin = dt + timedelta(minutes=40)
         fin = dt_fin.strftime('%Y/%m/%d %H:%M:%S')
         
-        asd = cor2_downloader(start_time=ini,end_time=fin,nave='STEREO_A',nivel='double',image_type='img')
+        asd = cor2_downloader(start_time=ini,end_time=fin,nave='STEREO_A',nivel='double',image_type='img',size=2)
         asd.search()
         if len(asd.search_cor2) >= 1:
             start_times = asd.search_cor2['Start Time']#[0:-1]
@@ -48,7 +48,7 @@ for i in range(len(tabla)):
         dt_fin = dt + timedelta(minutes=40)
         fin = dt_fin.strftime('%Y/%m/%d %H:%M:%S')
 
-        asd = cor2_downloader(start_time=ini,end_time=fin,nave='STEREO_A',nivel='double',image_type='img')
+        asd = cor2_downloader(start_time=ini,end_time=fin,nave='STEREO_A',nivel='double',image_type='img',size=2)
         asd.search()
         
         if len(asd.search_cor2) >= 1:
@@ -75,7 +75,7 @@ for i in range(len(tabla)):
         dt_fin = dt + timedelta(minutes=40)
         fin = dt_fin.strftime('%Y/%m/%d %H:%M:%S')
 
-        asd = cor2_downloader(start_time=ini,end_time=fin,nave='STEREO_B',nivel='double',image_type='img')
+        asd = cor2_downloader(start_time=ini,end_time=fin,nave='STEREO_B',nivel='double',image_type='img',size=2)
         asd.search()
         #breakpoint()
         if len(asd.search_cor2) >= 1:
@@ -103,7 +103,7 @@ for i in range(len(tabla)):
         dt_fin = dt + timedelta(minutes=40)
         fin = dt_fin.strftime('%Y/%m/%d %H:%M:%S')
 
-        asd = cor2_downloader(start_time=ini,end_time=fin,nave='STEREO_B',nivel='double',image_type='img')
+        asd = cor2_downloader(start_time=ini,end_time=fin,nave='STEREO_B',nivel='double',image_type='img',size=2)
         asd.search()
         if len(asd.search_cor2) >= 1:
             start_times = asd.search_cor2['Start Time']#[0:-1]
@@ -122,5 +122,5 @@ for i in range(len(tabla)):
         tabla['pre_b_2h_download'][i] = '*'
         
 breakpoint()
-tabla.to_csv('/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/Lista_Final_CMEs_downloads_cor2.csv', sep='\t', index=False)
+tabla.to_csv('/gehme/projects/2020_gcs_with_ml/repo_diego/2020_gcs_with_ml/nn_training/corona_background/Lista_Final_CMEs_downloads_cor2_v2.csv', sep='\t', index=False)
 breakpoint()
