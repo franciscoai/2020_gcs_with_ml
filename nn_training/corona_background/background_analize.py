@@ -52,56 +52,91 @@ def filtered(sat):
       df['date'] = pd.to_datetime(df['date'])
       df_sorted = df.sort_values('date')
 
-      resultados = []
+      results = pd.DataFrame(columns=["paths","date","mean","std","contrast","header_contrast"])
 
       # Iterar sobre cada fecha en la columna 'date'
       for i, date in enumerate(df_sorted['date']):
          
          # Calcular la fecha límite 12 horas antes de la fecha actual
-         prev_date = date - timedelta(hours=24)
+         prev_date = date - timedelta(hours=12)
          #for i in range(len(df["date"])):
          if not(df.loc[i,"date"]<date and df.loc[i,"date"]>=prev_date):
-            resultados.append((df.loc[i,"paths"],i))
-
+            results= results.append({"paths":df.loc[i,"paths"] ,"date":df.loc[i,"date"], "mean": df.loc[i,"mean"], "std": df.loc[i,"std"], "contrast":df.loc[i,"contraste"]}, ignore_index=True)
       
-      m=0
-      for lista in resultados:
-         path=lista[0]
-         index=lista[1]
-         print("image "+str(m)+" of "+str(len(resultados)))
+      
+      for i in range(len(results.index)):
+         path=results.loc[i,"paths"]
+         
+         print("image "+str(i)+" of "+str(len(results)))
          img = fits.open(path)
          data=img[0].data
          header=img[0].header
-         vmin = df.loc[index,"mean"]-3*(df.loc[index,"std"])
-         vmax = df.loc[index,"mean"]+3*(df.loc[index,"std"])
-         
+         sigma=header["DATASIG"]
+         avg=header["DATAAVG"]
+         header_contrast= sigma/avg
+         results.loc[i,"header_contrast"] = header_contrast
+          
+         vmin = results.loc[i,"mean"]-3*(results.loc[i,"std"])
+         vmax = results.loc[i,"mean"]+3*(results.loc[i,"std"])
          fig0, ax0 = plt.subplots()
          imagen = ax0.imshow(data, cmap='gray', vmin=vmin, vmax=vmax)
-         filename = os.path.basename(df.loc[index,"paths"])
+         filename = os.path.basename(path)
          filename = os.path.splitext(filename)[0]
-         m=m+1
          fits_img = fits.PrimaryHDU(data, header=header)
-         plt.savefig(cor2_opath+"/images/"+"/"+sat+"/"+filename+".png", format='png')
-         fits_img.writeto(cor2_opath+"/images/"+"/"+sat+"/"+filename+".fits",overwrite=True) 
-         img.close()
-                    
-         
-         
-
+         if header_contrast<0.25:
+            plt.savefig(cor2_opath+"/images/"+"/"+sat+"/"+filename+".png", format='png')
+            fits_img.writeto(cor2_opath+"/images/"+"/"+sat+"/"+filename+".fits",overwrite=True) 
+            img.close()
+         else:
+            img.close()
+      
    elif sat=="lasco_c2":
       print("lasco")
+   return results
      
 
       
    
 
 #df=process(data_path,sat)
-filtered(sat)
+not_cme_files=filtered(sat)
+
+# fig3, ax3 = plt.subplots()
+# ax3.plot(np.abs(not_cme_files["contrast"]), '.k')
+# ax3.set_title('Contrast')
+# ax3.set_yscale('log')
+# fig3.savefig(cor2_opath+"/plots/"+sat+'_contrast_plot_analyzed.png')
+
+# fig4, ax4 = plt.subplots()
+# ax4.hist(np.abs(not_cme_files["contrast"]), bins=50, color='k', alpha=0.7)
+# ax4.set_title('Contrast')
+# ax4.set_yscale('log')
+# fig4.savefig(cor2_opath+"/plots/"+sat+'_contrast_hist_analyzed.png')
 
 
+# fig3, ax3 = plt.subplots()
+# ax3.plot(np.abs(not_cme_files["std"]), '.k')
+# ax3.set_title('Std')
+# ax3.set_yscale('log')
+# fig3.savefig(cor2_opath+"/plots/"+sat+'_std_plot_analyzed.png')
 
+# fig4, ax4 = plt.subplots()
+# ax4.hist(np.abs(not_cme_files["std"]), bins=50, color='k', alpha=0.7)
+# ax4.set_title('Std')
+# ax4.set_yscale('log')
+# fig4.savefig(cor2_opath+"/plots/"+sat+'_std_hist_analyzed.png')
+      
+# fig3, ax3 = plt.subplots()
+# ax3.plot(np.abs(not_cme_files["header_contrast"]), '.k')
+# ax3.set_title("header_contrast")
+# ax3.set_yscale('log')
+# fig3.savefig(cor2_opath+"/plots/"+sat+'_header_contrast_plot_analyzed.png')
 
-
+# fig4, ax4 = plt.subplots()
+# ax4.hist(np.abs(not_cme_files["header_contrast"]), bins=50, color='k', alpha=0.7)
+# ax4.set_title("header_contrast")
+# ax4.set_yscale('log')
+# fig4.savefig(cor2_opath+"/plots/"+sat+'_header_contrast_hist_analyzed.png')
 
 
 
@@ -136,17 +171,7 @@ filtered(sat)
 # ax2.set_yscale('log')
 # fig2.savefig(cor2_opath+"/plots/"+sat+'_mean_hist_analyzed.png')
 
-# fig3, ax3 = plt.subplots()
-# ax3.plot(np.abs(df["contraste"]), '.k')
-# ax3.set_title('Contrast')
-# ax3.set_yscale('log')
-# fig3.savefig(cor2_opath+"/plots/"+sat+'_contrast_plot_analyzed.png')
 
-# fig4, ax4 = plt.subplots()
-# ax4.hist(np.abs(df["contraste"]), bins=50, color='k', alpha=0.7)
-# ax4.set_title('Contrast')
-# ax4.set_yscale('log')
-# fig4.savefig(cor2_opath+"/plots/"+sat+'_contrast_hist_analyzed.png')
 
 # fig3, ax3 = plt.subplots()
 # ax3.plot(np.abs(df["std"]), '.k')

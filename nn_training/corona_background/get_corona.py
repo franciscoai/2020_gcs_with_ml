@@ -56,11 +56,11 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     i0, h0 = sunpy.io._fits.read(p0)[0]
     oimg=i0
 
-    data_path = '/gehme/data'
-    secchipath = data_path + '/stereo/secchi/L1'
-    p0 = '/a/img/cor2/20110317/20110317_115400_14c2A.fts'
-    p0=secchipath + p0
-    i1,h0 = sunpy.io._fits.read(p0)[0]
+    # data_path = '/gehme/data'
+    # secchipath = data_path + '/stereo/secchi/L1'
+    # p0 = '/a/img/cor2/20110317/20110317_115400_14c2A.fts'
+    # p0=secchipath + p0
+    # i1,h0 = sunpy.io._fits.read(p0)[0]
 
     if rnd_rot:
         oimg = scipy.ndimage.rotate(oimg, np.random.randint(low=0, high=360), reshape=False)
