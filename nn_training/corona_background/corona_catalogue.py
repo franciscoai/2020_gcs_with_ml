@@ -26,7 +26,7 @@ df.loc[df['preevento_b_2h'] == 'NaT', 'preevento_b_2h'] = df['preevento_a_2h']
 df.loc[df['preevento_a_1h'] == 'NaT', 'preevento_a_1h'] = df['preevento_b_1h']
 df.loc[df['preevento_a_2h'] == 'NaT', 'preevento_a_2h'] = df['preevento_b_2h']
 
-df.to_csv('Lista_Final_CMEs.txt',sep='\t', header=True,index=False)
+df.to_csv(exec_path+'/catalogues/Lista_Final_CMEs.csv',sep='\t', header=True,index=False)
 
 print(df)
 
