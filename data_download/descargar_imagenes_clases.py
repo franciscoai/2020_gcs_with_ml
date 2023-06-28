@@ -511,7 +511,6 @@ class cor2_downloader:
             for j in range(len(self.search_cor2)):
                 if self.size <= int(round(self.search_cor2[j]['Size'].value)):
                     lista_filtro2.append(j)
-            breakpoint()
             self.search_cor2 = self.search_cor2[lista_filtro2]
             
             if not lista_filtro2: print('Filtered images')
