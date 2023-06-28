@@ -11,7 +11,7 @@ data_path="/gehme/projects/2020_gcs_with_ml/data/corona_back_database"
 exec_path ="/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues"
 cor2_opath=data_path+"/cor2/analysis"
 
-sat="cor2_b"#"cor2_b""lasco_c2"
+sat="cor2_a"#"cor2_b""lasco_c2"
 
 
 def process(path,sat):
