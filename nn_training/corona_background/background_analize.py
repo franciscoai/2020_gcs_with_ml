@@ -23,6 +23,7 @@ def process(path,sat):
       path=path+"/lasco/c2"
    df_analyzed=pd.DataFrame(columns=["paths","date","mean","std","contraste"])
    files= os.listdir(path)
+
    for i in files:
       file_path=path+"/"+i
       if sat=="cor2_a" or sat=="cor2_b":
@@ -30,6 +31,7 @@ def process(path,sat):
          date = datetime.strptime(i[0:-10], formato)
 
       if os.path.exists(file_path):
+         breakpoint()
          img = fits.open(file_path)
          data=img[0].data
          mean= np.mean(data)
@@ -42,6 +44,8 @@ def process(path,sat):
    return df_analyzed
 
 
+
+
 def filtered(sat):
    df= pd.read_csv(exec_path+"/"+sat+"_path_list_analyzed.csv", sep=",")
    if sat=="cor2_a" or sat=="cor2_b":
@@ -52,21 +56,28 @@ def filtered(sat):
 
       # Iterar sobre cada fecha en la columna 'date'
       for i, date in enumerate(df_sorted['date']):
+         
          # Calcular la fecha límite 12 horas antes de la fecha actual
-         prev_date = date - timedelta(hours=12)
-         for i in range(len(df["date"])):
-            if not(df.loc[i,"date"]<date and df.loc[i,"date"]>=prev_date):
-               resultados.append(df.loc[i,"paths"])
+         prev_date = date - timedelta(hours=24)
+         #for i in range(len(df["date"])):
+         if not(df.loc[i,"date"]<date and df.loc[i,"date"]>=prev_date):
+            resultados.append((df.loc[i,"paths"],i))
+
+      
       m=0
-      for path in resultados:
+      for lista in resultados:
+         path=lista[0]
+         index=lista[1]
+         print("image "+str(m)+" of "+str(len(resultados)))
          img = fits.open(path)
          data=img[0].data
          header=img[0].header
-         vmin = df.loc[m,"mean"]-3*(df.loc[m,"std"])
-         vmax = df.loc[m,"mean"]+3*(df.loc[m,"std"])
+         vmin = df.loc[index,"mean"]-3*(df.loc[index,"std"])
+         vmax = df.loc[index,"mean"]+3*(df.loc[index,"std"])
+         
          fig0, ax0 = plt.subplots()
          imagen = ax0.imshow(data, cmap='gray', vmin=vmin, vmax=vmax)
-         filename = os.path.basename(df.loc[m,"paths"])
+         filename = os.path.basename(df.loc[index,"paths"])
          filename = os.path.splitext(filename)[0]
          m=m+1
          fits_img = fits.PrimaryHDU(data, header=header)
