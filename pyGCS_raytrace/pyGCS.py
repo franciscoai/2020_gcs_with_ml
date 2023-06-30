@@ -172,7 +172,8 @@ def processHeaders(headers):
     for i in range(len(headers)):
         # Stonyhurst coords for the sats
         thisHead = headers[i]
-        satpos.append([float(thisHead['HGLN_OBS']), float(thisHead['HGLT_OBS']), float(thisHead['CROTA'])])
+        # GEHME changed HGLT_OBS to CRLN_OBS : 2023/06/30
+        satpos.append([float(thisHead['CRLN_OBS']), float(thisHead['HGLT_OBS']), float(thisHead['CROTA'])])
         # assuming Sun is in center.... for now
         rSun = float(thisHead['RSUN'])  # in arcsecs
         xaxrange = float(thisHead['CDELT1']) * int(thisHead['NAXIS1'])/rSun
