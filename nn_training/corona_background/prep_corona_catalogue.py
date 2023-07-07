@@ -90,7 +90,7 @@ def pathlist(df,column_list, do_write=True):
                 
                 #generar imagen diferencia
                 try:
-                    
+                    print("reading image "+str(i)+ " on cor2_a")
                     file1=glob.glob(cor2_a.loc[i,"paths"][0:-10]+"*")
                     file2=glob.glob(cor2_a.loc[i+1,"paths"][0:-10]+"*")
                     if len(file1)!=0 or len(file2)!=0:
@@ -108,11 +108,11 @@ def pathlist(df,column_list, do_write=True):
                         header= fits.getheader(path_1h)
                         header['NAXIS1'] = imsize[0]   
                         header['NAXIS2'] = imsize[1]
-                        # sigma=header["DATASIG"]
-                        # avg=header["DATAAVG"]
-                        # header_contrast= sigma/avg
+                        sigma=header["DATASIG"]
+                        avg=header["DATAAVG"]
+                        header_contrast= sigma/avg
                         
-                        #cor2_a.loc[i,"header_contrast"]=header_contrast                           
+                        cor2_a.loc[i,"header_contrast"]=header_contrast                           
                         final_img = fits.PrimaryHDU(im, header=header[0:-3])
                         filename = os.path.basename(path_1h)
                         fig0, ax0 = plt.subplots()
@@ -122,17 +122,17 @@ def pathlist(df,column_list, do_write=True):
                         vmax=mean+3*std
                         imagen = ax0.imshow(im, cmap='gray', vmin=vmin, vmax=vmax)
                         if do_write==True:
-                            #if header_contrast<0.25:
+                            if header_contrast<6.2:
                                 print("saving image "+str(i)+" from cor2_a")
                                 plt.savefig('/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'+df.name+'/'+"cor2_a"+"/"+filename+".png", format='png')
                                 final_img.writeto('/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'+df.name+'/'+"cor2_a"+"/"+filename+".fits",overwrite=True)
                                 im1.close()
                                 im2.close()
-                            #else:
-                            #    im1.close()
-                            #    im2.close()
+                            else:
+                                im1.close()
+                                im2.close()
                     else:
-                        raise IndexError("path not found")
+                        print("path not found")
                             
                 except:
                     print("error on "+path_1h+"  or  "+path_2h)
@@ -143,7 +143,7 @@ def pathlist(df,column_list, do_write=True):
             if count==1:
                 #generar imagen diferencia
                 try:
-                    
+                    print("reading image "+str(i)+ " on cor2_b")
                     file1=glob.glob(cor2_b.loc[i,"paths"][0:-10]+"*")
                     file2=glob.glob(cor2_b.loc[i+1,"paths"][0:-10]+"*")
                     if len(file1)!=0 or len(file2)!=0:
@@ -158,7 +158,10 @@ def pathlist(df,column_list, do_write=True):
                         header['NAXIS1'] = imsize[0]   
                         header['NAXIS2'] = imsize[1]
                         final_img = fits.PrimaryHDU(im, header=header[0:-3])
-                        #cor2_b.loc[i,"header_contrast"]=header_contrast   
+                        sigma=header["DATASIG"]
+                        avg=header["DATAAVG"]
+                        header_contrast= sigma/avg
+                        cor2_b.loc[i,"header_contrast"]=header_contrast   
                         filename = os.path.basename(path_1h)
                         fig0, ax0 = plt.subplots()
                         mean= np.mean(im)
@@ -167,58 +170,58 @@ def pathlist(df,column_list, do_write=True):
                         vmax=mean+3*std
                         imagen = ax0.imshow(im, cmap='gray', vmin=vmin, vmax=vmax)
                         if do_write==True:    
-                            #if header_contrast<0.25:
+                            if header_contrast<4.7:
                                 print("saving image "+str(i)+" from cor2_b")
                                 plt.savefig('/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'+df.name+'/'+"cor2_b"+"/"+filename+".png", format='png')
                                 final_img.writeto('/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'+df.name+'/'+"cor2_b"+"/"+filename+".fits",overwrite=True)                  
                                 im1.close()
                                 im2.close()
-                            #else:
-                            #    im1.close()
-                            #    im2.close()
+                            else:
+                                im1.close()
+                                im2.close()
                     else:
-                        raise IndexError("path not found")
+                        print("path not found")
                 except :
                     print("error on "+path_1h+"  or  "+path_2h)
-    #return cor2_a,cor2_b                    
+    return cor2_a,cor2_b                    
 
 #function to create corona background
-pathlist(cor2,cor2_downloads,do_write=do_write)
+#pathlist(cor2,cor2_downloads,do_write=do_write)
 
 
 
 
-# data=pathlist(cor2,cor2_downloads,do_write=do_write)
-# cor2_a=data[0]
-# cor2_b=data[1]
-# cor2_a.to_csv("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/cor2_a.csv")
-# cor2_b.to_csv("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/cor2_b.csv")
+data=pathlist(cor2,cor2_downloads,do_write=do_write)
+cor2_a=data[0]
+cor2_b=data[1]
+cor2_a.to_csv("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/cor2_a.csv")
+cor2_b.to_csv("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/cor2_b.csv")
 
-# cor2_a = pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/cor2_a.csv")
-# cor2_b=pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/cor2_b.csv")
+#cor2_a = pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/cor2_a.csv")
+#cor2_b=pd.read_csv("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/cor2_b.csv")
 
-# fig1, ax1 = plt.subplots()
-# ax1.plot(np.abs(cor2_a["header_contrast"]), '.k')
-# ax1.set_title('Header Contrast')
-# ax1.set_yscale('log')
-# fig1.savefig("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/"+"cor2_a_contrast_plot_analyzed.png")
+fig1, ax1 = plt.subplots()
+ax1.plot(np.abs(cor2_a["header_contrast"]), '.k')
+ax1.set_title('Header Contrast')
+ax1.set_yscale('log')
+fig1.savefig("/gehme/projects/2020_gcs_with_ml/data/plots/"+"cor2_a_contrast_plot_analyzed.png")
 
-# fig2, ax2 = plt.subplots()
-# ax2.hist(np.abs(cor2_a["header_contrast"]), bins=50, color='k', alpha=0.7)
-# ax2.set_title('Header Contrast')
-# ax2.set_yscale('log')
-# fig2.savefig("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/"+'cor2_a_contrast_hist_analyzed.png')
+fig2, ax2 = plt.subplots()
+ax2.hist(np.abs(cor2_a["header_contrast"]), bins=50, color='k', alpha=0.7)
+ax2.set_title('Header Contrast')
+ax2.set_yscale('log')
+fig2.savefig("/gehme/projects/2020_gcs_with_ml/data/plots/"+'cor2_a_contrast_hist_analyzed.png')
 
 
-# fig3, ax3 = plt.subplots()
-# ax3.plot(np.abs(cor2_b["header_contrast"]), '.k')
-# ax3.set_title('Header Contrast')
-# ax3.set_yscale('log')
-# fig3.savefig("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/"+"cor2_b_contrast_plot_analyzed.png")
+fig3, ax3 = plt.subplots()
+ax3.plot(np.abs(cor2_b["header_contrast"]), '.k')
+ax3.set_title('Header Contrast')
+ax3.set_yscale('log')
+fig3.savefig("/gehme/projects/2020_gcs_with_ml/data/plots/"+"cor2_b_contrast_plot_analyzed.png")
 
-# fig4, ax4 = plt.subplots()
-# ax4.hist(np.abs(cor2_b["header_contrast"]), bins=50, color='k', alpha=0.7)
-# ax4.set_title('Header Contrast')
-# ax4.set_yscale('log')
-# fig4.savefig("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/"+'cor2_b_contrast_hist_analyzed.png')
+fig4, ax4 = plt.subplots()
+ax4.hist(np.abs(cor2_b["header_contrast"]), bins=50, color='k', alpha=0.7)
+ax4.set_title('Header Contrast')
+ax4.set_yscale('log')
+fig4.savefig("/gehme/projects/2020_gcs_with_ml/data/plots/"+'cor2_b_contrast_hist_analyzed.png')
 
