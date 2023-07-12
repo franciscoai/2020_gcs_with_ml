@@ -62,7 +62,6 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     p1 = data_path + '/a/img/cor2/20110319/20110319_120800_14c2A.fts'
     p0img,h0 = sunpy.io._fits.read(p0)[0]
     p1img, _ = sunpy.io._fits.read(p1)[0]
-
     oimg = p1img - p0img
 
     if rnd_rot:

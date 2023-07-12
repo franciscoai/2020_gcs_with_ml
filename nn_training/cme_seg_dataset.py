@@ -91,7 +91,7 @@ def pnt2arr(x,y,plotranges,imsize):
 #files
 DATA_PATH = '/gehme/data'
 OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
-n_sat = 2 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
+n_sat = 1 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 
 # GCS parameters [first 6]
 # The other parameters are:
@@ -113,7 +113,7 @@ otype="png" # set the ouput file type: 'png' or 'fits'
 im_range=2. # range of the color scale of the output final syntethyc image in std dev around the mean
 back_rnd_rot=False # set to randomly rotate the background image around its center
 inner_hole_mask=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
-mask_from_cloud=True #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
+mask_from_cloud=False #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
 
 # generate param arrays
