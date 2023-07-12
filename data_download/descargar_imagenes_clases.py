@@ -572,15 +572,6 @@ class cor2_downloader:
         #    os.system('chown -R gehme {}'.format(directorio))
 
 
-
-
-
-
-
-
-
-
-
 class aia_downloader:
     def __init__(self, start_time, end_time, wavelength):
         self.start_time = start_time
