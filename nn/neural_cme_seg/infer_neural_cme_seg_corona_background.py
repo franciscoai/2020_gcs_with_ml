@@ -5,7 +5,6 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 import numpy as np
 import torch.utils.data
 import cv2
-import torchvision.models.segmentation
 import torch
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -37,19 +36,19 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
     in a single image saved to ofile
     """    
     mask_threshold = 0.5 # value to consider a pixel belongs to the object
-    scr_threshold = 0.5 # only detections with score larger than this value are considered
+    scr_threshold = 0.7 # only detections with score larger than this value are considered
     color=['r','b','g','k','y']
     obj_labels = ['Occ', 'CME','N/A','N/A']
     #
     cmap = mpl.colors.ListedColormap(color)  
     nans = np.full(np.shape(orig_img[0]), np.nan)
-    fig, axs = plt.subplots(2, 3, figsize=[20,10])
+    fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
     axs = axs.ravel()
     for i in range(len(orig_img)):
         axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
         axs[i].axis('off')
-        axs[i+3].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
-        axs[i+3].axis('off')        
+        axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
+        axs[i+1].axis('off')        
         if boxes is not None:
             nb = 0
             for b in boxes[i]:
@@ -60,17 +59,17 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
                 if scr > scr_threshold:             
                     masked = nans.copy()
                     masked[:, :][masks[i][nb] > mask_threshold] = nb              
-                    axs[i+3].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
+                    axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
                     box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
-                    axs[i+3].add_patch(box)
+                    axs[i+1].add_patch(box)
                     if labels is not None:
-                        axs[i+3].annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
+                        axs[i+1].annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
                 nb+=1
-    axs[0].set_title(f'Cor A: {len(boxes[0])} objects detected') 
-    axs[1].set_title(f'Cor B: {len(boxes[1])} objects detected')               
-    axs[2].set_title(f'Lasco: {len(boxes[2])} objects detected')     
-    if title is not None:
-        fig.suptitle('\n'.join([title[i]+' ; '+title[i+1] for i in range(0,len(title),2)]) , fontsize=16)   
+    # axs[0].set_title(f'Cor A: {len(boxes[0])} objects detected') 
+    # axs[1].set_title(f'Cor B: {len(boxes[1])} objects detected')               
+    # axs[2].set_title(f'Lasco: {len(boxes[2])} objects detected')     
+    #if title is not None:
+    #    fig.suptitle('\n'.join([title[i]+' ; '+title[i+1] for i in range(0,len(title),2)]) , fontsize=16)   
 
     plt.tight_layout()
     plt.savefig(ofile)
@@ -81,7 +80,7 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3"
 opath= model_path + "/infer_neural_cme_seg_corona_back_cor2"
-ipath=  "/gehme/projects/2020_gcs_with_ml/data/corona_back_database/cor2"
+ipath=  "/gehme/projects/2020_gcs_with_ml/data/corona_back_database/cor2/cor2_a"
 file_ext=".fits"
 trained_model = '3999.torch'
 
@@ -106,5 +105,5 @@ for f in files:
     #save results
     results.append({'file':f, 'img':imga, 'mask':maska, 'scr':scra, 'labels':labelsa, 'boxes':boxesa})
     #plot results
-    ofile = img+'.png'
-    plot_to_png(ofile, imga, maska, title=[f], labels=labelsa, boxes=boxesa, scores=scra)
+    ofile = os.path.join(opath,f)+'.png'
+    plot_to_png(ofile, [imga], [maska], title=[f], labels=[labelsa], boxes=[boxesa], scores=[scra])
