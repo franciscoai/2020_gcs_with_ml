@@ -90,8 +90,8 @@ def pnt2arr(x,y,plotranges,imsize):
 # CONSTANTS
 #files
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_mariano' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
-n_sat = 1 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
+n_sat = 2 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 
 # GCS parameters [first 6]
 # The other parameters are:
@@ -99,9 +99,9 @@ n_sat = 1 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names
-par_num = 10000  # total number of samples that will be generated for each param (there are nsat images per param combination)
+par_num = 10  # total number of samples that will be generated for each param (there are nsat images per param combination)
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
-same_corona=True # Set to use a single corona back for all par_num cases
+same_corona=False # Set to use a single corona back for all par_num cases
 
 # Syntethic image options
 imsize=np.array([512, 512], dtype='int32') # output image size
@@ -111,9 +111,9 @@ occ_noise = [0,30.] # occulter gaussian noise. [mean, sd] both expressed in frac
 mesh=False # set to also save a png with the GCSmesh (only for otype='png')
 otype="png" # set the ouput file type: 'png' or 'fits'
 im_range=2. # range of the color scale of the output final syntethyc image in std dev around the mean
-back_rnd_rot=True # set to randomly rotate the background image around its center
-inner_cme=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
-mask_from_cloud=False #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
+back_rnd_rot=False # set to randomly rotate the background image around its center
+inner_hole_mask=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
+mask_from_cloud=True #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
 
 # generate param arrays
@@ -171,7 +171,7 @@ for row in range(len(df)):
             if cme_npix<=0:
                 print(f'WARNING: CME number {row} raytracing did not work')
                 break          
-            mask = get_cme_mask(btot_mask,inner_cme=inner_cme)          
+            mask = get_cme_mask(btot_mask,inner_cme=inner_hole_mask)          
             mask_npix= len(mask[mask>0].flatten())
             if mask_npix/cme_npix<0.9:
                 print(f'WARNING: CME number {row} mask is too small compared to cme brigthness image, skipping all views...')

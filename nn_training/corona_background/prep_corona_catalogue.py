@@ -197,19 +197,22 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None)
     return cor2_a,cor2_b                    
 
 #### main
+#nn inference
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3"
 trained_model = '3999.torch'
-
-#nn inference
-SCR_THRESHOLD=0.4 # only save images with score below this threshold (i.e., No CME is present)
+SCR_THRESHOLD=0.3 # only save images with score below this threshold (i.e., No CME is present)
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
-
 print(f'Using device:  {device}')
 model_param = torch.load(model_path + "/"+ trained_model)
-data=prep_catalogue(cor2,cor2_downloads,do_write=do_write,model_param=model_param, device=device) # get paths of ok files
 
-# # saves to csv
+#tasks
+#cor2 a and b
+data=prep_catalogue(cor2,cor2_downloads,do_write=do_write,model_param=model_param, device=device) # get paths of ok files
+# lasco
+#data=prep_catalogue(lasco,lasco_downloads,do_write=do_write,model_param=model_param, device=device) # get paths of ok files ??
+
+# saves data to csv and plots
 # cor2_a=data[0]
 # cor2_b=data[1]
 # cor2_a.to_csv("/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/corona_background/catalogues/analysis/cor2_a.csv")
