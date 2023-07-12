@@ -218,11 +218,11 @@ class lascoc2_downloader:
                 breakpoint()
                 downloaded_files = self.nrl_navy_download(self.search_lascoc2[w]['fileid'], download_path)
             else:   
-                if not os.path.isfile(download_path+self.search_lascoc2[w]['fileid'].split('/')[-1]):#Si archivo no descargado entonces que descargue.
+                ofile = download_path+self.search_lascoc2[w]['fileid'].split('/')[-1]
+                if not os.path.isfile(ofile):#Si archivo no descargado entonces que descargue.
                     downloaded_files = Fido.fetch(self.search_lascoc2[w],path=download_path, max_conn=5, progress=True) 
-
-            os.system('chgrp -R gehme {}'.format(download_path))
-            os.system('chmod -R 775 {}'.format(download_path))
+                    os.system('chgrp gehme {}'.format(ofile[0:-9]+'*'))
+                    os.system('chmod 775 {}'.format(ofile[0:-9]+'*'))
 
         print(f'Archivos descargados en: {download_path}')
 
@@ -368,11 +368,11 @@ class cor1_downloader:
             else:   
                 print(f"El directorio {download_path} ya existe")
 
-            if not os.path.isfile(download_path+self.search_cor1[w]['fileid'].split('/')[-1]):#Si archivo no descargado entonces que descargue.
-                downloaded_files = Fido.fetch(self.search_cor1[w],path=download_path, max_conn=5, progress=True) 
-      
-            os.system('chgrp -R gehme {}'.format(download_path))
-            os.system('chmod -R 775 {}'.format(download_path))
+            ofile = download_path+self.search_cor1[w]['fileid'].split('/')[-1]          
+            if not os.path.isfile(ofile):#Si archivo no descargado entonces que descargue.
+                downloaded_files = Fido.fetch(self.search_cor1[w],path=download_path, max_conn=5, progress=True)       
+                os.system('chgrp gehme {}'.format(ofile[0:-9]+'*'))
+                os.system('chmod 775 {}'.format(ofile[0:-9]+'*'))
     
 
         print(f'Archivos descargados en: {download_path}')
@@ -396,9 +396,10 @@ class cor2_downloader:
             self.dir_descarga = '/gehme/data/stereo/'
             #self.dir_descarga = '/data_local/GCS/gcs/Imagenes/'
             self.nivel = nivel
-            self.indices_descarga = ''
+            self.indices_descarga = '' # store the elements that will be effectivelly downloaded
             self.image_type = image_type #puede ser img o seq
             self.size = size
+            self.ofiles = [] # files downloaded (full path)
         except TypeError:
             print("Be sure to add start_time, end_time, ship name, level/type of image when creating of object of this class.")
             raise
@@ -556,21 +557,15 @@ class cor2_downloader:
             else:   
                 print(f"El directorio {download_path} ya existe")
 
-            if not os.path.isfile(download_path+self.search_cor2[w]['fileid'].split('/')[-1]):#Si archivo no descargado entonces que descargue.
+            ofile = download_path+self.search_cor2[w]['fileid'].split('/')[-1]
+            self.ofiles.append(ofile)
+            if not os.path.isfile(ofile):#Si archivo no descargado entonces que descargue.
                 downloaded_files = Fido.fetch(self.search_cor2[w],path=download_path, max_conn=5, progress=True) 
-      
-            os.system('chgrp -R gehme {}'.format(download_path))
-            os.system('chmod -R 775 {}'.format(download_path))
+                os.system('chgrp gehme {}'.format(ofile[0:-9]+'*'))
+                os.system('chmod 775 {}'.format(ofile[0:-9]+'*'))
     
 
         print(f'Archivos descargados en: {download_path}')
-        #print(*downloaded_files.data, sep = "\n")
-
-        #for directorio in carpetas_creadas:
-        #    os.system('chgrp -R gehme {}'.format(directorio))
-        #    os.system('chmod -R 775 {}'.format(directorio))
-        #    os.system('chown -R gehme {}'.format(directorio))
-
 
 class aia_downloader:
     def __init__(self, start_time, end_time, wavelength):
