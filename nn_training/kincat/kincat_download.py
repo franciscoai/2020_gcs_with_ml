@@ -20,8 +20,9 @@ df=df.drop([0,1])
 df.columns=col_names
 df = df.reset_index(drop=True)
 
-data=pd.DataFrame()
+data=[]
 for i in range(len(df.index)):
+#for i in range(0,2):
     print("Downloading row number  {}".format(i))
     pre_date = df["PRE_DATE"][i]
     pre_time= df["PRE_TIME"][i]
@@ -38,6 +39,9 @@ for i in range(len(df.index)):
     asd.search()
     if len(asd.search_cor2) >= 1:   
         asd.download()
-        data.append(asd.ofiles)  
-    
-data.to_csv(downloaded_files_list, sep='\t', index=False)
+        for path in asd.ofiles:
+            date_time = datetime.strptime(path[49:-10], '%Y%m%d_%H%M%S')
+            data.append([path,date_time])
+
+data = pd.DataFrame(data, columns=["PATH","DATE_TIME"])    
+data.to_csv(downloaded_files_list,  index=False)
