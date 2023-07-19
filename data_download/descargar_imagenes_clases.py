@@ -516,7 +516,7 @@ class cor2_downloader:
             
             if not lista_filtro2: print('Filtered images')
 
-    def download(self, download_path=None):
+    def download(self, download_path_default=None):
         """
         Definicion del metodo download.
         """
@@ -544,12 +544,16 @@ class cor2_downloader:
         if getattr(self,'indices_descarga') != '':  #'indice_descarga' debe ser una lista de enteros contenidos en [0,len(self.search_cor2)]
             rango_descargas = self.indices_descarga
 
+        download_path=''
         for w in rango_descargas:
-            folder_year_month_day = self.search_cor2[w]['fileid'].split('/')[5]
+            if download_path:
+                print(download_path)
+            #folder_year_month_day = self.search_cor2[w]['fileid'].split('/')[5]
             #full_download_path = download_path+'/'+folder_year_month_day+'/'
-            if not download_path:
+            if download_path_default:
+                download_path = download_path_default
+            if not download_path_default:
                 download_path = self.dir_descarga+"/".join(self.search_cor2['fileid'][w].split('/')[0:-1])+'/'
-
             if not os.path.exists(download_path):
                 os.makedirs(download_path)
                 print(f"Se ha creado el directorio {download_path}")
