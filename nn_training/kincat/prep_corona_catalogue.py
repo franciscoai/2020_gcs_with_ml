@@ -14,21 +14,28 @@ helcat_db=repo_dir + "/nn_training/kincat/helcatslist_20160601.txt" # kincat dat
 opath= "/gehme/projects/2020_gcs_with_ml/data/corona_background_kincat"
 imsize=[512,512]
 
-# read csv with paths of the downloaded files
+# read csv with paths and dates of the downloaded files
 downloaded=pd.read_csv('/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/kincat/helcatslist_20160601_downloaded.csv')
-downloaded = downloaded.reset_index(drop=True)
 downloaded['DATE_TIME'] = pd.to_datetime(downloaded['DATE_TIME'])
+downloaded= downloaded.sort_values('DATE_TIME')
+downloaded = downloaded.reset_index(drop=True)
 
 
-# read helcats database
+
+# read helcat database and changes the column names
 catalogue = pd.read_csv(helcat_db, sep = "\t")
 catalogue=catalogue.drop([0,1])
 catalogue.columns=col_names
 catalogue = catalogue.reset_index(drop=True)
 
+indice=0
+
 for i in range(len(catalogue.index)):
-    date_helcat = datetime.strptime((catalogue["PRE_DATE"][i]+" "+catalogue["PRE_TIME"][i]),'%Y-%m-%d %H:%M')
+    print("Reading path "+str(i))
+    date_helcat = datetime.strptime((catalogue["PRE_DATE"][i]+" "+catalogue["PRE_TIME"][i]),'%Y-%m-%d %H:%M') #forms datetime object
     time_range= date_helcat-timedelta(hours=6)
+
+    #calculates the closest dates to the original one
     for j in range(len(downloaded.index)):
         date=downloaded["DATE_TIME"][j]
         if date <= date_helcat:
@@ -39,37 +46,46 @@ for i in range(len(catalogue.index)):
           date_helcat=after_date
     else:
           date_helcat=before_date
+    
+    #if finds dates before date_helcat it takes the closest one and calculate the diff image between them
     dates=[]
     for j in range(len(downloaded.index)):
+        path=downloaded.loc[j,"PATH"]
+        #if os.path.exists(path):
         date=downloaded["DATE_TIME"][j]
         if date<date_helcat and date>time_range:
-              dates.append(date)
-    dates=sorted(dates)
-    if len(dates)>0:
-        pre_date= dates[0]
-        
-        idx1=downloaded.index[downloaded['DATE_TIME'] == date_helcat].tolist()
-        idx2 = downloaded.index[downloaded['DATE_TIME'] == pre_date].tolist()
-        #breakpoint()
-        file1=glob.glob(downloaded.loc[idx1[0],"PATH"][0:-5]+"*")
-        file2=glob.glob(downloaded.loc[idx2[0],"PATH"][0:-5]+"*")
-        if len(file1)!=0 or len(file2)!=0:
-            path1=file1[0]
-            path2=file2[0]
-            im1= fits.open(path1)
-            im2= fits.open(path2)
-            image1 = rebin(im1[0].data,imsize,operation='mean') 
-            image2 = rebin(im2[0].data,imsize,operation='mean') 
-            im=image1-image2
-            header= fits.getheader(path1)
-            filename = os.path.basename(path1)
-            header['NAXIS1'] = imsize[0]   
-            header['NAXIS2'] = imsize[1]
-            final_img = fits.PrimaryHDU(im, header=header[0:-3])
-            final_img.writeto(opath+"/"+filename,overwrite=True)
-            im1.close()
-            im2.close()
+            dates.append(date)
+        dates=sorted(dates)
+        if len(dates)>0:
+            pre_date= dates[0]
+            idx1=downloaded.index[downloaded['DATE_TIME'] == date_helcat].tolist()
+            idx2 = downloaded.index[downloaded['DATE_TIME'] == pre_date].tolist()
+            #breakpoint()
+            file1=glob.glob(downloaded.loc[idx1[0],"PATH"][0:-5]+"*")
+            file2=glob.glob(downloaded.loc[idx2[0],"PATH"][0:-5]+"*")
+            if len(file1) ==0 or len(file2)==0: 
+                breakpoint() 
+            if len(file1)!=0 or len(file2)!=0:
+                print(indice)
+                indice+=1
+                # path1=file1[0]
+                # path2=file2[0]
+                # im1= fits.open(path1)
+                # im2= fits.open(path2)
+                # image1 = rebin(im1[0].data,imsize,operation='mean') 
+                # image2 = rebin(im2[0].data,imsize,operation='mean') 
+                # im=image1-image2
+                # header= fits.getheader(path1)
+                # filename = os.path.basename(path1)
+                # header['NAXIS1'] = imsize[0]   
+                # header['NAXIS2'] = imsize[1]
+                # #breakpoint()
+                # final_img = fits.PrimaryHDU(im, header=header[0:-3])
+                # final_img.writeto(opath+"/"+filename,overwrite=True)
+                # im1.close()
+                # im2.close()
+                
 
-                    
+                        
 
-                    
+                        
