@@ -180,7 +180,7 @@ class lascoc2_downloader:
 
 
 
-    def download(self, download_path=None):
+    def download(self, download_path_default=None):
         """
         Definir metodo download
         """
@@ -190,11 +190,13 @@ class lascoc2_downloader:
             rango_descargas = range(cantidad)
         if getattr(self,'indices_descarga') != '':  #'indice_descarga' debe ser una lista de enteros contenidos en [0,len(self.search_cor2)]
             rango_descargas = self.indices_descarga
-
+        download_path=''
         for w in rango_descargas:
             folder_year_month_day = self.search_lascoc2[w]['fileid'].split('/')[8]
             #full_download_path = download_path+'/'+folder_year_month_day+'/'
-            if not download_path:
+            if download_path_default:
+                download_path = download_path_default
+            if not download_path_default:
                 #download_path = self.dir_descarga+"/".join(self.search_lascoc2['fileid'][w].split('/')[0:-1])+'/'
                 folder = self.search_lascoc2['fileid'][w].split('/')[-3]
                 if int(folder[0:2]) < 50:
@@ -344,7 +346,7 @@ class cor1_downloader:
             if not lista_filtro2: print('Filtered images')
 
 
-    def download(self, download_path=None):
+    def download(self, download_path_default=None):
         """
         Definicion del metodo download.
         """
@@ -354,11 +356,13 @@ class cor1_downloader:
             rango_descargas = range(cantidad)
         if getattr(self,'indices_descarga') != '':  #'indice_descarga' debe ser una lista de enteros contenidos en [0,len(self.search_cor2)]
             rango_descargas = self.indices_descarga
-
+        download_path=''
         for w in rango_descargas:
-            folder_year_month_day = self.search_cor1[w]['fileid'].split('/')[5]
+            #folder_year_month_day = self.search_cor1[w]['fileid'].split('/')[5]
             #full_download_path = download_path+'/'+folder_year_month_day+'/'
-            if not download_path:
+            if download_path_default:
+                download_path = download_path_default
+            if not download_path_default:
                 download_path = self.dir_descarga+"/".join(self.search_cor1['fileid'][w].split('/')[0:-1])+'/'
 
             if not os.path.exists(download_path):
@@ -524,19 +528,6 @@ class cor2_downloader:
         #    case 'polarizadas': suffix_nivel = ''
         #    case 'level_05':    suffix_nivel = 'L0'
 
-        #match self.nave:
-        #    case 'STEREO_A': suffix_nave = 'a'
-        #    case 'STEREO_B': suffix_nave = 'b'
-
-        #if not download_path:
-            #download_path = self.dir_descarga+self.start_time.replace(" ","_").replace("/","").replace(":","_")+'/'+self.nave+'/Cor2/'+self.nivel
-            #download_path = self.dir_descarga+suffix_nivel+'/'+suffix_nave+'/img/cor2/'  
-            #download_path = self.dir_descarga+"/".join(self.search_cor2['fileid'][0].split('/')[0:-1])+'/'
-        #if not os.path.exists(download_path):
-        #    os.makedirs(download_path)
-        #    print(f"Se ha creado el directorio {download_path}")
-        #else:   
-        #    print(f"El directorio {download_path} ya existe")
         carpetas_creadas = []
         if getattr(self,'indices_descarga') == '': 
             cantidad = len(self.search_cor2)
@@ -546,8 +537,6 @@ class cor2_downloader:
 
         download_path=''
         for w in rango_descargas:
-            if download_path:
-                print(download_path)
             #folder_year_month_day = self.search_cor2[w]['fileid'].split('/')[5]
             #full_download_path = download_path+'/'+folder_year_month_day+'/'
             if download_path_default:
