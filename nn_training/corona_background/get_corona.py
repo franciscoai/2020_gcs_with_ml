@@ -58,7 +58,7 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     oimg=i0
 
     
-    breakpoint() # THERE IS AN ERROR IN THE HEADERS OF cor2_path FILES THAT WE CREATED, WE NEED TO FIX IT
+    #breakpoint() # THERE IS AN ERROR IN THE HEADERS OF cor2_path FILES THAT WE CREATED, WE NEED TO FIX IT
 
     # # use fixed file
     data_path = '/gehme/data/stereo/secchi/L1'
