@@ -1,39 +1,57 @@
 import os
 import torch
 import torchvision
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+mpl.use('Agg')
 from torch.utils.data import DataLoader
 from cme_dataset import CmeDataset
 from mlp_resnet_model import Mlp_Resnet
+from mask_generator import maskFromCloud
 
-mpl.use('Agg')
 
 EPOCHS = 1
 IMAGE_LIMIT = None
-BATCH_SIZE = 16
+BATCH_SIZE = 3
 IMG_SiZE = [512, 512]
 GPU = 0
 TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_mariano'
 OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/cme_seg_training_mariano"
 
 
-def compute_loss(predictions, mask):
-    pass
+def compute_loss(predictions, mask, satpos, plotranges):
+    '''
+    Computes mean square error between predicted and target masks
+    '''
+    losses = []
+    predictions = predictions.cpu().detach().numpy()
+    mask = mask.cpu().detach().numpy()
+    satpos = satpos.cpu().detach().numpy()
+    plotranges = plotranges.cpu().detach().numpy()
+    for i in range(len(predictions)):
+        mask_infer = maskFromCloud(predictions[i], sat=0, satpos=satpos[i], imsize=IMG_SiZE, plotranges=plotranges[i])
+        mask_infer = mask_infer[None, :, :]
+        loss = criterion(torch.tensor(mask_infer), torch.tensor(mask[i]))
+        losses.append(loss)
+    return sum(losses)/len(losses)
 
 def optimize(images_limit=IMAGE_LIMIT):
     losses_per_batch = []
     batch_count = 0
     for epoch in range(EPOCHS):
         stop_flag = False
-        for i, (inputs, targets, mask) in enumerate(cme_dataloader, 0):
+        model.train()
+        for i, (inputs, targets, mask, satpos, plotranges) in enumerate(cme_dataloader, 0):
             inputs, targets = inputs.to(device), targets.to(device)
             # zero the parameter gradients
             optimizer.zero_grad()
             # send inputs to model and get predictions
             predictions = model(inputs)
             # calculate loss
-            loss = criterion(predictions, targets)
+            #loss = criterion(predictions, targets)
+            loss = compute_loss(predictions, mask, satpos, plotranges)
+            loss.requires_grad = True
             # backpropagate loss
             loss.backward()
             # update weights

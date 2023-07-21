@@ -7,7 +7,12 @@ class Mlp_Resnet(torch.nn.Module):
         super(Mlp_Resnet, self).__init__()
 
         self.backbone = backbone
-        # self.backbone = torch.nn.Sequential(*(list(backbone.children())[:-1])) # remove last layer
+        self.regression = torch.nn.Sequential(
+            torch.nn.Linear(1000, 512),
+            torch.nn.ReLU(),
+            torch.nn.Linear(512, 6),
+        )
+        #self.backbone = torch.nn.Sequential(*(list(backbone.children())[:-1])) # remove last layer
 
         # freeze backbone parameters
         for param in self.backbone.parameters():
@@ -18,19 +23,11 @@ class Mlp_Resnet(torch.nn.Module):
             param.requires_grad = True
 
         # regression head
-        self.regression = torch.nn.Sequential(
-            torch.nn.Linear(1000, 512),
-            torch.nn.ReLU(),
-            torch.nn.Linear(512, 6),
-            # torch.nn.ReLU(),
-            # torch.nn.Linear(512, 256),
-            # torch.nn.ReLU(),
-            # torch.nn.Linear(256, 6),
-        )
+        
 
     def forward(self, x):
         freatures = self.backbone(x)
-        #freatures = freatures.view(freatures.size(0), -1)
+        freatures = freatures.view(freatures.size(0), -1)
         predictions = self.regression(freatures)
         return predictions
         

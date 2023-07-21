@@ -61,6 +61,10 @@ def get_mask_cloud(p_x,p_y,imsize):
     imsize: size of the output array
     OPATH: output path for the image
     '''
+    if sum(p_x) == len(p_x) * p_x[0] or sum(p_y) == len(p_y) * p_y[0]:
+        line = np.zeros(imsize)
+        line[p_x, p_y] = 1
+        return line
 
     points=[]
     for i in range(len(p_x)):
@@ -88,6 +92,9 @@ def get_mask_cloud(p_x,p_y,imsize):
     for i in range(len(xi)):
         arr_mask[int(xi[i][0]), int(xi[i][1])] = mask[i]
     arr_mask[arr_mask>0]=1
+
+    if np.sum(arr_mask) == 0:
+        arr_mask = arr_cloud
 
     return arr_mask
   
