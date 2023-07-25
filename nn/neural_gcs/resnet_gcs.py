@@ -1,26 +1,44 @@
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 import torch
 import torchvision
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-mpl.use('Agg')
+mpl.use('TkAgg')
 from torch.utils.data import DataLoader
 from cme_dataset import CmeDataset
 from mlp_resnet_model import Mlp_Resnet
-from mask_generator import maskFromCloud
+from nn.utils.gcs_mask_generator import maskFromCloud
 
 
-EPOCHS = 1
+EPOCHS = 10
 IMAGE_LIMIT = None
-BATCH_SIZE = 3
+BATCH_SIZE = 16
 IMG_SiZE = [512, 512]
 GPU = 0
+LR = 0.1
+GCS_PAR_RNG = torch.tensor([[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60]])
 TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_mariano'
 OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/cme_seg_training_mariano"
 
 
-def compute_loss(predictions, mask, satpos, plotranges):
+def plot_masks(mask, mask_infered, predictions):
+    '''
+    Plots the target and predicted masks
+    '''
+    mask_squeeze = np.squeeze(mask)
+    mask_infered_squeeze = np.squeeze(mask_infered)
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    ax[0].imshow(mask_squeeze)
+    ax[0].set_title('Target Mask')
+    ax[1].imshow(mask_infered_squeeze)
+    ax[1].set_title(f'Predicted Mask\nparams: {predictions}')
+    plt.show()
+    plt.close()
+
+def compute_loss(predictions, mask, occulter_mask, satpos, plotranges):
     '''
     Computes mean square error between predicted and target masks
     '''
@@ -29,12 +47,17 @@ def compute_loss(predictions, mask, satpos, plotranges):
     mask = mask.cpu().detach().numpy()
     satpos = satpos.cpu().detach().numpy()
     plotranges = plotranges.cpu().detach().numpy()
-    for i in range(len(predictions)):
+    occulter_mask = occulter_mask.cpu().detach().numpy()
+    occulter_mask = occulter_mask.astype(bool)
+    counter = 0
+    for i in range(predictions.shape[0]):
         mask_infer = maskFromCloud(predictions[i], sat=0, satpos=satpos[i], imsize=IMG_SiZE, plotranges=plotranges[i])
         mask_infer = mask_infer[None, :, :]
-        loss = criterion(torch.tensor(mask_infer), torch.tensor(mask[i]))
+        mask_infer[occulter_mask[i]] = 0 #setting 0 where the occulter is
+        loss = torch.mean((torch.tensor(mask_infer) - torch.tensor(mask[i]))**2)
         losses.append(loss)
-    return sum(losses)/len(losses)
+        counter += 1
+    return (sum(losses)/len(losses)), mask_infer
 
 def optimize(images_limit=IMAGE_LIMIT):
     losses_per_batch = []
@@ -42,7 +65,7 @@ def optimize(images_limit=IMAGE_LIMIT):
     for epoch in range(EPOCHS):
         stop_flag = False
         model.train()
-        for i, (inputs, targets, mask, satpos, plotranges) in enumerate(cme_dataloader, 0):
+        for i, (inputs, targets, mask, occulter_mask, satpos, plotranges) in enumerate(cme_dataloader, 0):
             inputs, targets = inputs.to(device), targets.to(device)
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -50,7 +73,7 @@ def optimize(images_limit=IMAGE_LIMIT):
             predictions = model(inputs)
             # calculate loss
             #loss = criterion(predictions, targets)
-            loss = compute_loss(predictions, mask, satpos, plotranges)
+            loss, mask_infer = compute_loss(predictions, mask, occulter_mask, satpos, plotranges)
             loss.requires_grad = True
             # backpropagate loss
             loss.backward()
@@ -61,7 +84,10 @@ def optimize(images_limit=IMAGE_LIMIT):
             # print statistics
             if i % 10 == 9:  # print every 10 batches
                 print(
-                    f'Epoch: {epoch + 1}, Batch: {i + 1}, Loss: {loss.item():.3f}')
+                    f'Epoch: {epoch + 1}, Image: {i*BATCH_SIZE}, Batch: {i + 1}, Loss: {loss.item():.3f}, learning rate: {optimizer.param_groups[0]["lr"]:.3f}')
+                # print("targets:",targets[-1])
+                # print("predictions:",predictions[-1])
+                #plot_masks(mask[-1], mask_infer[-1], predictions[-1])
             # add batch to batch count
             batch_count += 1
             # check if we reached the images limit
@@ -90,11 +116,10 @@ if __name__ == "__main__":
     backbone = backbone.to(device)
     # model = Mlp_Resnet(backbone=backbone, input_size=1000,
     #                    hidden_size=256, output_size=6)
-    model = Mlp_Resnet(backbone=backbone)
+    model = Mlp_Resnet(backbone=backbone, gcs_par_rng=GCS_PAR_RNG)
     model.to(device)
-
+    model_params = [param for param in model.backbone.parameters() if param.requires_grad] + [param for param in model.regression.parameters() if param.requires_grad]
     criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam([param for param in model.backbone.parameters() if param.requires_grad] + [
-                                 param for param in model.regression.parameters() if param.requires_grad], lr=1e-3)
+    optimizer = torch.optim.Adam(model_params, lr=LR)    
 
     optimize()

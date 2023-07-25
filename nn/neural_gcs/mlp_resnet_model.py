@@ -3,14 +3,17 @@ import torchvision.models.detection as detection
 
 
 class Mlp_Resnet(torch.nn.Module):
-    def __init__(self, backbone, input_size=1000, hidden_size=512, output_size=6) -> None:
+    def __init__(self, backbone, input_size=1000, hidden_size=512, output_size=6, gcs_par_rng=None) -> None:
         super(Mlp_Resnet, self).__init__()
-
+        self.gcs_par_rng = gcs_par_rng
         self.backbone = backbone
+        # regression head
         self.regression = torch.nn.Sequential(
             torch.nn.Linear(1000, 512),
-            torch.nn.ReLU(),
-            torch.nn.Linear(512, 6),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(512, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, 6)
         )
         #self.backbone = torch.nn.Sequential(*(list(backbone.children())[:-1])) # remove last layer
 
@@ -22,12 +25,17 @@ class Mlp_Resnet(torch.nn.Module):
         for param in self.backbone.layer4.parameters():
             param.requires_grad = True
 
-        # regression head
+        
         
 
     def forward(self, x):
         freatures = self.backbone(x)
-        freatures = freatures.view(freatures.size(0), -1)
+        #freatures = freatures.view(freatures.size(0), -1)
         predictions = self.regression(freatures)
+        for i in range(predictions.shape[0]):
+            for j in range(predictions.shape[1]):
+                if j in [0,1,2]:
+                    predictions[i][j] = torch.tanh(predictions[i][j]) * torch.max(torch.abs(self.gcs_par_rng[j,:]))
+                else:
+                    predictions[i][j] = torch.sigmoid(predictions[i][j]) * torch.max(torch.abs(self.gcs_par_rng[j,:]))
         return predictions
-        

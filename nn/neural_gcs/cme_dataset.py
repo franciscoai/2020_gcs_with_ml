@@ -38,16 +38,20 @@ class CmeDataset(Dataset):
         img = self.__normalize(img)
         img = self.transform(img)
         mask = read_image(os.path.join(mask_dir, '2.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
-        mask = (mask > 0).float()
+        occulter_mask = read_image(os.path.join(mask_dir, '1.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
+        mask = mask.new_tensor(mask > 0, dtype=torch.uint8)
+        occulter_mask = occulter_mask.new_tensor(occulter_mask > 0, dtype=torch.uint8)
         resize = torchvision.transforms.Resize(self.image_size, torchvision.transforms.InterpolationMode.BILINEAR)
         mask = resize(mask)
+        occulter_mask = resize(occulter_mask)
+        mask = torch.flip(mask, dims=[1])
         parameters = file[0].split('_')
         parameters = parameters[:6]
         parameters = [float(p) for p in parameters]
         parameters = torch.tensor(parameters, dtype=torch.float32)
         satpos = torch.tensor(eval(self.csv_df["satpos"].iloc[idx]), dtype=torch.float32)
         plotranges = torch.tensor(eval(self.csv_df["plotranges"].iloc[idx]), dtype=torch.float32)
-        return img, parameters, mask, satpos, plotranges
+        return img, parameters, mask, occulter_mask, satpos, plotranges
 
     def __normalize(self, img):
         sd_range = 1

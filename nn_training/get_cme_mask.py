@@ -94,7 +94,7 @@ def get_mask_cloud(p_x,p_y,imsize):
     arr_mask[arr_mask>0]=1
 
     if np.sum(arr_mask) == 0:
-        arr_mask = arr_cloud
+        arr_mask = np.zeros(imsize)
 
     return arr_mask
   
