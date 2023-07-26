@@ -55,7 +55,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None)
                     file2=glob.glob(df.loc[i,column_list[k+2]])
                 paths.append(file1)
                 paths.append(file2)
-                
+    
     paths=pd.DataFrame(paths,columns=['paths'])
     paths = paths.drop_duplicates()
     paths.to_csv(exec_path+"/"+name+"_path_list.csv", index=False)
@@ -118,6 +118,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None)
                         cor2_a.loc[i,"header_contrast"]=header_contrast                           
                         final_img = fits.PrimaryHDU(im, header=header[0:-3])
                         filename = os.path.basename(path_1h)
+                        filename=filename[0:-4]
                         fig0, ax0 = plt.subplots()
                         mean= np.mean(im)
                         std = np.std(im)
@@ -170,6 +171,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None)
                         header_contrast= sigma/avg
                         cor2_b.loc[i,"header_contrast"]=header_contrast   
                         filename = os.path.basename(path_1h)
+                        filename=filename[0:-4]
                         fig0, ax0 = plt.subplots()
                         mean= np.mean(im)
                         std = np.std(im)
@@ -204,7 +206,8 @@ SCR_THRESHOLD=0.3 # only save images with score below this threshold (i.e., No C
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
-model_param = torch.load(model_path + "/"+ trained_model)
+#model_param = torch.load(model_path + "/"+ trained_model)
+model_param=torch.load(model_path + "/" + trained_model, map_location=device)
 
 #tasks
 #cor2 a and b
