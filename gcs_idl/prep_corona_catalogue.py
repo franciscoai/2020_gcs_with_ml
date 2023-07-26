@@ -126,7 +126,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                         cor2_a.loc[i,"header_contrast"]=header_contrast                           
                         final_img = fits.PrimaryHDU(im, header=header[0:-3])
                         filename = os.path.basename(path_1h)
-                    
+                        breakpoint()
                         fig0, ax0 = plt.subplots()
                         mean= np.mean(im)
                         std = np.std(im)
@@ -137,6 +137,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                         if do_write==True:
                             test_im=rebin(test_im,imsize_nn,operation='mean') 
                             imgs, masks, scrs, labels, boxes  = neural_cme_segmentation(model_param, test_im, device)
+                            #breakpoint()
                             if np.max(scrs)<SCR_THRESHOLD:  # header_contrast<6.2 and 
                                 print("saving image "+str(i)+" from cor2_a")
                                 if write_png==True:
@@ -226,7 +227,7 @@ SCR_THRESHOLD=0.3 # only save images with score below this threshold (i.e., No C
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
-model_param = torch.load(model_path + "/"+ trained_model, map_location=device)
+model_param = torch.load(model_path + "/"+ trained_model)
 
 #tasks
 #cor2 a and b
