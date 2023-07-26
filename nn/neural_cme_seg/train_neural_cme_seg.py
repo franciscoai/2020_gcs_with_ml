@@ -91,7 +91,7 @@ opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 pre_trained_model= None # "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v2_running_diff/3999.torch"
 batchSize=8 #number of images used in each iteration
 train_ncases=4000 # Total no. of epochs
-gpu=1 # GPU to use
+gpu=0 # GPU to use
 
 #main
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
