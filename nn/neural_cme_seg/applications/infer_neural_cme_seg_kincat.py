@@ -9,10 +9,13 @@ import torch
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.use('Agg')
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))))
 from ext_libs.rebin import rebin
-from neural_cme_seg import neural_cme_segmentation
+from nn.neural_cme_seg.neural_cme_seg import neural_cme_segmentation
 import csv
+import pandas as pd
+from datetime import datetime, timedelta
+import glob
 
 __author__ = "Francisco Iglesias"
 __copyright__ = "Grupo de Estudios en Heliofisica de Mendoza - https://sites.google.com/um.edu.ar/gehme"
@@ -23,8 +26,12 @@ __email__ = "franciscoaiglesias@gmail.com"
 def read_fits(file_path):
     imageSize=[512,512]
     try:       
-        img = fits.open(file_path)[0].data
-        img = rebin(img, imageSize)   
+        
+        file=glob.glob((file_path)[0:-5]+"*")
+        img = fits.open(file[0])
+        img=(img[0].data).astype("float32")
+        img = rebin(img, imageSize,operation='mean')
+        
         return img  
     except:
         print(f'WARNING. I could not find file {file_path}')
@@ -78,32 +85,63 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
       
 #main
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
+repo_dir =  os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+helcat_db =  repo_dir + "/nn_training/kincat/helcatslist_20160601.txt" # kincat database
+downloaded_files_list = repo_dir + '/nn_training/kincat/helcatslist_20160601_sta_downloaded.csv' # list of downloaded files
+units= ["-","-","yyyymmdd","hhmm","yyyymmdd","hhmm","deg","lon","old","deg","deg","deg", "yyyymmdd","hhmm","km/s","g","km/s","LON","LAT","km/s","LON","LAT","km/s","LON","LAT"]
+col_names=["HEL","CME","PRE_DATE","PRE_TIME","LAST_DATE","LAST_TIME","CARLON","STONEY","LAT","TILT", "ASP_RATIO","H_ANGLE","DATE","TIME","APEX_SPEED","CME_MASS","SPEED_FPF","FPF_LON","FPF_LAT","SPEED_SSEF","SSEF_LON","SSEF_LAT","SPEED_HMF","HMF_LON","HMF_LAT"]
+
+#nn model parameters
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3"
-opath= model_path + "/infer_neural_cme_seg_corona_back_cor2"
+opath= model_path + "/infer_neural_cme_seg_kincat/cor2_a"
 ipath=  "/gehme/projects/2020_gcs_with_ml/data/corona_back_database/cor2/cor2_a"
 file_ext=".fits"
 trained_model = '3999.torch'
 
 #main
-gpu=1 # GPU to use
+gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
 
 os.makedirs(opath, exist_ok=True)
 #loads model
-model_param = torch.load(model_path + "/"+ trained_model)
-# list .fits files in ipath
-files = [f for f in os.listdir(ipath) if f.endswith(file_ext)]
+model_param = torch.load(model_path + "/"+ trained_model, map_location=device)
 #vars to store all results
 results = []
-for f in files:
-    print(f'Processing {f}')
-    #read fits
-    img = read_fits(os.path.join(ipath,f))
-    # infers
-    imga, maska, scra, labelsa, boxesa  = neural_cme_segmentation(model_param, img, device)
-    #save results
-    results.append({'file':f, 'img':imga, 'mask':maska, 'scr':scra, 'labels':labelsa, 'boxes':boxesa})
-    #plot results
-    ofile = os.path.join(opath,f)+'.png'
-    plot_to_png(ofile, [imga], [maska], title=[f], labels=[labelsa], boxes=[boxesa], scores=[scra])
+
+
+
+# read csv with paths and dates of the downloaded files
+downloaded=pd.read_csv(downloaded_files_list)
+downloaded['DATE_TIME'] = pd.to_datetime(downloaded['DATE_TIME'])
+downloaded= downloaded.sort_values('DATE_TIME')
+downloaded = downloaded.reset_index(drop=True)
+
+# read helcat database and changes the column names
+catalogue = pd.read_csv(helcat_db, sep = "\t")
+catalogue=catalogue.drop([0,1])
+catalogue.columns=col_names
+catalogue = catalogue.reset_index(drop=True)
+
+for i in range(len(catalogue.index)):
+    print("Reading path "+str(i))
+    date_helcat = datetime.strptime((catalogue["PRE_DATE"][i]+" "+catalogue["PRE_TIME"][i]),'%Y-%m-%d %H:%M') #forms datetime object
+    start_date = date_helcat - timedelta(hours=1)
+    end_date= datetime.strptime((catalogue["LAST_DATE"][i]+" "+catalogue["LAST_TIME"][i]),'%Y-%m-%d %H:%M') #forms datetime object
+    index=catalogue["CME"][i]
+    for j in range(len(downloaded.index)):
+        files = downloaded[(downloaded["DATE_TIME"] < end_date) & (downloaded["DATE_TIME"] > start_date)]["PATH"]
+        for f in files:
+            print(f'Processing {f}')
+            #read fits
+            img = read_fits(f)
+            # infers
+            imga, maska, scra, labelsa, boxesa  = neural_cme_segmentation(model_param, img, device)
+            #save results
+            results.append({'file':f, 'img':imga, 'mask':maska, 'scr':scra, 'labels':labelsa, 'boxes':boxesa})
+            #plot results
+            filename=f[49:-4]
+            os.makedirs(os.path.join(opath, str(index)),exist_ok=True)
+            ofile = os.path.join(opath, str(index), filename + '.png')
+            breakpoint()
+            plot_to_png(ofile, [imga], [maska], title=[f], labels=[labelsa], boxes=[boxesa], scores=[scra])

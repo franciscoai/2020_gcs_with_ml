@@ -43,6 +43,7 @@ def neural_cme_segmentation(model_param, img, device):
     model.eval()#set the model to evaluation state
 
     #inference
+
     images = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
     #images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)        
     images = normalize(images) #cv2.normalize(images, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F) # normalize to 0,1
