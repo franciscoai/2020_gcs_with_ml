@@ -91,7 +91,7 @@ def pnt2arr(x,y,plotranges,imsize):
 #files
 DATA_PATH = '/gehme/data'
 OPATH ='/gehme/projects/2020_gcs_with_ml/data/cme_seg_training' #'/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training' '/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
-n_sat = 1 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
+n_sat = 2 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 
 # GCS parameters [first 6]
 # The other parameters are:
@@ -99,7 +99,7 @@ n_sat = 1 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names
-par_num = 10  # total number of samples that will be generated for each param (there are nsat images per param combination)
+par_num = 7500  # total number of samples that will be generated for each param (there are nsat images per param combination)
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 same_corona=False # Set to True use a single corona back for all par_num cases
 
@@ -125,6 +125,7 @@ for (rng, num) in zip(par_rng, par_num):
         np.random.shuffle(cpar)
     all_par.append(cpar)
 
+
 # Save configuration to .CSV
 os.makedirs(OPATH, exist_ok=True)
 date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
@@ -133,14 +134,13 @@ set = pd.DataFrame(np.column_stack(all_par), columns=par_names)
 set.to_csv(configfile_name)
 df = pd.DataFrame(pd.read_csv(configfile_name))
 mask_prev = None
-back_corona=[]
-headers=[]
-size_occ=[]
 # generate views
 for row in range(len(df)):
     #get background corona,headers and occulter size
     if same_corona==False or row==0:
-        
+        back_corona=[]
+        headers=[]
+        size_occ=[]
         for sat in range(n_sat):
             a,b,c=get_corona(sat,imsize=imsize)
             back_corona.append(a)
@@ -149,7 +149,7 @@ for row in range(len(df)):
     
     # Get the location of sats and gcs:
     satpos, plotranges = pyGCS.processHeaders(headers)
-
+    
     print(f'Saving image pair {row} of {len(df)-1}')
     for sat in range(n_sat):
         #defining ranges and radius of the occulter
@@ -169,6 +169,7 @@ for row in range(len(df)):
         else:
             btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.1, nel=1e5)     
             cme_npix= len(btot_mask[btot_mask>0].flatten())
+            #breakpoint()
             if cme_npix<=0:
                 print(f'WARNING: CME number {row} raytracing did not work')
                 break          

@@ -38,52 +38,41 @@ for i in range(len(catalogue.index)):
     #calculates the closest dates to the original one
     for j in range(len(downloaded.index)):
         date=downloaded["DATE_TIME"][j]
-        if date <= date_helcat:
-                before_date = date
-        elif date >= date_helcat:
-                after_date = date
+        before_date = downloaded[downloaded["DATE_TIME"] <= date_helcat]["DATE_TIME"].max()
+        after_date = downloaded[downloaded["DATE_TIME"] >= date_helcat]["DATE_TIME"].min()
     if date_helcat-before_date>after_date-date_helcat:
           date_helcat=after_date
     else:
           date_helcat=before_date
     
     #if finds dates before date_helcat it takes the closest one and calculate the diff image between them
-    dates=[]
-    for j in range(len(downloaded.index)):
-        path=downloaded.loc[j,"PATH"]
-        #if os.path.exists(path):
-        date=downloaded["DATE_TIME"][j]
-        if date<date_helcat and date>time_range:
-            dates.append(date)
-        dates=sorted(dates)
-        if len(dates)>0:
-            pre_date= dates[0]
-            idx1=downloaded.index[downloaded['DATE_TIME'] == date_helcat].tolist()
-            idx2 = downloaded.index[downloaded['DATE_TIME'] == pre_date].tolist()
-            #breakpoint()
-            file1=glob.glob(downloaded.loc[idx1[0],"PATH"][0:-5]+"*")
-            file2=glob.glob(downloaded.loc[idx2[0],"PATH"][0:-5]+"*")
-            if len(file1) ==0 or len(file2)==0: 
-                breakpoint() 
-            if len(file1)!=0 or len(file2)!=0:
-                print(indice)
-                indice+=1
-                # path1=file1[0]
-                # path2=file2[0]
-                # im1= fits.open(path1)
-                # im2= fits.open(path2)
-                # image1 = rebin(im1[0].data,imsize,operation='mean') 
-                # image2 = rebin(im2[0].data,imsize,operation='mean') 
-                # im=image1-image2
-                # header= fits.getheader(path1)
-                # filename = os.path.basename(path1)
-                # header['NAXIS1'] = imsize[0]   
-                # header['NAXIS2'] = imsize[1]
-                # #breakpoint()
-                # final_img = fits.PrimaryHDU(im, header=header[0:-3])
-                # final_img.writeto(opath+"/"+filename,overwrite=True)
-                # im1.close()
-                # im2.close()
+    
+    pre_date = downloaded[(downloaded["DATE_TIME"] < date_helcat) & (downloaded["DATE_TIME"] > time_range)]["DATE_TIME"].max()
+
+    if pd.notna(pre_date):
+        idx1=downloaded.index[downloaded['DATE_TIME'] == date_helcat].tolist()
+        idx2 = downloaded.index[downloaded['DATE_TIME'] == pre_date].tolist()
+
+        file1=glob.glob(downloaded.loc[idx1[0],"PATH"][0:-5]+"*")
+        
+        file2=glob.glob(downloaded.loc[idx2[0],"PATH"][0:-5]+"*")
+        if len(file1)!=0 or len(file2)!=0:
+                path1=file1[0]
+                path2=file2[0]
+                im1= fits.open(path1)
+                im2= fits.open(path2)
+                image1 = rebin(im1[0].data,imsize,operation='mean') 
+                image2 = rebin(im2[0].data,imsize,operation='mean') 
+                im=image1-image2
+                header= fits.getheader(path1)
+                filename = os.path.basename(path1)
+                header['NAXIS1'] = imsize[0]   
+                header['NAXIS2'] = imsize[1]
+                print("Writing image...")
+                final_img = fits.PrimaryHDU(im, header=header[0:-3])
+                final_img.writeto(opath+"/"+filename,overwrite=True)
+                im1.close()
+                im2.close()
                 
 
                         

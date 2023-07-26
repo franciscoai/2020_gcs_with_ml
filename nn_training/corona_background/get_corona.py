@@ -34,7 +34,7 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     #files
     
     
-    cor2_path="/gehme/projects/2020_gcs_with_ml/data/corona_back_database/cor2"
+    cor2_path= "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2"#/gehme/projects/2020_gcs_with_ml/data/corona_background_kincat/cor2"
     lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_back_database/lasco"
     size_occ=[2.6, 3.7, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
 
@@ -45,35 +45,27 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     # STEREO B
     elif sat==1:
         path=cor2_path+"/cor2_b"
+    # LASCO    
     elif sat==2:
         path=lasco_path+"/c2"
     else:
         os.error('Input instrument not recognized, check value of sat')
 
     files=[f for f in os.listdir(path) if f.endswith('.fits')]
+    
     p0= np.random.choice(files)
     p0=path+"/"+p0
-    print('Using back file ', p0)
-    i0, h0 = sunpy.io._fits.read(p0)[0]
-    oimg=i0
-
     
-    #breakpoint() # THERE IS AN ERROR IN THE HEADERS OF cor2_path FILES THAT WE CREATED, WE NEED TO FIX IT
-
-    # # use fixed file
-    data_path = '/gehme/data/stereo/secchi/L1'
-    p0 = data_path + '/a/img/cor2/20110319/20110319_110800_14c2A.fts'
-    # p1 = data_path + '/a/img/cor2/20110319/20110319_120800_14c2A.fts'
-    p0img,h0 = sunpy.io._fits.read(p0)[0]
-    # p1img, _ = sunpy.io._fits.read(p1)[0]    
-    # oimg = p1img - p0img
+    print('Using back file ', p0)
+    oimg= fits.open(p0)[0].data
+    h0= fits.getheader(p0)
 
     if rnd_rot:
         oimg = scipy.ndimage.rotate(oimg, np.random.randint(low=0, high=360), reshape=False)
  
     if imsize is not None:
         oimg = rebin(oimg,imsize,operation='mean') 
-        
+   
     return oimg, h0, size_occ[sat]
 
 

@@ -22,7 +22,7 @@ df.columns=col_names
 df = df.reset_index(drop=True)
 
 data=[]
-for i in range(0,len(df.index)):
+for i in range(len(df.index)):
 #for i in range(11,12):
     print("Downloading row number  {}".format(i))
     pre_date = df["PRE_DATE"][i]
