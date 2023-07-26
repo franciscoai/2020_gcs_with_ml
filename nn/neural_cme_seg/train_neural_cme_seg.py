@@ -85,8 +85,8 @@ https://towardsdatascience.com/train-mask-rcnn-net-for-object-detection-in-60-li
 """
 
 #Constants
-trainDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_v3'
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3"
+trainDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_v4'
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 #full path of a model to use it as initial condition, use None to used the stadard pre-trained model 
 pre_trained_model= None # "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v2_running_diff/3999.torch"
 batchSize=8 #number of images used in each iteration
