@@ -11,11 +11,11 @@ units= ["-","-","yyyymmdd","hhmm","yyyymmdd","hhmm","deg","lon","old","deg","deg
 col_names=["HEL","CME","PRE_DATE","PRE_TIME","LAST_DATE","LAST_TIME","CARLON","STONEY","LAT","TILT", "ASP_RATIO","H_ANGLE","DATE","TIME","APEX_SPEED","CME_MASS","SPEED_FPF","FPF_LON","FPF_LAT","SPEED_SSEF","SSEF_LON","SSEF_LAT","SPEED_HMF","HMF_LON","HMF_LAT"]
 repo_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 helcat_db=repo_dir + "/nn_training/kincat/helcatslist_20160601.txt" # kincat database
-opath= "/gehme/projects/2020_gcs_with_ml/data/corona_background_kincat"
+opath= "/gehme/projects/2020_gcs_with_ml/data/corona_background_kincat/cor2/cor2_b"
 imsize=[512,512]
 
 # read csv with paths and dates of the downloaded files
-downloaded=pd.read_csv('/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/kincat/helcatslist_20160601_downloaded.csv')
+downloaded=pd.read_csv('/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/kincat/helcatslist_20160601_stb_downloaded.csv')
 downloaded['DATE_TIME'] = pd.to_datetime(downloaded['DATE_TIME'])
 downloaded= downloaded.sort_values('DATE_TIME')
 downloaded = downloaded.reset_index(drop=True)

@@ -22,6 +22,7 @@ lasco_downloads=["pre_a_1h_download_c2","pre_b_1h_download_c2","pre_a_2h_downloa
 cor2_downloads=["pre_a_1h_download","pre_b_1h_download","pre_a_2h_download","pre_b_2h_download"]
 opath = "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects"#'/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'
 imsize=[0,0]# if 0,0 no rebin its applied 
+imsize_nn=[512,512] #for rebin befor the nn
 do_write=True # if set to True it saves the diff images
 write_png=False#if set to True it will save the images in fits and png formats else it will save only fits
 lasco= pd.read_csv(lasco_path , sep="\t")
@@ -65,8 +66,8 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
         cor2_a=pd.DataFrame(columns=['paths',"date"])#,"header_contrast"])
         cor2_b=pd.DataFrame(columns=['paths',"date"])#,"header_contrast"])
         #creates odir
-        odir = opath+df.name+'/'+"cor2_a"
-        odirb= opath+df.name+'/'+"cor2_b"
+        odir = opath+'/'+df.name+'/'+"cor2_a"
+        odirb= opath+'/'+df.name+'/'+"cor2_b"
         os.makedirs(odir, exist_ok=True)
         os.makedirs(odirb, exist_ok=True)
 
@@ -106,7 +107,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                         im2= fits.open(path_2h)
                         
                         
-                        im=image1-image2
+                        
                         header= fits.getheader(path_1h)
                         if imsize[0]!=0 and imsize[1]!=0:
                             image1 = rebin(im1[0].data,imsize,operation='mean') 
@@ -117,6 +118,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                             image1 = im1[0].data
                             image2 = im2[0].data
 
+                        im=image1-image2
                         sigma=header["DATASIG"]
                         avg=header["DATAAVG"]
                         header_contrast= sigma/avg
@@ -131,9 +133,12 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                         vmin=mean-1*std
                         vmax=mean+1*std
                         imagen = ax0.imshow(im, cmap='gray', vmin=vmin, vmax=vmax)
+                        test_im=im
                         if do_write==True:
-                            imgs, masks, scrs, labels, boxes  = neural_cme_segmentation(model_param, im, device)
-                            if not np.max(scrs)>SCR_THRESHOLD:  # header_contrast<6.2 and 
+                            test_im=rebin(test_im,imsize_nn,operation='mean') 
+                            imgs, masks, scrs, labels, boxes  = neural_cme_segmentation(model_param, test_im, device)
+                            #breakpoint()
+                            if np.max(scrs)<SCR_THRESHOLD:  # header_contrast<6.2 and 
                                 print("saving image "+str(i)+" from cor2_a")
                                 if write_png==True:
                                     plt.savefig(odir+"/"+filename+".png", format='png')
@@ -147,7 +152,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                     else:
                         print("files not found")
                             
-                except:
+                except :
                     im1.close()
                     im2.close()                    
                     print("error on "+path_1h+"  or  "+path_2h)
@@ -192,9 +197,11 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                         vmin=mean-1*std
                         vmax=mean+1*std
                         imagen = ax0.imshow(im, cmap='gray', vmin=vmin, vmax=vmax)
+                        test_im=im
                         if do_write==True:    
-                            imgs, masks, scrs, labels, boxes  = neural_cme_segmentation(model_param, im, device)
-                            if not np.max(scrs)>SCR_THRESHOLD: # header_contrast<4.7 and
+                            test_im=rebin(test_im,imsize_nn,operation='mean') 
+                            imgs, masks, scrs, labels, boxes  = neural_cme_segmentation(model_param, test_im, device)
+                            if  np.max(scrs)<SCR_THRESHOLD: # header_contrast<4.7 and
                                 print("saving image "+str(i)+" from cor2_b")
                                 if write_png==True:
                                     plt.savefig(odirb+"/"+filename+".png", format='png')
@@ -202,7 +209,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                                 im1.close()
                                 im2.close()
                             else:
-                                print("image "+str(i)+" from cor2_a has a CME")
+                                print("image "+str(i)+" from cor2_b has a CME")
                                 im1.close()
                                 im2.close()
                     else:
