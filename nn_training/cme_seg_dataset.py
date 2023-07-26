@@ -125,6 +125,7 @@ for (rng, num) in zip(par_rng, par_num):
         np.random.shuffle(cpar)
     all_par.append(cpar)
 
+
 # Save configuration to .CSV
 os.makedirs(OPATH, exist_ok=True)
 date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
@@ -149,7 +150,7 @@ for row in range(len(df)):
     
     # Get the location of sats and gcs:
     satpos, plotranges = pyGCS.processHeaders(headers)
-
+    
     print(f'Saving image pair {row} of {len(df)-1}')
     for sat in range(n_sat):
         #defining ranges and radius of the occulter
@@ -169,6 +170,7 @@ for row in range(len(df)):
         else:
             btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.1, nel=1e5)     
             cme_npix= len(btot_mask[btot_mask>0].flatten())
+            #breakpoint()
             if cme_npix<=0:
                 print(f'WARNING: CME number {row} raytracing did not work')
                 break          

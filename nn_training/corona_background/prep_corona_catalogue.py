@@ -20,10 +20,10 @@ lasco_path = exec_path+'/Lista_Final_CMEs_downloads_lascoc2.csv' #'/catalogues/L
 cor2_path = exec_path+'/Lista_Final_CMEs_downloads_cor2.csv'
 lasco_downloads=["pre_a_1h_download_c2","pre_b_1h_download_c2","pre_a_2h_download_c2","pre_b_2h_download_c2"]
 cor2_downloads=["pre_a_1h_download","pre_b_1h_download","pre_a_2h_download","pre_b_2h_download"]
-opath = '/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'
-imsize=[512,512]
+opath = "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects"#'/gehme/projects/2020_gcs_with_ml/data/corona_back_database/'
+imsize=[0,0]# if 0,0 no rebin its applied 
 do_write=True # if set to True it saves the diff images
-
+write_png=False#if set to True it will save the images in fits and png formats else it will save only fits
 lasco= pd.read_csv(lasco_path , sep="\t")
 lasco.name='lasco'
 
@@ -35,7 +35,7 @@ for i in range(len(cor2.index)):
         if cor2.loc[i,j] != "No data" and cor2.loc[i,j] != "*" and cor2.loc[i,j] != "No img/double data":
             cor2.at[i, j] = "/gehme/data/stereo/secchi/"+ cor2.at[i, j]
 
-def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None):
+def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,write_png=write_png):
     '''
     df=dataframe
     column_list: list of columns to use 
@@ -104,13 +104,17 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None)
                         
                         im1= fits.open(path_1h)
                         im2= fits.open(path_2h)
-                        
-                        image1 = rebin(im1[0].data,imsize,operation='mean') 
-                        image2 = rebin(im2[0].data,imsize,operation='mean') 
-                        im=image1-image2
                         header= fits.getheader(path_1h)
-                        header['NAXIS1'] = imsize[0]   
-                        header['NAXIS2'] = imsize[1]
+                        if imsize[0]!=0 and imsize[1]!=0:
+                            image1 = rebin(im1[0].data,imsize,operation='mean') 
+                            image2 = rebin(im2[0].data,imsize,operation='mean') 
+                            header['NAXIS1'] = imsize[0]   
+                            header['NAXIS2'] = imsize[1]
+                        else:
+                            image1 = im1[0].data
+                            image2 = im2[0].data
+
+                        im=image1-image2
                         sigma=header["DATASIG"]
                         avg=header["DATAAVG"]
                         header_contrast= sigma/avg
@@ -118,6 +122,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None)
                         cor2_a.loc[i,"header_contrast"]=header_contrast                           
                         final_img = fits.PrimaryHDU(im, header=header[0:-3])
                         filename = os.path.basename(path_1h)
+                        breakpoint()
                         fig0, ax0 = plt.subplots()
                         mean= np.mean(im)
                         std = np.std(im)
@@ -128,7 +133,8 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None)
                             imgs, masks, scrs, labels, boxes  = neural_cme_segmentation(model_param, im, device)
                             if not np.max(scrs)>SCR_THRESHOLD:  # header_contrast<6.2 and 
                                 print("saving image "+str(i)+" from cor2_a")
-                                plt.savefig(odir+"/"+filename+".png", format='png')
+                                if write_png==True:
+                                    plt.savefig(odir+"/"+filename+".png", format='png')
                                 final_img.writeto(odir+"/"+filename+".fits",overwrite=True)
                                 im1.close()
                                 im2.close()
@@ -158,12 +164,17 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None)
                         path_2h=(file2[0])
                         im1= fits.open(path_1h)
                         im2= fits.open(path_2h)
-                        image1 = rebin(im1[0].data,imsize,operation='mean') 
-                        image2 = rebin(im2[0].data,imsize,operation='mean') 
+                        header= fits.getheader(path_1h) 
+                        if imsize[0]!=0 and imsize[1]!=0:
+                            image1 = rebin(im1[0].data,imsize,operation='mean') 
+                            image2 = rebin(im2[0].data,imsize,operation='mean') 
+                            header['NAXIS1'] = imsize[0]   
+                            header['NAXIS2'] = imsize[1]
+                        else:
+                            image1 = im1[0].data
+                            image2 = im2[0].data
+                       
                         im=image1-image2
-                        header= fits.getheader(path_1h)
-                        header['NAXIS1'] = imsize[0]   
-                        header['NAXIS2'] = imsize[1]
                         final_img = fits.PrimaryHDU(im, header=header[0:-3])
                         sigma=header["DATASIG"]
                         avg=header["DATAAVG"]
@@ -180,7 +191,8 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None)
                             imgs, masks, scrs, labels, boxes  = neural_cme_segmentation(model_param, im, device)
                             if not np.max(scrs)>SCR_THRESHOLD: # header_contrast<4.7 and
                                 print("saving image "+str(i)+" from cor2_b")
-                                plt.savefig(odirb+"/"+filename+".png", format='png')
+                                if write_png==True:
+                                    plt.savefig(odirb+"/"+filename+".png", format='png')
                                 final_img.writeto(odirb+"/"+filename+".fits",overwrite=True)                  
                                 im1.close()
                                 im2.close()
@@ -208,7 +220,7 @@ model_param = torch.load(model_path + "/"+ trained_model)
 
 #tasks
 #cor2 a and b
-data=prep_catalogue(cor2,cor2_downloads,do_write=do_write,model_param=model_param, device=device) # get paths of ok files
+data=prep_catalogue(cor2,cor2_downloads,do_write=do_write,model_param=model_param, device=device, write_png=write_png) # get paths of ok files
 # lasco
 #data=prep_catalogue(lasco,lasco_downloads,do_write=do_write,model_param=model_param, device=device) # get paths of ok files ??
 
