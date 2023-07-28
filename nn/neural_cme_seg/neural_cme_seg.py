@@ -17,11 +17,21 @@ __email__ = "franciscoaiglesias@gmail.com"
 class neural_cme_segmentation():
     '''
     Class to perform CME segmentation using Mask R-CNN
+
+    Based on Pytorch vision model MASKRCNN_RESNET50_FPN from the paper https://arxiv.org/pdf/1703.06870.pdf
+
+    see also:
+    https://pytorch.org/vision/0.12/generated/torchvision.models.detection.maskrcnn_resnet50_fpn.html
+    https://pytorch.org/tutorials/intermediate/torchvision_tutorial.html
+    https://towardsdatascience.com/train-mask-rcnn-net-for-object-detection-in-60-lines-of-code-9b6bbff292c3
     '''
     def __init__(self, device, pre_trained_model = None):
-        self.num_classes = 3
+        # model param
+        self.num_classes = 2 # background and CME
+        self.trainable_backbone_layers = 4
         self.device = device
-        self.model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
+        # innitializes the model
+        self.model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True, trainable_backbone_layers=self.trainable_backbone_layers) 
         self.in_features = self.model.roi_heads.box_predictor.cls_score.in_features 
         self.model.roi_heads.box_predictor=FastRCNNPredictor(self.in_features,num_classes=self.num_classes)
         if pre_trained_model is not None:
@@ -35,7 +45,7 @@ class neural_cme_segmentation():
         Normalizes the values of the input image to have a given range (as fractions of the sd around the mean)
         maped to [0,1]. It clips output values outside [0,1]
         '''
-        sd_range=1.
+        sd_range=1.5
         m = np.mean(image)
         sd = np.std(image)
         image = (image - m + sd_range * sd) / (2 * sd_range * sd)
@@ -60,8 +70,8 @@ class neural_cme_segmentation():
         Infers a cme segmentation mask in the input coronograph image (img) using the trauined R-CNN with weigths given by model_param
         '''    
         #loads model
-        self.model.load_state_dict(model_param) #loads the last iteration of training 
-        self.model.eval()#set the model to evaluation state
+        self.model.load_state_dict(model_param) 
+        self.model.eval() #set the model to evaluation state
 
         #inference
         images = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)

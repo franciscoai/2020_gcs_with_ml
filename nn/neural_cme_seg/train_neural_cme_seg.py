@@ -13,22 +13,11 @@ from neural_cme_seg import neural_cme_segmentation
 
 mpl.use('Agg')
 
-def normalize(image):
+def loadData(imgs, batchSize, imageSize=[512,512], file_ext=".png", normalization_func=None, masks2use=None):
     '''
-    Normalizes the values of the model input image to have a given range (as fractions of the sd around the mean)
-    maped to [0,1]. It clips output values outside [0,1]
-    '''
-    sd_range=1.
-    m = np.mean(image)
-    sd = np.std(image)
-    image = (image - m + sd_range * sd) / (2 * sd_range * sd)
-    image[image >1]=1
-    image[image <0]=0
-    return image
-
-def loadData(imgs, batchSize, imageSize=[512,512], file_ext=".png"):
-    '''
-    Loads batch images
+    Loads a batch of images and targets
+    normalization_func: function to normalize the images, use None for no normalization
+    masks2use: list of masks to use, use None to use all masks found in the mask directory
     '''    
     batch_Imgs=[]
     batch_Data=[]
@@ -39,12 +28,16 @@ def loadData(imgs, batchSize, imageSize=[512,512], file_ext=".png"):
         file=[f for f in file if f.endswith(file_ext)]
         img = cv2.imread(os.path.join(imgs[idx], file[0])) #reads the random image
         img = cv2.resize(img, imageSize, cv2.INTER_LINEAR) #rezise the image  
-        img = normalize(img) #cv2.normalize(img, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)  # normalize to 0,1
+        if normalization_func is not None:
+            img = normalization_func(img)
         maskDir=os.path.join(imgs[idx], "mask") #path to the mask corresponding to the random image
         masks=[]
         labels = []
         lbl_idx=0
-        for mskName in os.listdir(maskDir):
+        ok_masks=os.listdir(maskDir) #list of all masks in the mask directory
+        if masks2use is not None:
+            ok_masks = [ok_masks[i] for i in masks2use]
+        for mskName in ok_masks:
             labels.append(lbl_idx) # labels are: 0='Occ', 1='CME', 2='CME']
             vesMask = cv2.imread(maskDir+'/'+mskName, 0) #reads the mask image in greyscale 
             vesMask = (vesMask > 0).astype(np.uint8) #The mask image is stored in 0–255 format and is converted to 0–1 format
@@ -77,23 +70,19 @@ def loadData(imgs, batchSize, imageSize=[512,512], file_ext=".png"):
 
 #---------------------------------------------------------Fine_tune the pretrained R-CNN----------------------------------------------------------
 """
-Based on Pytorch vision model MASKRCNN_RESNET50_FPN from the paper https://arxiv.org/pdf/1703.06870.pdf
 
-see also:
-https://pytorch.org/vision/0.12/generated/torchvision.models.detection.maskrcnn_resnet50_fpn.html
-https://pytorch.org/tutorials/intermediate/torchvision_tutorial.html
-https://towardsdatascience.com/train-mask-rcnn-net-for-object-detection-in-60-lines-of-code-9b6bbff292c3
 
 """
 
 #Constants
-trainDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_v4'
+trainDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training'
 opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 #full path of a model to use it as initial condition, use None to used the stadard pre-trained model 
 pre_trained_model= None # "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v2_running_diff/3999.torch"
 batchSize=8 #number of images used in each iteration
-train_ncases=4000 # Total no. of epochs
+train_ncases=10000 # Total no. of epochs
 gpu=0 # GPU to use
+masks2use=[1] # list of masks to use, use None to use all masks found in the mask directory
 
 #main
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
@@ -112,14 +101,15 @@ nn_seg.train()
 
 #training
 all_loss=[]
-for i in range(train_ncases): #Number of iterations
-    images, targets= loadData(imgs, batchSize) #call the function, images=batch_img and targets=batch_data
-    images = list(image.to(device) for image in images) #send images to the selected device
-    targets=[{k: v.to(device) for k,v in t.items()} for t in targets] #send targets to the selected device
-   
-    nn_seg.optimizer.zero_grad() #Sets the gradients of all optimized torch.Tensors to zero.
+for i in range(train_ncases): 
+    images, targets= loadData(imgs, batchSize, normalization_func=nn_seg.normalize, masks2use=masks2use) # loads a batch of training data
+    images = list(image.to(device) for image in images)
+    targets=[{k: v.to(device) for k,v in t.items()} for t in targets]
+    nn_seg.optimizer.zero_grad() 
     loss_dict = nn_seg.model(images, targets)
-    losses = sum(loss for loss in loss_dict.values()) #The loss is composed of several parts: class loss, bounding box loss, and mask loss. We sum all of these parts together to get the total loss as a single number
+    # TODO!!
+    # use only the loss for mask and box ?
+    losses = sum(loss for loss in loss_dict.values())
    
     losses.backward() #computes the partial derivative of the output f with respect to each of the input variables.
     nn_seg.optimizer.step()
