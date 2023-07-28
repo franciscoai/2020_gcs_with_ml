@@ -18,7 +18,6 @@ def rtraytracewcs_wrapper(input_data, test=False,compare=False):
     from a electronic cloud
 
     @authors: F. A. Iglesias, Y. Machuca and F. Cisterna. 2023. Mendoza Group for Heloiphysics Studies (GEHMe), Argentina
-
     Contact: franciscoaiglesias@gmail.com
 
     test::Bool # Set to True to ignore input_data and run the example saved in test_save_file 
