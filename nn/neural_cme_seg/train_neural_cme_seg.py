@@ -9,6 +9,8 @@ import os
 import matplotlib.pyplot as plt
 import pickle
 import matplotlib as mpl
+from neural_cme_seg import neural_cme_segmentation
+
 mpl.use('Agg')
 
 def normalize(image):
@@ -73,7 +75,7 @@ def loadData(imgs, batchSize, imageSize=[512,512], file_ext=".png"):
     batch_Imgs = batch_Imgs.swapaxes(1, 3).swapaxes(2, 3)
     return batch_Imgs, batch_Data #, batch_Masks
 
-#---------------------------------------------------------Fine_tunes the pre trained R-CNN----------------------------------------------------------
+#---------------------------------------------------------Fine_tune the pretrained R-CNN----------------------------------------------------------
 """
 Based on Pytorch vision model MASKRCNN_RESNET50_FPN from the paper https://arxiv.org/pdf/1703.06870.pdf
 
@@ -91,7 +93,7 @@ opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 pre_trained_model= None # "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v2_running_diff/3999.torch"
 batchSize=8 #number of images used in each iteration
 train_ncases=4000 # Total no. of epochs
-gpu=1 # GPU to use
+gpu=0 # GPU to use
 
 #main
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
@@ -104,16 +106,9 @@ for pth in dirs:
     imgs.append(trainDir+"/"+pth)
 print(f'The total number of training images found is {len(imgs)}')
 
-# loads the model
-model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True, trainable_backbone_layers=3)   # load an instance segmentation model pre-trained on COCO dataset
-in_features = model.roi_heads.box_predictor.cls_score.in_features # get number of input features for the classifier
-model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=3) # replace the pre-trained head with a new one. 3clases, CME, Occulter, Background
-if pre_trained_model is not None:
-    model_param = torch.load(pre_trained_model)
-    model.load_state_dict(model_param) #loads the last iteration of training 
-model.to(device) # move model to the right device    
-optimizer = torch.optim.AdamW(params=model.parameters(), lr=1e-6) # optimization technique that comes under gradient decent algorithm    
-model.train()#sets the model to train mode
+# loads nn model and sets it to train mode
+nn_seg = neural_cme_segmentation(device, pre_trained_model = pre_trained_model)
+nn_seg.train()  
 
 #training
 all_loss=[]
@@ -121,19 +116,18 @@ for i in range(train_ncases): #Number of iterations
     images, targets= loadData(imgs, batchSize) #call the function, images=batch_img and targets=batch_data
     images = list(image.to(device) for image in images) #send images to the selected device
     targets=[{k: v.to(device) for k,v in t.items()} for t in targets] #send targets to the selected device
-    #masks=list(image.to(device) for image in masks)
    
-    optimizer.zero_grad() #Sets the gradients of all optimized torch.Tensors to zero.
-    loss_dict = model(images, targets)
+    nn_seg.optimizer.zero_grad() #Sets the gradients of all optimized torch.Tensors to zero.
+    loss_dict = nn_seg.model(images, targets)
     losses = sum(loss for loss in loss_dict.values()) #The loss is composed of several parts: class loss, bounding box loss, and mask loss. We sum all of these parts together to get the total loss as a single number
    
     losses.backward() #computes the partial derivative of the output f with respect to each of the input variables.
-    optimizer.step()
+    nn_seg.optimizer.step()
    
     all_loss.append(losses.item())
     print(i,'loss:', losses.item())
     if (i>0) and (i%2000==0):
-        torch.save(model.state_dict(),opath + "/" + str(i)+".torch")
+        torch.save(nn_seg.model.state_dict(),opath + "/" + str(i)+".torch")
         #saves all losses in a pickle file
         with open(opath + "/all_loss", 'wb') as file:
             pickle.dump(all_loss, file, protocol=pickle.HIGHEST_PROTOCOL)
@@ -145,7 +139,7 @@ for i in range(train_ncases): #Number of iterations
         plt.savefig(opath + '/all_loss.png')
         plt.close()
 
-torch.save(model.state_dict(),opath + "/" + str(i)+".torch")
+torch.save(nn_seg.model.state_dict(),opath + "/" + str(i)+".torch")
 #saves all losses in a pickle file
 with open(opath + "/all_loss", 'wb') as file:
     pickle.dump(all_loss, file, protocol=pickle.HIGHEST_PROTOCOL)

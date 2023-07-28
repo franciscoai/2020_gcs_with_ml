@@ -1,6 +1,9 @@
 """ PURPOSE: 
 Main raytracing routine that calls the python wrapper of the compiled c raytracing library (shared object)
 
+@authors: F. A. Iglesias, Y. Machuca and F. Cisterna. 2023. Mendoza Group for Heloiphysics Studies (GEHMe), Argentina
+Contact: franciscoaiglesias@gmail.com
+
 CATEGORY:
 raytracing, simulation, 3d
 INPUTS:
