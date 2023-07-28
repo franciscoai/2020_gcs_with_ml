@@ -16,7 +16,7 @@ __email__ = "franciscoaiglesias@gmail.com"
 
 class neural_cme_segmentation():
     '''
-    Class to perform CME segmentation using a trained R-CNN
+    Class to perform CME segmentation using Mask R-CNN
     '''
     def __init__(self, device, pre_trained_model = None):
         self.num_classes = 3
@@ -45,14 +45,14 @@ class neural_cme_segmentation():
     
     def train(self, opt_type='adam' , lr=1e-6):
         '''
-        Sets optimizer and train mode
+        Sets optimizer type and train mode
         '''
         if opt_type == 'adam':
             self.optimizer = torch.optim.AdamW(params=self.model.parameters(), lr=lr) # optimization technique that comes under gradient decent algorithm    
         else:
             print('Optimizer opt_type not implemented')
             return None
-        self.model.train()#sets the model to train mode        
+        self.model.train()        
         return 
     
     def infer(self, model_param, img, device):
