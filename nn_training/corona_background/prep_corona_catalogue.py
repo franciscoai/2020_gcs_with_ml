@@ -110,10 +110,10 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                         
                         header= fits.getheader(path_1h)
                         if imsize[0]!=0 and imsize[1]!=0:
-                            image1 = rebin(im1[0].data,imsize,operation='mean') 
-                            image2 = rebin(im2[0].data,imsize,operation='mean') 
-                            header['NAXIS1'] = imsize[0]   
-                            header['NAXIS2'] = imsize[1]
+                            image1 = rebin(im1[0].data,imsize_nn,operation='mean') 
+                            image2 = rebin(im2[0].data,imsize_nn,operation='mean') 
+                            header['NAXIS1'] = imsize_nn[0]   
+                            header['NAXIS2'] = imsize_nn[1]
                         else:
                             image1 = im1[0].data
                             image2 = im2[0].data
@@ -174,10 +174,10 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                         
                         header= fits.getheader(path_1h)
                         if imsize[0]!=0 and imsize[1]!=0:
-                            header['NAXIS1'] = imsize[0]   
-                            header['NAXIS2'] = imsize[1]
-                            image1 = rebin(im1[0].data,imsize,operation='mean') 
-                            image2 = rebin(im2[0].data,imsize,operation='mean') 
+                            header['NAXIS1'] = imsize_nn[0]   
+                            header['NAXIS2'] = imsize_nn[1]
+                            image1 = rebin(im1[0].data,imsize_nn,operation='mean') 
+                            image2 = rebin(im2[0].data,imsize_nn,operation='mean') 
                         else:
                             image1 = im1[0].data
                             image2 = im2[0].data
