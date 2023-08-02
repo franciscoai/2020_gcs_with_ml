@@ -25,17 +25,28 @@ class neural_cme_segmentation():
     https://pytorch.org/tutorials/intermediate/torchvision_tutorial.html
     https://towardsdatascience.com/train-mask-rcnn-net-for-object-detection-in-60-lines-of-code-9b6bbff292c3
     '''
-    def __init__(self, device, pre_trained_model = None):
-        # model param
-        self.num_classes = 2 # background and CME
-        self.trainable_backbone_layers = 4
+    def __init__(self, device, pre_trained_model = None, version='v4'):
+        '''
+        Initializes the model
+        device: device to use for training and inference
+        pre_trained_model: path to model parameters to use for inference
+        version: version of the model to use. Options are 'v3' and 'v4'
+        '''
         self.device = device
+        self.pre_trained_model = pre_trained_model        
+        # model param
+        if version == 'v3':
+            self.num_classes = 3 # background and CME
+            self.trainable_backbone_layers = 3
+        if version == 'v4':
+            self.num_classes = 2 # background and CME
+            self.trainable_backbone_layers = 4
         # innitializes the model
         self.model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True, trainable_backbone_layers=self.trainable_backbone_layers) 
         self.in_features = self.model.roi_heads.box_predictor.cls_score.in_features 
         self.model.roi_heads.box_predictor=FastRCNNPredictor(self.in_features,num_classes=self.num_classes)
-        if pre_trained_model is not None:
-            model_param = torch.load(pre_trained_model)
+        if self.pre_trained_model is not None:
+            model_param = torch.load(self.pre_trained_model, map_location=device)
             self.model.load_state_dict(model_param)      
         self.model.to(self.device)
         return
@@ -65,12 +76,16 @@ class neural_cme_segmentation():
         self.model.train()        
         return 
     
-    def infer(self, model_param, img, device):
+    def infer(self, img, model_param=None):
         '''        
         Infers a cme segmentation mask in the input coronograph image (img) using the trauined R-CNN with weigths given by model_param
         '''    
         #loads model
-        self.model.load_state_dict(model_param) 
+        if model_param is not None:
+            self.model.load_state_dict(model_param) 
+        elif self.pre_trained_model is None:
+            os.error('No model parameters given')
+        
         self.model.eval() #set the model to evaluation state
 
         #inference
@@ -80,7 +95,7 @@ class neural_cme_segmentation():
         oimages = images.copy()                                   
         images = torch.as_tensor(images, dtype=torch.float32).unsqueeze(0)
         images=images.swapaxes(1, 3).swapaxes(2, 3)
-        images = list(image.to(device) for image in images)
+        images = list(image.to(self.device) for image in images)
         with torch.no_grad(): #runs the image through the net and gets a prediction for the object in the image.
             pred = self.model(images)
 

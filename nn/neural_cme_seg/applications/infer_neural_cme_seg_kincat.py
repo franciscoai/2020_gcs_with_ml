@@ -54,7 +54,6 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
     color=['r','b','g','k','y']
     obj_labels = ['Occ', 'CME','N/A','N/A']
     #
-    breakpoint()
     cmap = mpl.colors.ListedColormap(color)  
     nans = np.full(np.shape(orig_img[0]), np.nan)
     fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
@@ -74,7 +73,6 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
                     scr = 0   
                 if scr > scr_threshold:             
                     masked = nans.copy()
-                    breakpoint()
                     masked[:, :][masks[i][nb] > mask_threshold] = nb              
                     axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
                     box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
@@ -114,14 +112,10 @@ trained_model = '3999.torch'
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
-
 os.makedirs(opath, exist_ok=True)
-#loads model
-model_param = torch.load(model_path + "/"+ trained_model, map_location=device)
+
 #vars to store all results
 results = []
-
-
 
 # read csv with paths and dates of the downloaded files
 downloaded=pd.read_csv(downloaded_files_list)
@@ -134,6 +128,9 @@ catalogue = pd.read_csv(helcat_db, sep = "\t")
 catalogue=catalogue.drop([0,1])
 catalogue.columns=col_names
 catalogue = catalogue.reset_index(drop=True)
+
+#loads nn model
+nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version='v3')
 
 for i in range(len(catalogue.index)):
     print("Reading date range nª "+str(i))
@@ -156,8 +153,7 @@ for i in range(len(catalogue.index)):
                 header=fits.getheader(file[0])
                 f=files[j+1]
                 # infers
-                breakpoint()
-                imga, maska, scra, labelsa, boxesa  = neural_cme_segmentation(model_param, img, device)
+                imga, maska, scra, labelsa, boxesa  = nn_seg.infer(img)
                 #save results
                 results.append({'file':f, 'img':imga, 'mask':maska, 'scr':scra, 'labels':labelsa, 'boxes':boxesa})
                 #plot results
