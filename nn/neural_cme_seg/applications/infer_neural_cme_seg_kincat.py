@@ -54,6 +54,7 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
     color=['r','b','g','k','y']
     obj_labels = ['Occ', 'CME','N/A','N/A']
     #
+    breakpoint()
     cmap = mpl.colors.ListedColormap(color)  
     nans = np.full(np.shape(orig_img[0]), np.nan)
     fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
@@ -151,8 +152,11 @@ for i in range(len(catalogue.index)):
             
             if (image1 is not None) and (image2 is not None):
                 img=image2-image1
+                file=glob.glob((files[j+1])[0:-5]+"*")
+                header=fits.getheader(file[0])
                 f=files[j+1]
                 # infers
+                breakpoint()
                 imga, maska, scra, labelsa, boxesa  = neural_cme_segmentation(model_param, img, device)
                 #save results
                 results.append({'file':f, 'img':imga, 'mask':maska, 'scr':scra, 'labels':labelsa, 'boxes':boxesa})
@@ -161,7 +165,8 @@ for i in range(len(catalogue.index)):
                 os.makedirs(os.path.join(opath, str(index)),exist_ok=True)
                 ofile = os.path.join(opath, str(index), filename )
                 plot_to_png(ofile+".png", [imga], [maska], title=[f], labels=[labelsa], boxes=[boxesa], scores=[scra])
-                
+                hdu = fits.PrimaryHDU(img, header=header)
+                hdu.writeto(ofile+".fits", overwrite=True)
                 #Saves mask parameters in pickle file
                 with open((ofile+"_nn_seg"+'.pkl'), 'wb') as pickle_file:
                     # Utiliza pickle.dump() para escribir las variables en el archivo

@@ -71,49 +71,76 @@ def plot_to_png(ofile,orig_img, masks, pol_mask, center,imsize, title=None, labe
     nans = np.full(np.shape(orig_img[0]), np.nan)
     fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
     axs = axs.ravel()
-
     angles = [s[1] for s in pol_mask]
+    ang=[]
+    points=[]
     min_ang = np.radians(min(angles))
     max_ang = np.radians(max(angles))
-    cpa=np.radians((max_ang-min_ang)/2)
-    dist_x = imsize[0] - center[0]
-    dist_y = int(dist_x * np.tan(min_ang))
-    x_final = center[0]+ dist_x
-    y_final = center[1]+ dist_y
-    #breakpoint()
+    cpa_ang=np.radians((max_ang-min_ang)/2)
+    ang.append([min_ang,max_ang,cpa_ang])
+    for i in ang[0]:
+        vector=np.array([np.cos(i), np.sin(i)])
+        start_point = center
+        end_point = start_point + imsize[0] * vector
+        x_points = np.array([start_point[0], end_point[0]])
+        y_points = np.array([start_point[1], end_point[1]])
+        points.append([x_points,y_points])
 
 
-    for i in range(len(orig_img)):
-        axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
-        axs[i].axis('off')
-        axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
-        axs[i+1].axis('off')        
-        if boxes is not None:
-            nb = 0
-            for b in boxes[i]:
-                if scores is not None:
-                    scr = scores[i][nb]
-                else:
-                    scr = 0   
-                if scr > scr_threshold:             
-                    masked = nans.copy()
-                    masked[:, :][masks[i][nb] > mask_threshold] = nb              
-                    axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
 
-                    axs[i+1].plot([center[0], x_final], [center[1], y_final], color='red', label='Recta')
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+        # Plotear la primera imagen en el primer subplot
+        axs[0].imshow(orig_img, cmap='gray')
+        axs[0].set_title('Imagen 1')
+        axs[0].axis('off')
+
+        # Plotear la segunda imagen en el segundo subplot
+        axs[1].imshow(orig_img, cmap='gray')
+        axs[1].set_title('Imagen 2')
+        axs[1].axis('off')
+
+        # Ajustar el espacio entre los subplots
+        plt.tight_layout()
+
+        # Guardar la figura como una imagen
+        plt.savefig(opath)
+
+
+    #for i in range(len(orig_img)):
+        #axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
+        #axs[i].axis('off')
+        #axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
+        #axs[i+1].axis('off')        
+        #if boxes is not None:
+            #nb = 0
+            #for b in boxes[i]:
+                #if scores is not None:
+                #    scr = scores[i][nb]
+                #else:
+                #    scr = 0   
+                #if scr > scr_threshold:             
+                    #masked = nans.copy()
+                    #masked[:, :][masks[i][nb] > mask_threshold] = nb              
+                    #axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
+       
+                    #axs[i+1].plot(points[0][0], points[0][1], color='blue', label='Recta')
+                    #axs[i+1].plot(points[1][0],points[1][1] , color='blue', label='Recta')
+                    #axs[i+1].plot(points[2][0], points[2][1], color='blue', label='Recta')
+             
                     # Ajustar límites del eje y aspecto
-                    axs[i+1].set_xlim(0, imsize[0])
-                    axs[i+1].set_ylim(0, imsize[1])
-                    axs[i+1].set_aspect('equal', adjustable='box')
+                    #axs[i+1].set_xlim(0, imsize[0])
+                    #axs[i+1].set_ylim(0, imsize[1])
+                    #axs[i+1].set_aspect('equal', adjustable='box')
 
 
-                    if labels is not None:
-                        axs[i+1].annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
-                nb+=1 
-    plt.tight_layout()
-    plt.show()
+                    #if labels is not None:
+                    #    axs[i+1].annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
+                #nb+=1 
+    #plt.tight_layout()
+    #plt.show()
     #plt.savefig(ofile)
-    plt.close()
+    #plt.close()
 
 
 
@@ -154,6 +181,7 @@ for folder in folders:
             pol_mask,center=rec2pol(mask,scores,labels,boxes,imsize=imsize)
             img=read_fits(img_path)
             f=file[:-11]
-            opath=data_dir+folder+"/"+str(f)+"_stats.png"
-            plot_to_png(opath,[img],[mask], title=[f],labels=[labels], boxes=[boxes], scores=[scores],pol_mask=pol_mask, center=center,imsize=imsize)
+            opath="/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications/img/"+folder+str(f)+"_stats.png"#data_dir+folder+"/"+str(f)+"_stats.png"
 
+            plot_to_png(opath,[img],[mask], title=[f],labels=[labels], boxes=[boxes], scores=[scores],pol_mask=pol_mask, center=center,imsize=imsize)
+            
