@@ -2,6 +2,9 @@ import os
 import torchvision
 import torch
 import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+mpl.use('TkAgg')
 from torchvision.io import read_image
 from torch.utils.data import Dataset
 
@@ -34,10 +37,13 @@ class CmeDataset(Dataset):
         file = [f for f in os.listdir(self.imgs[idx]) if f.endswith(self.file_ext)]
         mask_dir = os.path.join(self.imgs[idx], 'mask')
         img = read_image(os.path.join(self.imgs[idx], file[0]), mode=torchvision.io.image.ImageReadMode.RGB)
+        mask = read_image(os.path.join(mask_dir, '2.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
+        img[0,:,:] = mask
+        img[1,:,:] = mask
+        img[2,:,:] = mask
         img = img.float()
         img = self.__normalize(img)
         img = self.transform(img)
-        mask = read_image(os.path.join(mask_dir, '2.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
         occulter_mask = read_image(os.path.join(mask_dir, '1.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
         mask = mask.new_tensor(mask > 0, dtype=torch.uint8)
         occulter_mask = occulter_mask.new_tensor(occulter_mask > 0, dtype=torch.uint8)
@@ -51,6 +57,18 @@ class CmeDataset(Dataset):
         parameters = torch.tensor(parameters, dtype=torch.float32)
         satpos = torch.tensor(eval(self.csv_df["satpos"].iloc[idx]), dtype=torch.float32)
         plotranges = torch.tensor(eval(self.csv_df["plotranges"].iloc[idx]), dtype=torch.float32)
+        
+        #Squeeze everything
+        img = torch.squeeze(img)
+        parameters = torch.squeeze(parameters)
+        mask = torch.squeeze(mask)
+        occulter_mask = torch.squeeze(occulter_mask)
+        satpos = torch.squeeze(satpos)
+        plotranges = torch.squeeze(plotranges)
+
+        
+
+
         return img, parameters, mask, occulter_mask, satpos, plotranges
 
     def __normalize(self, img):
@@ -65,7 +83,7 @@ class CmeDataset(Dataset):
     def __define_transforms(self):
         transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(self.image_size, torchvision.transforms.InterpolationMode.BILINEAR),
-            torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            #torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
         
         # transform = torchvision.transforms.Compose([
