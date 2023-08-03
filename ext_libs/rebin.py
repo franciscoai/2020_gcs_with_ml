@@ -2,7 +2,7 @@ import numpy as np
 
 #taken from bin_ndarray by https://gist.github.com/derricw/95eab740e1b08b78c03f
 
-def rebin(ndarray, new_shape, operation='sum'):
+def imrebin(ndarray, new_shape, operation='sum'):
     """
     Bins an ndarray in all axes based on the target shape, by summing or
         averaging.

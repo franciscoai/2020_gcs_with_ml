@@ -10,7 +10,7 @@ def read_fits(file_path,smooth_kernel=[0,0]):
         #img = gaussian_filter(img, sigma=smooth_kernel)
 
         # if smooth_kernel[0]!=0 and smooth_kernel[1]!=0: 
-        img = rebin(img, imageSize,operation='mean')
+        img = imrebin(img, imageSize,operation='mean')
         
         return img  
     except:
@@ -25,6 +25,7 @@ def rec2pol(mask,scores,labels,boxes,imsize):
     nans = np.full(imsize, np.nan)
     try:
         if boxes is not None:
+            nb=0
             for b in boxes:
                 if scores is not None:
                     scr = scores[0]
@@ -32,7 +33,7 @@ def rec2pol(mask,scores,labels,boxes,imsize):
                     scr = 0   
                 if scr > scr_threshold:             
                     masked = nans.copy()
-                    masked[:, :][mask[0] > mask_threshold] = 0
+                    masked[:, :][mask[nb] > mask_threshold] = nb   
                     
 
                     height, width = masked.shape
@@ -45,14 +46,16 @@ def rec2pol(mask,scores,labels,boxes,imsize):
                         for y in range(height):
                             value=masked[x,y]
                             if not np.isnan(value):
-                                pts.append([x,y])
-                                x_dist = (center_x-x)
-                                y_dist = (center_y-y)
+                                #breakpoint()
+                                pts.append([y,x])#the coordinates are written in the format (y,x)
+                                x_dist = (x-center_x)
+                                y_dist = (y-center_y)
                                 distance= math.sqrt(x_dist**2 + y_dist**2)
+                                
                                 angle=np.arctan2(y_dist,x_dist)
                                 
                                 pol_mask.append([distance,angle])
-                
+        
         return pol_mask,center,masked,pts
     except:
         print("A parameter its None")
@@ -80,8 +83,10 @@ def plot_to_png(ofile,pts,orig_img, masks, pol_mask, center,imsize, title=None, 
     max_ang = max(angles)
     idx_min = angles.index(min_ang)
     idx_max = angles.index(max_ang)
+
     pts_min=pts[idx_min]
     pts_max=pts[idx_max]
+    breakpoint()
     cpa_ang=(max_ang-min_ang)/2
     ang.append([min_ang,max_ang,cpa_ang])
     angulo_max=np.degrees(max_ang)
@@ -115,11 +120,12 @@ def plot_to_png(ofile,pts,orig_img, masks, pol_mask, center,imsize, title=None, 
                     masked[:, :][masks[i][nb] > mask_threshold] = nb              
                     axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
        
-                    axs[i+1].plot(points[0][0], points[0][1], color='blue', label='Recta')
-                    axs[i+1].plot(points[1][0],points[1][1] , color='orange', label='Recta')
-                    axs[i+1].plot(points[2][0], points[2][1], color='green', label='Recta')
-                    axs[i+1].plot(pts_min[0],pts_min[1] , 'purple')
-                    axs[i+1].plot(pts_max[0],pts_max[1] , 'purple')
+                    axs[i+1].plot(points[0][0], points[0][1], color='blue', label='Recta min')
+                    axs[i+1].plot(points[1][0],points[1][1] , color='orange', label='Recta max')
+                    #axs[i+1].plot(points[2][0], points[2][1], color='green', label='Recta cpa')
+                    axs[i+1].scatter(0,0 , color='purple', marker='o')
+                    axs[i+1].scatter(pts_min[0],pts_min[1] , color='purple', marker='o')
+                    axs[i+1].scatter(pts_max[0],pts_max[1] , color='purple', marker='o')
                     # Ajustar límites del eje y aspecto
                     #axs[i+1].set_xlim(0, imsize[0])
                     #axs[i+1].set_ylim(0, imsize[1])
@@ -146,7 +152,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from astropy.io import fits
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))))
-from ext_libs.rebin import rebin
+from ext_libs.rebin import imrebin
 
 
 data_dir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3/infer_neural_cme_seg_kincat/cor2_a/"
