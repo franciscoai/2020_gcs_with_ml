@@ -36,11 +36,14 @@ class neural_cme_segmentation():
         self.pre_trained_model = pre_trained_model        
         # model param
         if version == 'v3':
-            self.num_classes = 3 # background, CME and occulter
-            self.trainable_backbone_layers = 3 # number of trainable layers in the backbone resnet, int in [0,5] range
-        if version == 'v4':
-            self.num_classes = 2 # background, CME
+            self.num_classes = 3 # background, CME, occulter
+            # number of trainable layers in the backbone resnet, int in [0,5] range. Specifies the stage number.
+            # Stages 2-5 are composed of 6 convolutional layers each. Stage 1 is more complex
+            # See https://arxiv.org/pdf/1512.03385.pdf
             self.trainable_backbone_layers = 3
+        if version == 'v4':
+            self.num_classes = 3 # background, CME, occulter
+            self.trainable_backbone_layers = 4
         # innitializes the model
         self.model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True, trainable_backbone_layers=self.trainable_backbone_layers) 
         self.in_features = self.model.roi_heads.box_predictor.cls_score.in_features 
@@ -64,7 +67,7 @@ class neural_cme_segmentation():
         image[image <0]=0
         return image
     
-    def train(self, opt_type='adam' , lr=1e-6):
+    def train(self, opt_type='adam' , lr=1e-5):
         '''
         Sets optimizer type and train mode
         '''
@@ -90,8 +93,9 @@ class neural_cme_segmentation():
 
         #inference
         images = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        #images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)        
-        images = self.normalize(images) #cv2.normalize(images, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F) # normalize to 0,1
+        #images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)  
+        #cv2.normalize(images, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)       
+        images = self.normalize(images) # normalize to 0,1
         oimages = images.copy()                                   
         images = torch.as_tensor(images, dtype=torch.float32).unsqueeze(0)
         images=images.swapaxes(1, 3).swapaxes(2, 3)

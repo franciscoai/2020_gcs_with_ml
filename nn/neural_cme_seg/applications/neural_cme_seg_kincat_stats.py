@@ -10,7 +10,7 @@ def read_fits(file_path,smooth_kernel=[0,0]):
         #img = gaussian_filter(img, sigma=smooth_kernel)
 
         # if smooth_kernel[0]!=0 and smooth_kernel[1]!=0: 
-        img = imrebin(img, imageSize,operation='mean')
+        img = rebin(img, imageSize,operation='mean')
         
         return img  
     except:
@@ -164,7 +164,7 @@ from scipy.ndimage import center_of_mass
 from astropy.io import fits
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))))
-from ext_libs.rebin import imrebin
+from ext_libs.rebin import rebin
 
 
 data_dir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3/infer_neural_cme_seg_kincat/cor2_a/"
