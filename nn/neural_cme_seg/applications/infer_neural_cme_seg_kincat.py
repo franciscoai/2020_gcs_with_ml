@@ -49,10 +49,10 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
     """    
-    mask_threshold = 0.6 # value to consider a pixel belongs to the object
-    scr_threshold = 0.6 # only detections with score larger than this value are considered
-    color=['r','b','g','k','y']
-    obj_labels = ['Occ', 'CME','N/A','N/A']
+    mask_threshold = 0.7 # value to consider a pixel belongs to the object
+    scr_threshold = 0.4 # only detections with score larger than this value are considered
+    color=['r','b','g','k','y','m','c','w']
+    obj_labels = ['Back', 'Occ','CME','N/A']
     #
     cmap = mpl.colors.ListedColormap(color)  
     nans = np.full(np.shape(orig_img[0]), np.nan)
@@ -88,7 +88,7 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
     plt.tight_layout()
     plt.savefig(ofile)
     plt.close()
-     
+   
       
 #main
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
@@ -107,15 +107,13 @@ model_version="v4"
 opath= model_path + "/infer_neural_cme_seg_kincat/cor2_a"
 ipath=  "/gehme/projects/2020_gcs_with_ml/data/corona_back_database/cor2/cor2_a"
 file_ext=".fits"
-trained_model = '3999.torch'
+trained_model = '499.torch'
 
 #main
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
 os.makedirs(opath, exist_ok=True)
-
-#vars to store all results
 results = []
 
 # read csv with paths and dates of the downloaded files
@@ -161,16 +159,19 @@ for i in range(len(catalogue.index)):
                 filename=f[49:-4]
                 os.makedirs(os.path.join(opath, str(index)),exist_ok=True)
                 ofile = os.path.join(opath, str(index), filename )
-                plot_to_png(ofile+".png", [imga], [maska], title=[f], labels=[labelsa], boxes=[boxesa], scores=[scra])
                 hdu = fits.PrimaryHDU(img, header=header)
                 hdu.writeto(ofile+".fits", overwrite=True)
                 #Saves mask parameters in pickle file
-                with open((ofile+"_nn_seg"+'.pkl'), 'wb') as pickle_file:
-                    # Utiliza pickle.dump() para escribir las variables en el archivo
-                    pickle.dump(maska, pickle_file)
-                    pickle.dump(scra, pickle_file)
-                    pickle.dump(labelsa, pickle_file)
-                    pickle.dump(boxesa, pickle_file)
+                if len(maska)>0:
+                    plot_to_png(ofile+".png", [imga], [maska], title=[f], labels=[labelsa], boxes=[boxesa], scores=[scra])
+                    with open((ofile+"_nn_seg"+'.pkl'), 'wb') as pickle_file:
+                        # Utiliza pickle.dump() para escribir las variables en el archivo
+                        pickle.dump(maska, pickle_file)
+                        pickle.dump(scra, pickle_file)
+                        pickle.dump(labelsa, pickle_file)
+                        pickle.dump(boxesa, pickle_file)
+                else:
+                    print("No CME detected :-/")                        
 
 
 

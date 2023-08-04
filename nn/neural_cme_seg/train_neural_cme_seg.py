@@ -10,14 +10,16 @@ import matplotlib.pyplot as plt
 import pickle
 import matplotlib as mpl
 from neural_cme_seg import neural_cme_segmentation
+import scipy
 
 mpl.use('Agg')
 
-def loadData(imgs, batchSize, imageSize=[512,512], file_ext=".png", normalization_func=None, masks2use=None):
+def loadData(imgs, batchSize, imageSize=[512,512], file_ext=".png", normalization_func=None, masks2use=None, rnd_rot=False):
     '''
     Loads a batch of images and targets
     normalization_func: function to normalize the images, use None for no normalization
     masks2use: list of masks to use, use None to use all masks found in the mask directory
+    rnd_rot: if True, the images are randomly rotated
     '''    
     batch_Imgs=[]
     batch_Data=[]
@@ -33,7 +35,7 @@ def loadData(imgs, batchSize, imageSize=[512,512], file_ext=".png", normalizatio
         maskDir=os.path.join(imgs[idx], "mask") #path to the mask corresponding to the random image
         masks=[]
         labels = []
-        lbl_idx=0
+        lbl_idx=1
         ok_masks=os.listdir(maskDir) #list of all masks in the mask directory
         if masks2use is not None:
             ok_masks = [ok_masks[i] for i in masks2use]
@@ -44,6 +46,12 @@ def loadData(imgs, batchSize, imageSize=[512,512], file_ext=".png", normalizatio
             vesMask=cv2.resize(vesMask,imageSize,cv2.INTER_NEAREST) #resizes the mask image to the same size of the random image
             masks.append(vesMask) # get bounding box coordinates for each mask  
             lbl_idx+=1
+        #optional random rotation
+        if rnd_rot:
+            rot_ang = np.random.randint(low=0, high=360)
+            img = scipy.ndimage.rotate(img, rot_ang, axes=(1, 0), reshape=False, order=0)
+            masks = [scipy.ndimage.rotate(m, rot_ang, axes=(1, 0), reshape=False, order=0) for m in masks]
+            masks = [(m>0).astype(np.uint8) for m in masks]
         num_objs = len(masks) #amount of objects in the image
         if num_objs==0: return loadData()        # if image have no objects just load another image
         boxes = torch.zeros([num_objs,4], dtype=torch.float32) #Returns a tensor filled with the scalar value 0 of the defined size    
@@ -79,14 +87,18 @@ trainDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training'
 opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 #full path of a model to use it as initial condition, use None to used the stadard pre-trained model 
 pre_trained_model= None # "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v2_running_diff/3999.torch"
-batchSize=8 #number of images used in each iteration
+batchSize=24 #number of images used in each iteration
 train_ncases=10000 # Total no. of epochs
+random_rot = True # if True, the images are randomly rotated
 gpu=0 # GPU to use
-masks2use=[1] # list of masks to use, use None to use all masks found in the mask directory
+masks2use=[0,1] # list of masks to use, use None to use all masks found in the mask directory
+model_version='v4' # version of the model to use
 
 #main
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 print(f'Using device:  {device}')
+#flush cuda device memory
+torch.cuda.empty_cache()
 os.makedirs(opath,exist_ok=True)
 imgs=[] #list of images on the trainig dataset
 dirs=os.listdir(trainDir)
@@ -96,22 +108,19 @@ for pth in dirs:
 print(f'The total number of training images found is {len(imgs)}')
 
 # loads nn model and sets it to train mode
-nn_seg = neural_cme_segmentation(device, pre_trained_model = pre_trained_model, version='v4')
+nn_seg = neural_cme_segmentation(device, pre_trained_model = pre_trained_model, version=model_version)
 nn_seg.train()  
 
 #training
 all_loss=[]
 for i in range(train_ncases): 
-    images, targets= loadData(imgs, batchSize, normalization_func=nn_seg.normalize, masks2use=masks2use) # loads a batch of training data
+    images, targets= loadData(imgs, batchSize, normalization_func=nn_seg.normalize, masks2use=masks2use, rnd_rot=random_rot) # loads a batch of training data
     images = list(image.to(device) for image in images)
     targets=[{k: v.to(device) for k,v in t.items()} for t in targets]
     nn_seg.optimizer.zero_grad() 
     loss_dict = nn_seg.model(images, targets)
-    # TODO!!
-    # use only the loss for mask and box ?
-    losses = sum(loss for loss in loss_dict.values())
-   
-    losses.backward() #computes the partial derivative of the output f with respect to each of the input variables.
+    losses = sum(loss for loss in loss_dict.values()) 
+    losses.backward()
     nn_seg.optimizer.step()
    
     all_loss.append(losses.item())
