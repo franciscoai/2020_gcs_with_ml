@@ -38,7 +38,7 @@ def loadData(imgs, batchSize, imageSize=[512,512], file_ext=".png", normalizatio
         if masks2use is not None:
             ok_masks = [ok_masks[i] for i in masks2use]
         for mskName in ok_masks:
-            labels.append(lbl_idx) # labels are: 0='Occ', 1='CME', 2='CME']
+            labels.append(lbl_idx)
             vesMask = cv2.imread(maskDir+'/'+mskName, 0) #reads the mask image in greyscale 
             vesMask = (vesMask > 0).astype(np.uint8) #The mask image is stored in 0–255 format and is converted to 0–1 format
             vesMask=cv2.resize(vesMask,imageSize,cv2.INTER_NEAREST) #resizes the mask image to the same size of the random image
@@ -96,7 +96,7 @@ for pth in dirs:
 print(f'The total number of training images found is {len(imgs)}')
 
 # loads nn model and sets it to train mode
-nn_seg = neural_cme_segmentation(device, pre_trained_model = pre_trained_model)
+nn_seg = neural_cme_segmentation(device, pre_trained_model = pre_trained_model, version='v4')
 nn_seg.train()  
 
 #training

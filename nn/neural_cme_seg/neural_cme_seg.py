@@ -36,11 +36,11 @@ class neural_cme_segmentation():
         self.pre_trained_model = pre_trained_model        
         # model param
         if version == 'v3':
-            self.num_classes = 3 # background and CME
-            self.trainable_backbone_layers = 3
+            self.num_classes = 3 # background, CME and occulter
+            self.trainable_backbone_layers = 3 # number of trainable layers in the backbone resnet, int in [0,5] range
         if version == 'v4':
-            self.num_classes = 2 # background and CME
-            self.trainable_backbone_layers = 4
+            self.num_classes = 2 # background, CME
+            self.trainable_backbone_layers = 3
         # innitializes the model
         self.model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True, trainable_backbone_layers=self.trainable_backbone_layers) 
         self.in_features = self.model.roi_heads.box_predictor.cls_score.in_features 

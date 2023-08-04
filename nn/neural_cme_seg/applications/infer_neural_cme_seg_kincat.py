@@ -102,7 +102,8 @@ imsize_nn=[512,512] #for rebin befor the nn
 smooth_kernel=[2,2] #changes the gaussian filter size
 
 #nn model parameters
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3"
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
+model_version="v4"
 opath= model_path + "/infer_neural_cme_seg_kincat/cor2_a"
 ipath=  "/gehme/projects/2020_gcs_with_ml/data/corona_back_database/cor2/cor2_a"
 file_ext=".fits"
@@ -130,7 +131,7 @@ catalogue.columns=col_names
 catalogue = catalogue.reset_index(drop=True)
 
 #loads nn model
-nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version='v3')
+nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 
 for i in range(len(catalogue.index)):
     print("Reading date range nª "+str(i))
