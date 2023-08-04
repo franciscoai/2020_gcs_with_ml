@@ -52,9 +52,10 @@ def rec2pol(mask,scores,labels,boxes,imsize):
                                 y_dist = (y-center_y)
                                 distance= math.sqrt(x_dist**2 + y_dist**2)
                                 
-                                angle=np.arctan2(y_dist,x_dist)
+                                angle=np.arctan2(y_dist,x_dist)+np.radians(270)
                                 
                                 pol_mask.append([distance,angle])
+      
         
         return pol_mask,center,masked,pts
     except:
@@ -87,7 +88,7 @@ def plot_to_png(ofile,pts,orig_img, masks, pol_mask, center,imsize, title=None, 
     pts_min=pts[idx_min]
     pts_max=pts[idx_max]
     breakpoint()
-    cpa_ang=(max_ang-min_ang)/2
+    cpa_ang=(max_ang+min_ang)/2
     ang.append([min_ang,max_ang,cpa_ang])
     angulo_max=np.degrees(max_ang)
     angulo_min=np.degrees(min_ang)
@@ -120,12 +121,16 @@ def plot_to_png(ofile,pts,orig_img, masks, pol_mask, center,imsize, title=None, 
                     masked[:, :][masks[i][nb] > mask_threshold] = nb              
                     axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
        
-                    axs[i+1].plot(points[0][0], points[0][1], color='blue', label='Recta min')
-                    axs[i+1].plot(points[1][0],points[1][1] , color='orange', label='Recta max')
-                    #axs[i+1].plot(points[2][0], points[2][1], color='green', label='Recta cpa')
+                    axs[i+1].plot(points[0][0], 512-points[0][1], color='blue', label='Recta min')
+                    axs[i+1].plot(points[1][0],512-points[1][1] , color='orange', label='Recta max')
+                    axs[i+1].plot(points[2][0], 512-points[2][1], color='green', label='Recta cpa')
                     axs[i+1].scatter(0,0 , color='purple', marker='o')
+                    axs[i+1].scatter(256,256, color='purple', marker='o')
+                    print(np.degrees(ang[0]))
+                    print(points)
+                    #print(pts[1000])
                     axs[i+1].scatter(pts_min[0],pts_min[1] , color='purple', marker='o')
-                    axs[i+1].scatter(pts_max[0],pts_max[1] , color='purple', marker='o')
+                    #axs[i+1].scatter(pts_max[0],pts_max[1] , color='purple', marker='o')
                     # Ajustar límites del eje y aspecto
                     #axs[i+1].set_xlim(0, imsize[0])
                     #axs[i+1].set_ylim(0, imsize[1])
