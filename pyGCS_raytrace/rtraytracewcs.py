@@ -187,7 +187,10 @@ def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=3
     leg_height = rtsccguicloud_calcfeetheight(height, k, ang)
 
     modparam = np.array([1.5, ang, leg_height, k, nel, 0., 0., 0., in_sig, out_sig], dtype='float32')
-    pv2_1 = header['PV2_1']
+    try:
+        pv2_1 = header['PV2_1']
+    except:
+        pv2_1 = 0.0
     obslonlat = np.array([math.radians(header['CRLN_OBS']),math.radians(header['CRLT_OBS']),
                          header['DSUN_OBS']/(695508.00*1e3)], dtype='float32')
     obslonlatflag = 1

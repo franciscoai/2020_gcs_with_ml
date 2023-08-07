@@ -53,8 +53,8 @@ def save_png(array, ofile=None, range=None):
 # CONSTANTS
 #files
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_mariano_no_interpolation' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
-n_sat = 1 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_mariano_three_views' #'/gehme/projects/2020_gcs_with_ml/data/forwardGCS_test'
+n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 
 # GCS parameters [first 6]
 # The other parameters are:
@@ -62,7 +62,7 @@ n_sat = 1 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names
-par_num = 10000  # total number of samples that will be generated for each param (there are nsat images per param combination)
+par_num = 10  # total number of samples that will be generated for each param (there are nsat images per param combination)
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 same_corona=True # Set to use a single corona back for all par_num cases
 
@@ -198,43 +198,31 @@ for row in range(len(df)):
         btot[r <= size_occ[sat]] = level_occ*level_back + noise
 
         #creating folders for each case
-        folder = os.path.join(OPATH, str(row*len(satpos)+sat))
-        if os.path.exists(folder):
-            os.system("rm -r " + folder) 
-        os.makedirs(folder)
+        folder = os.path.join(OPATH, str(row))
+        # if os.path.exists(folder):
+        #     os.system("rm -r " + folder) 
+        os.makedirs(folder, exist_ok=True)
         mask_folder = os.path.join(folder, "mask")
-        os.makedirs(mask_folder) 
+        os.makedirs(mask_folder, exist_ok=True) 
 
         if otype=="fits":
             #mask for cme
             cme_mask = fits.PrimaryHDU(mask)
-            cme_mask.writeto(mask_folder +'/2.fits'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), overwrite=True)
-            if sceond_mask is not None:
-                cme_mask = fits.PrimaryHDU(sceond_mask)
-                cme_mask.writeto(mask_folder +'/3.fits'.format(
-                    df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), overwrite=True)               
+            cme_mask.writeto(mask_folder +'/sat{}.fits'.format(sat+1), overwrite=True)              
             #cme
             cme = fits.PrimaryHDU(btot)
             cme.writeto(folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btot.fits'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), overwrite=True)
             #mask for occulter
             occ = fits.PrimaryHDU(arr)
-            occ.writeto(mask_folder +'/1.fits'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1), overwrite=True)
+            occ.writeto(mask_folder +'/sat{}_occ.fits'.format(sat+1), overwrite=True)
             
         elif otype =="png":       
             #mask for cme
-            ofile = mask_folder +'/2.png'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)
-            fig=save_png(mask,ofile=ofile, range=[0, 1])
-            if sceond_mask is not None:      
-                ofile = mask_folder +'/3.png'.format(
-                    df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)
-                fig=save_png(sceond_mask,ofile=ofile, range=[0, 1])                      
+            ofile = mask_folder +'/sat{}.png'.format(sat+1)
+            fig=save_png(mask,ofile=ofile, range=[0, 1])                  
             #mask for occulter
-            ofile = mask_folder +'/1.png'.format(
-                df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)       
+            ofile = mask_folder +'/sat{}_occ.png'.format(sat+1)       
             fig=save_png(arr,ofile=ofile, range=[0, 1])
             #full image
             m = np.mean(btot[mask>0])
