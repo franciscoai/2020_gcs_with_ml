@@ -25,9 +25,10 @@ class CmeDataset(Dataset):
     def __get_dirs(self, root_dir):
         imgs = []
         dirs = os.listdir(root_dir)
-        dirs = [d for d in dirs if not d.endswith('.csv')]
+        dirs = [int(d) for d in dirs if not d.endswith('.csv')]
+        dirs.sort()
         for d in dirs:
-            imgs.append(os.path.join(root_dir, d))
+            imgs.append(os.path.join(root_dir, str(d)))
         return imgs
     
     def __len__(self):
@@ -38,9 +39,9 @@ class CmeDataset(Dataset):
         mask_dir = os.path.join(self.imgs[idx], 'mask')
         img = read_image(os.path.join(self.imgs[idx], file[0]), mode=torchvision.io.image.ImageReadMode.RGB)
         mask = read_image(os.path.join(mask_dir, '2.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
-        img[0,:,:] = mask
-        img[1,:,:] = mask
-        img[2,:,:] = mask
+        # img[0,:,:] = mask
+        # img[1,:,:] = mask
+        # img[2,:,:] = mask
         img = img.float()
         img = self.__normalize(img)
         img = self.transform(img)
@@ -65,9 +66,6 @@ class CmeDataset(Dataset):
         occulter_mask = torch.squeeze(occulter_mask)
         satpos = torch.squeeze(satpos)
         plotranges = torch.squeeze(plotranges)
-
-        
-
 
         return img, parameters, mask, occulter_mask, satpos, plotranges
 
@@ -96,4 +94,3 @@ class CmeDataset(Dataset):
     #     torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     # ])
         return transform
-    
