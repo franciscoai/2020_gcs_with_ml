@@ -130,8 +130,6 @@ import numpy as np
 import math
 from ctypes import *
 
-obslonlatflag = 0
-
 def rtsccguicloud_calcneang(CMElon, CMElat, CMEtilt, carrlonshiftdeg= -0.0000000, carrstonyshiftdeg= 0.00000):
     return np.array([CMElon + carrlonshiftdeg, CMElat, CMEtilt], dtype='float32')
 
@@ -170,14 +168,13 @@ def arcsec2rad(x):
 #arseconds to radians convertion
     return math.radians(x/3600.) 
 
-
 def rtsccguicloud_calcfeetheight(height,k,ang):
     # convert from distance of nose to Thernisien h (length of leg)
     return height*(1.-k)*np.cos(ang)/(1.+np.sin(ang))
 
 
 def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=30, in_sig=0.1, out_sig=0.1, nel=1e5, modelid=54, imsize=np.array([512, 512], dtype='int32'), occrad=0, losrange=np.array([-10., 10.], dtype='float32'), losnbp=64):
-    
+    obslonlatflag = 1
     CMElon = math.radians(CMElon)
     CMElat = math.radians(CMElat)
     CMEtilt = math.radians(CMEtilt)
@@ -191,14 +188,12 @@ def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=3
         pv2_1 = header['PV2_1']
     except:
         pv2_1 = 0.0
-    obslonlat = np.array([math.radians(header['CRLN_OBS']),math.radians(header['CRLT_OBS']),
-                         header['DSUN_OBS']/(695508.00*1e3)], dtype='float32')
-    obslonlatflag = 1
-    rollang = 0.00000
-    #fovpix = 0.00011538566 #new
-    fovpix =np.array(0.00028507045, dtype='float32')
-    obspos = np.array([0., 0, -214], dtype='float32')
 
+    obslonlat = np.array([math.radians(header['CRLN_OBS']),math.radians(header['CRLT_OBS']),1./arcsec2rad(header['RSUN'])], dtype='float32') # carr lon, lat, distance from Sun center in Sr
+    rollang = 0.00000
+    imszratio = header['NAXIS1']/imsize[0]
+    fovpix = np.array(arcsec2rad((header['CDELT1']+header['CDELT2'])*imszratio/2.), dtype='float32') # mean plate scale # np.array(math.radians(1./64.), dtype='float32')
+    obspos = np.array([0., 0, -214], dtype='float32')
     rmat = rotatemat(arcsec2rad(header['CRVAL2']),2) @ rotatemat(arcsec2rad(-header['CRVAL1']),1) @ rotatemat(arcsec2rad(-rollang),3)
     obsang = rtrotmat2rxryrz(rmat)
     nepos = np.array([0., 0, 0], dtype='float32')
@@ -217,7 +212,6 @@ def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=3
     adapthres = 0.
     maxsubdiv = 4
     limbdark = 0.58
-    imszratio = header['NAXIS1']/imsize[0]
     crpix = piximchangereso(np.array([header['CRPIX1'] -1, header['CRPIX2'] -1], dtype='float32'),-math.log(imszratio)/math.log(2) )
     pc = np.array([1, 8.687118e-14, -8.687118e-14, 1], dtype='float32')
 

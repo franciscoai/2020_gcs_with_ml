@@ -61,9 +61,9 @@ n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 # level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names
-par_num = 10  # total number of samples that will be generated for each param (there are nsat images per param combination)
-rnd_par=True # set to randomnly shuffle the generated parameters linspace 
+par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e3,1e4]] # min-max ranges of each parameter in par_names
+par_num = 20  # total number of samples that will be generated for each param (there are nsat images per param combination)
+rnd_par=False # set to randomnly shuffle the generated parameters linspace 
 same_corona=True # Set to use a single corona back for all par_num cases
 
 # Syntethic image options
@@ -71,14 +71,14 @@ imsize=np.array([512, 512], dtype='int32') # output image size
 level_occ=0. #mean level of the occulter relative to the background level
 cme_noise= [0,2.] #gaussian noise level of cme image. [mean, sd], both expressed in fractions of the cme-only image mean level. Set mean to None to avoid
 occ_noise = [0,30.] # occulter gaussian noise. [mean, sd] both expressed in fractions of the abs mean background level. Set mean to None to avoid
-mesh=False # set to also save a png with the GCSmesh (only for otype='png')
+mesh=True # set to also save a png with the GCSmesh (only for otype='png')
 otype="png" # set the ouput file type: 'png' or 'fits'
 im_range=2. # range of the color scale of the output final syntethyc image in std dev around the mean
-back_rnd_rot=True # set to randomly rotate the background image around its center
+back_rnd_rot=False # set to randomly rotate the background image around its center
 inner_cme=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
 mask_from_cloud=True #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
-add_fluxropes = True # set to include fluxropes on some (random) cases
+add_fluxropes = False # set to include fluxropes on some (random) cases
 
 # generate param arrays
 par_num = [par_num] * len(par_rng)
@@ -108,11 +108,10 @@ for row in range(len(df)):
             back_corona.append(a)
             headers.append(b)
             size_occ.append(c)
-    
-    # Get the location of sats and gcs:
-    satpos, plotranges = pyGCS.processHeaders(headers)
+        # Get the location of sats and gcs:
+        satpos, plotranges = pyGCS.processHeaders(headers)
 
-    print(f'Saving image pair {row} of {len(df)-1}')
+    print(f'Saving event {row} of {len(df)-1}')
     for sat in range(n_sat):
         #defining ranges and radius of the occulter
         x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
@@ -131,7 +130,7 @@ for row in range(len(df)):
                 break          
             mask = get_cme_mask(btot_mask,inner_cme=inner_cme)          
             mask_npix= len(mask[mask>0].flatten())
-            if mask_npix/cme_npix<0.9:
+            if mask_npix/cme_npix<0.7:
                 print(f'WARNING: CME number {row} mask is too small compared to cme brigthness image, skipping all views...')
                 break
         
@@ -143,7 +142,6 @@ for row in range(len(df)):
 
         #Total intensity (Btot) figure from raytrace:               
         btot0 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.5, out_sig=0.25, nel=1e5)
-
         if add_fluxropes:                      
             #adds a flux rope-like structure
             height_diff = np.random.uniform(low=0.55, high=0.85)
@@ -239,11 +237,11 @@ for row in range(len(df)):
             # overplot  GCS mesh to cme figure
             clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)                
             x = clouds[sat, :, 1]
-            y = clouds[0, :, 2]         
-            arr_cloud=pnt2arr(x,y,plotranges,imsize,sat)
+            y = clouds[0, :, 2]    
+            arr_cloud=pnt2arr(x,y,plotranges,imsize, sat)
             ofile = folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_mesh.png'.format(
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)
-            fig=save_png(arr_cloud,ofile=ofile, range=[0, 1])
+            fig=save_png(arr_cloud,ofile=ofile, range=[0, 1])     
 
     #save satpos and plotranges
     satpos_all.append(satpos)

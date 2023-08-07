@@ -3,12 +3,10 @@ import numpy as np
 
 def center_rSun_pixel(headers, plotranges, sat):
     '''
-    Gets the location of Suncenter 
+    Gets the location of Suncenter in pixels
     '''    
-    x_cS = (headers[sat]['CRPIX1']*plotranges[sat][sat]*2) / \
-        headers[sat]['NAXIS1'] - plotranges[sat][sat]
-    y_cS = (headers[sat]['CRPIX2']*plotranges[sat][sat]*2) / \
-        headers[sat]['NAXIS2'] - plotranges[sat][sat]
+    x_cS = headers[sat]['CRPIX1'] #(headers[sat]['CRPIX1']*plotranges[sat][sat]*2) / headers[sat]['NAXIS1'] - plotranges[sat][sat]
+    y_cS = headers[sat]['CRPIX2'] #(headers[sat]['CRPIX2']*plotranges[sat][sat]*2) / headers[sat]['NAXIS2'] - plotranges[sat][sat]
     return x_cS, y_cS
 
 def deg2px(x,y,plotranges,imsize,sat):
@@ -26,7 +24,7 @@ def deg2px(x,y,plotranges,imsize,sat):
     for i in range(len(x_ok)):
         v_x= (np.round((x_ok[i]-plotranges[sat][0])/scale_x)).astype("int") 
         v_y= (np.round((y_ok[i]-plotranges[sat][2])/scale_y)).astype("int")
-        if np.abs(v_x)<512 and np.abs(v_y)<512:
+        if np.abs(v_x)<imsize[0] and np.abs(v_y)<imsize[1]:
             x_px.append(v_x)
             y_px.append(v_y)
     return(y_px,x_px)
