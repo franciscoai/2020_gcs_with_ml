@@ -14,19 +14,21 @@ from mlp_resnet_model import Mlp_Resnet
 from nn.utils.gcs_mask_generator import maskFromCloud
 
 
-EPOCHS = 1
+EPOCHS = 5
 BATCH_LIMIT = 1000
-BATCH_SIZE = 16
+BATCH_SIZE = 8
 IMG_SiZE = [512, 512]
 GPU = 0
 LR = 1e-2
 # CMElon,CMElat,CMEtilt,height,k,ang
 GCS_PAR_RNG = torch.tensor([[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60]]) 
+LOSS_WEIGHTS = torch.tensor([100,100,100,10,1,10])
 TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_mariano'
 OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/cme_seg_training_mariano"
 
 def plot_loss(losses):
     plt.plot(losses)
+    plt.yscale('log')
     plt.xlabel('Batch')
     plt.ylabel('Loss')
     plt.savefig(os.path.join(OPATH, 'loss.png'))
@@ -45,25 +47,30 @@ def plot_masks(mask, mask_infered, predictions):
     # no wait
     plt.show(block=False)
 
-def compute_loss(predictions, targets, mask, occulter_mask, satpos, plotranges):
-    '''
-    Computes mean square error between predicted and target masks
-    '''
-    losses = torch.zeros(predictions.shape[0])
-    predictions = predictions.cpu().detach().numpy()
-    mask = mask.cpu().detach().numpy()
-    satpos = satpos.cpu().detach().numpy()
-    plotranges = plotranges.cpu().detach().numpy()
-    occulter_mask = occulter_mask.cpu().detach().numpy()
-    targets = targets.cpu().detach().numpy()
-    for i in range(predictions.shape[0]):
-        mask_infer = maskFromCloud(predictions[i,:], sat=0, satpos=[satpos[i,:]], imsize=IMG_SiZE, plotranges=[plotranges[i,:]])
-        mask_infer[occulter_mask[i,:,:] > 0] = 0 #setting 0 where the occulter is
-        loss = torch.sum((torch.tensor(mask_infer) - torch.tensor(mask[i,:,:]))**2) / torch.sum(torch.tensor(mask[i,:,:][mask[i,:,:] > 0])) 
-        #+ torch.mean((torch.tensor((predictions[i,:]) - targets[i,:]) / targets[i,:])**2)
-        losses[i] = loss
-        #plot_masks(mask[i], mask_infer, predictions[i])
-    return (torch.mean(losses))
+# def compute_loss(predictions, targets, mask, occulter_mask, satpos, plotranges):
+#     '''
+#     Computes mean square error between predicted and target masks
+#     '''
+#     losses = torch.zeros(predictions.shape[0])
+#     # predictions = predictions.cpu().detach().numpy()
+#     # mask = mask.cpu().detach().numpy()
+#     # satpos = satpos.cpu().detach().numpy()
+#     # plotranges = plotranges.cpu().detach().numpy()
+#     # occulter_mask = occulter_mask.cpu().detach().numpy()
+#     # targets = targets.cpu().detach().numpy()
+#     for i in range(predictions.shape[0]):
+#         # mask_infer = maskFromCloud(predictions[i,:], sat=0, satpos=[satpos[i,:]], imsize=IMG_SiZE, plotranges=[plotranges[i,:]])
+#         # mask_infer[occulter_mask[i,:,:] > 0] = 0 #setting 0 where the occulter is
+#         #loss = torch.sum((torch.tensor(mask_infer) - torch.tensor(mask[i,:,:]))**2) / torch.sum(torch.tensor(mask[i,:,:][mask[i,:,:] > 0])) 
+#         loss = torch.mean((torch.tensor((predictions[i,:]) - targets[i,:])**2)) #/ targets[i,:])**2)
+#         losses[i] = loss
+#         #plot_masks(mask[i], mask_infer, predictions[i])
+#     return (torch.mean(losses))
+
+def compute_loss(predictions, targets):
+    loss_weights = LOSS_WEIGHTS.to(device)
+    loss = torch.mean((predictions - targets) / loss_weights[None,:])**2
+    return loss
 
 def optimize(batch_limit=BATCH_LIMIT):
     losses_per_batch = []
@@ -77,11 +84,12 @@ def optimize(batch_limit=BATCH_LIMIT):
             # zero the parameter gradients
             optimizer.zero_grad()
             # send inputs to model and get predictions
-            predictions = model(inputs)
+            freatures = backbone(inputs)
+            predictions = model(freatures)
             # calculate loss
-            #loss = criterion(predictions, targets)
-            loss = compute_loss(predictions, targets, mask, occulter_mask, satpos, plotranges)
-            loss.requires_grad = True
+            # loss = criterion(predictions, targets)
+            #loss = compute_loss(predictions, targets, mask, occulter_mask, satpos, plotranges)
+            loss = compute_loss(predictions, targets)
             # backpropagate loss
             loss.backward()
             # update weights
@@ -120,12 +128,10 @@ if __name__ == "__main__":
 
     backbone = torchvision.models.resnet50(weights='DEFAULT')
     backbone = backbone.to(device)
-    # model = Mlp_Resnet(backbone=backbone, input_size=1000,
-    #                    hidden_size=256, output_size=6)
     model = Mlp_Resnet(backbone=backbone, gcs_par_rng=GCS_PAR_RNG)
     model.to(device)
-    model_params = [param for param in model.backbone.parameters() if param.requires_grad] + [param for param in model.regression.parameters()]
-    criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(model_params, lr=LR)    
-
+    #model_params = [param for param in model.backbone.parameters() if param.requires_grad] + [param for param in model.parameters() if param.requires_grad]
+    #criterion = torch.nn.MSELoss()
+    #optimizer = torch.optim.Adam(model_params, lr=LR)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     optimize()
