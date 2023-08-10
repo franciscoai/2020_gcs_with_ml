@@ -14,8 +14,8 @@ from mlp_resnet_model import Mlp_Resnet
 from nn.utils.gcs_mask_generator import maskFromCloud
 
 
-EPOCHS = 5
-BATCH_LIMIT = 1000
+EPOCHS = 20
+BATCH_LIMIT = None
 BATCH_SIZE = 8
 IMG_SiZE = [512, 512]
 GPU = 0
@@ -84,8 +84,7 @@ def optimize(batch_limit=BATCH_LIMIT):
             # zero the parameter gradients
             optimizer.zero_grad()
             # send inputs to model and get predictions
-            freatures = backbone(inputs)
-            predictions = model(freatures)
+            predictions = model(inputs)
             # calculate loss
             # loss = criterion(predictions, targets)
             #loss = compute_loss(predictions, targets, mask, occulter_mask, satpos, plotranges)
@@ -130,8 +129,7 @@ if __name__ == "__main__":
     backbone = backbone.to(device)
     model = Mlp_Resnet(backbone=backbone, gcs_par_rng=GCS_PAR_RNG)
     model.to(device)
-    #model_params = [param for param in model.backbone.parameters() if param.requires_grad] + [param for param in model.parameters() if param.requires_grad]
+    model_params = [param for param in model.backbone.parameters() if param.requires_grad] + [param for param in model.parameters() if param.requires_grad]
     #criterion = torch.nn.MSELoss()
-    #optimizer = torch.optim.Adam(model_params, lr=LR)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+    optimizer = torch.optim.Adam(model_params, lr=LR)
     optimize()

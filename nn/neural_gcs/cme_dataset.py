@@ -4,7 +4,7 @@ import torch
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-mpl.use('TkAgg')
+mpl.use('Agg')
 from torchvision.io import read_image
 from torch.utils.data import Dataset
 
