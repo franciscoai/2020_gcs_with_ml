@@ -28,17 +28,13 @@ __email__ = "franciscoaiglesias@gmail.com"
 
 def read_fits(file_path,smooth_kernel=[0,0]):
     imageSize=[512,512]
-    
     try:       
-        
         file=glob.glob((file_path)[0:-5]+"*")
         img = fits.open(file[0])
         img=(img[0].data).astype("float32")
         img = gaussian_filter(img, sigma=smooth_kernel)
-
         if smooth_kernel[0]!=0 and smooth_kernel[1]!=0: 
             img = rebin(img, imageSize,operation='mean')
-        
         return img  
     except:
         print(f'WARNING. I could not find file {file_path}')
@@ -49,9 +45,9 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
     """    
-    mask_threshold = 0.7 # value to consider a pixel belongs to the object
-    scr_threshold = 0.4 # only detections with score larger than this value are considered
-    color=['r','b','g','k','y','m','c','w']
+    mask_threshold = 0.5 # value to consider a pixel belongs to the object
+    scr_threshold = 0.3 # only detections with score larger than this value are considered
+    color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
     obj_labels = ['Back', 'Occ','CME','N/A']
     #
     cmap = mpl.colors.ListedColormap(color)  
@@ -94,20 +90,23 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
 repo_dir =  os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 helcat_db =  repo_dir + "/nn_training/kincat/helcatslist_20160601.txt" # kincat database
+level = 'L0' # fits reduction level
+filter_pol_images = True
 downloaded_files_list = repo_dir + '/nn_training/kincat/helcatslist_20160601_sta_downloaded.csv' # list of downloaded files
 units= ["-","-","yyyymmdd","hhmm","yyyymmdd","hhmm","deg","lon","old","deg","deg","deg", "yyyymmdd","hhmm","km/s","g","km/s","LON","LAT","km/s","LON","LAT","km/s","LON","LAT"]
 col_names=["HEL","CME","PRE_DATE","PRE_TIME","LAST_DATE","LAST_TIME","CARLON","STONEY","LAT","TILT", "ASP_RATIO","H_ANGLE","DATE","TIME","APEX_SPEED","CME_MASS","SPEED_FPF","FPF_LON","FPF_LAT","SPEED_SSEF","SSEF_LON","SSEF_LAT","SPEED_HMF","HMF_LON","HMF_LAT"]
 imsize=[0,0]# if 0,0 no rebin its applied 
 imsize_nn=[512,512] #for rebin befor the nn
 smooth_kernel=[2,2] #changes the gaussian filter size
+occ_size = 50 # occulter radius in pixels. An artifitial occulter with constant value equal to the mean of the image is added before inference. Use 0 to avoid
 
 #nn model parameters
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 model_version="v4"
-opath= model_path + "/infer_neural_cme_seg_kincat/cor2_a"
+opath= model_path + "/infer_neural_cme_seg_kincat_"+level+"/cor2_a"
 ipath=  "/gehme/projects/2020_gcs_with_ml/data/corona_back_database/cor2/cor2_a"
 file_ext=".fits"
-trained_model = '499.torch'
+trained_model = '6000.torch'
 
 #main
 gpu=0 # GPU to use
@@ -137,8 +136,14 @@ for i in range(len(catalogue.index)):
     start_date = date_helcat - timedelta(hours=1)
     end_date= datetime.strptime((catalogue["LAST_DATE"][i]+" "+catalogue["LAST_TIME"][i]),'%Y-%m-%d %H:%M') #forms datetime object
     index=catalogue["CME"][i]
+    if filter_pol_images:
+        # if downloaded["DATE_TIME"] is at 08 minutes drop it
+        downloaded = downloaded[~(downloaded["DATE_TIME"].dt.minute == 8)]        
     files = downloaded[(downloaded["DATE_TIME"] < end_date) & (downloaded["DATE_TIME"] > start_date)]["PATH"]
     files =files.reset_index(drop=True)
+    if level == 'L1':
+        files = [f.replace('L0','L1') for f in files]
+        files = [f.replace('_d4c','_14c') for f in files]
     if len(files)>0:
         for j in range(len(files)-1):
             print(f'Processing {j} of {len(files)-1}')
@@ -152,7 +157,7 @@ for i in range(len(catalogue.index)):
                 header=fits.getheader(file[0])
                 f=files[j+1]
                 # infers
-                imga, maska, scra, labelsa, boxesa  = nn_seg.infer(img)
+                imga, maska, scra, labelsa, boxesa  = nn_seg.infer(img, occulter_size=occ_size)
                 #save results
                 results.append({'file':f, 'img':imga, 'mask':maska, 'scr':scra, 'labels':labelsa, 'boxes':boxesa})
                 #plot results
