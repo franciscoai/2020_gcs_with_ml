@@ -18,10 +18,7 @@ class CmeDataset(Dataset):
         #find .csv files
         csv_path = [f for f in os.listdir(self.root_dir) if f.endswith('.csv')][0]
         self.csv_df = pd.read_csv(os.path.join(self.root_dir, csv_path))
-
-
-
-        
+       
     def __get_dirs(self, root_dir):
         imgs = []
         dirs = os.listdir(root_dir)

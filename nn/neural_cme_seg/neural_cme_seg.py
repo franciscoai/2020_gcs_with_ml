@@ -25,7 +25,7 @@ class neural_cme_segmentation():
     https://pytorch.org/tutorials/intermediate/torchvision_tutorial.html
     https://towardsdatascience.com/train-mask-rcnn-net-for-object-detection-in-60-lines-of-code-9b6bbff292c3
     '''
-    def __init__(self, device, pre_trained_model = None, version='v4'):
+    def __init__(self, device, pre_trained_model=None, version='v4', imsize=[512,512]):
         '''
         Initializes the model
         device: device to use for training and inference
@@ -33,7 +33,8 @@ class neural_cme_segmentation():
         version: version of the model to use. Options are 'v3' and 'v4'
         '''
         self.device = device
-        self.pre_trained_model = pre_trained_model        
+        self.pre_trained_model = pre_trained_model    
+        self.imsize = imsize    
         # model param
         if version == 'v3':
             self.num_classes = 3 # background, CME, occulter
@@ -56,10 +57,12 @@ class neural_cme_segmentation():
 
     def normalize(self, image):
         '''
-        Normalizes the values of the input image to have a given range (as fractions of the sd around the mean)
-        maped to [0,1]. It clips output values outside [0,1]
+        Normalizes the input image to
+            - gaussian filter to reduce noise in the image
         '''
         sd_range=1.5
+        #smooth_kernel=3
+        #image = cv2.GaussianBlur(image, (smooth_kernel, smooth_kernel), 0)
         m = np.mean(image)
         sd = np.std(image)
         image = (image - m + sd_range * sd) / (2 * sd_range * sd)
@@ -79,27 +82,52 @@ class neural_cme_segmentation():
         self.model.train()        
         return 
     
-    def infer(self, img, model_param=None):
+    def resize(self, img):
+        '''
+        Resizes the input image to the given size
+        '''
+        return cv2.resize(img, self.imsize, cv2.INTER_LINEAR)
+    
+    def mask_occulter(self, img, occulter_size):
+        '''
+        Replace a circular area of radius occulter_size in input image[h,w,3] with a constant value
+        '''
+        h,w = img.shape[:2]
+        mask = np.zeros((h,w), dtype=np.uint8)
+        cv2.circle(mask, (int(w/2), int(h/2)), occulter_size, 1, -1)
+        img[mask==1] = np.mean(img)
+        return img
+
+    
+    def infer(self, img, model_param=None, resize=True, occulter_size=0):
         '''        
-        Infers a cme segmentation mask in the input coronograph image (img) using the trauined R-CNN with weigths given by model_param
+        Infers a cme segmentation mask in the input coronograph image (img) using the trained R-CNN
+        model_param: model parameters to use for inference. If None, the model parameters given at initialization are used
+        resize: if True, the input image is resized to the size of the training images
+        occulter_size: size of the artifitial occulter in the image. If 0, the occulter is not masked out
         '''    
         #loads model
         if model_param is not None:
             self.model.load_state_dict(model_param) 
         elif self.pre_trained_model is None:
             os.error('No model parameters given')
-        
         self.model.eval() #set the model to evaluation state
 
         #inference
-        images = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        #images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)  
-        #cv2.normalize(images, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)       
+        if img.ndim == 2:
+            images = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        else:
+            images = img.copy()
+        if resize and (images.shape[0] != self.imsize[0] or images.shape[1] != self.imsize[1]):
+            images = self.resize(images)   
+        if occulter_size > 0:
+            images = self.mask_occulter(images, occulter_size)    
         images = self.normalize(images) # normalize to 0,1
         oimages = images.copy()                                   
         images = torch.as_tensor(images, dtype=torch.float32).unsqueeze(0)
         images=images.swapaxes(1, 3).swapaxes(2, 3)
         images = list(image.to(self.device) for image in images)
+        
         with torch.no_grad(): #runs the image through the net and gets a prediction for the object in the image.
             pred = self.model(images)
 
@@ -123,3 +151,24 @@ class neural_cme_segmentation():
         else:
             os.error('Found no maks in the current image')
         return orig_img, all_masks, all_scores, all_lbl, all_boxes
+    
+    def test_mask(self, img, target, mask_threshold=0.5, model_param=None, resize=True, occulter_size=0):
+        """
+        Makes an inference on img and return the mask that has the smallest loss wrt target binary mask
+        mask_threshold: threshold for the predicted box pixels to be considered as part of the mask
+        """
+        orig_img, all_masks, all_scores, all_lbl, all_boxes = self.infer(img, model_param=model_param, resize=resize, occulter_size=occulter_size)
+        if len(all_masks) == 0:
+            print('Warning, no masks found in the image')
+            return None
+        # compute loss for all masks
+        all_loss = []
+        for i in range(len(all_masks)):
+            msk = all_masks[i]
+            msk[msk > mask_threshold] = 1
+            msk[msk <= mask_threshold] = 0
+            all_loss.append(np.sum(np.abs(msk - target))/np.sum(target))
+        # return the mask with the smallest loss
+        imin = np.argmin(all_loss)
+        return orig_img, all_masks[imin], all_scores[imin], all_lbl[imin], all_boxes[imin], all_loss[imin]
+        
