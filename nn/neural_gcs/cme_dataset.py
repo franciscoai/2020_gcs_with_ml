@@ -4,7 +4,7 @@ import torch
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-mpl.use('Agg')
+mpl.use('TkAgg')
 from torchvision.io import read_image
 from torch.utils.data import Dataset
 
@@ -29,16 +29,16 @@ class CmeDataset(Dataset):
         return imgs
     
     def __len__(self):
-        return len(self.imgs)
+        return len(self.imgs) # -1 because the last file is a .csv (only on reduced dataset)
     
     def __getitem__(self, idx):
         file = [f for f in os.listdir(self.imgs[idx]) if f.endswith(self.file_ext)]
         mask_dir = os.path.join(self.imgs[idx], 'mask')
         img = read_image(os.path.join(self.imgs[idx], file[0]), mode=torchvision.io.image.ImageReadMode.RGB)
         mask = read_image(os.path.join(mask_dir, '2.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
-        # img[0,:,:] = mask
-        # img[1,:,:] = mask
-        # img[2,:,:] = mask
+        img[0,:,:] = mask
+        img[1,:,:] = mask
+        img[2,:,:] = mask
         img = img.float()
         img = self.__normalize(img)
         img = self.transform(img)
@@ -48,7 +48,6 @@ class CmeDataset(Dataset):
         resize = torchvision.transforms.Resize(self.image_size, torchvision.transforms.InterpolationMode.BILINEAR)
         mask = resize(mask)
         occulter_mask = resize(occulter_mask)
-        mask = torch.flip(mask, dims=[1])
         parameters = file[0].split('_')
         parameters = parameters[:6]
         parameters = [float(p) for p in parameters]
@@ -63,6 +62,10 @@ class CmeDataset(Dataset):
         occulter_mask = torch.squeeze(occulter_mask)
         satpos = torch.squeeze(satpos)
         plotranges = torch.squeeze(plotranges)
+
+        # plt.imshow(img[0,:,:])
+        # plt.show()
+        # plt.close()
 
         return img, parameters, mask, occulter_mask, satpos, plotranges
 
