@@ -20,23 +20,22 @@ def read_fits(file_path,smooth_kernel=[0,0]):
 
 def rec2pol(mask,scores,labels,boxes,imsize):
     
-    mask_threshold = 0.6 # value to consider a pixel belongs to the object
-    scr_threshold = 0.6 # only detections with score larger than this value are considered
+    mask_threshold = 0.5 # value to consider a pixel belongs to the object
+    scr_threshold = 0.3 # only detections with score larger than this value are considered
     nans = np.full(imsize, np.nan)
     pol_mask=[]
     pts=[]
     try:
         if boxes is not None:
-            nb=0
             for b in boxes:
                 if scores is not None:
-                    scr = scores[0]
+                    scr = scores
                 else:
                     scr = 0   
                 if scr > scr_threshold:
                     #creates an array with zero value inside the mask and Nan value outside             
                     masked = nans.copy()
-                    masked[:, :][mask[nb] > mask_threshold] = nb   
+                    masked[:, :][mask > mask_threshold] = 0   
                     
                     #calculates geometric center of the image
                     height, width = masked.shape
@@ -61,94 +60,120 @@ def rec2pol(mask,scores,labels,boxes,imsize):
 
 
 
-def plot_to_png(ofile,image_path,orig_img, masks, pol_mask, center,imsize, title=None, labels=None, boxes=None, scores=None):
+def plot_to_png(ofile,image_path,orig_img, masks,imsize, title=None, labels=None, boxes=None, scores=None):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
     """    
-    mask_threshold = 0.6 # value to consider a pixel belongs to the object
-    scr_threshold = 0.6 # only detections with score larger than this value are considered
+    mask_threshold = 0.5 # value to consider a pixel belongs to the object
+    #scr_threshold = 0.3 # only detections with score larger than this value are considered
     color=['r','b','g','k','y']
     obj_labels = ['Occ', 'CME','N/A','N/A']
     cmap = mpl.colors.ListedColormap(color)  
     nans = np.full(np.shape(orig_img[0]), np.nan)
-    fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
-    axs = axs.ravel()
-
-    #takes the min and max angles and calculates cpa and wide angles
-    angles = [s[1] for s in pol_mask]
-    ang=[]
-    points=[]
-    min_ang = min(angles)
-    max_ang = max(angles)
-    cpa_ang=(max_ang+min_ang)/2
-    wide_ang=(max_ang-min_ang)
-    ang.append([min_ang,max_ang,cpa_ang])
-
-    #transforms angles to degrees for display purposes
-    angulo_max=np.degrees(max_ang)
-    angulo_min=np.degrees(min_ang)
-    angulo_cpa=np.degrees(cpa_ang)
-    title=str(angulo_max)+"/"+str(angulo_cpa)+"/"+str(angulo_min)
-
-    #obtains end points and direction for the lines
-    for i in ang[0]:
-        vector=np.array([np.cos(i), np.sin(i)])
-        start_point = center
-        x_end = start_point[0] + (imsize[0]/2) * vector[0]
-        y_end = start_point[1] + (imsize[1]/2) * vector[1]
-        x_points = np.array([start_point[0], x_end])
-        y_points = np.array([start_point[1], y_end])
-        points.append([x_points,y_points])
-
-    #saves the image
-    for i in range(len(orig_img)):
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        axs[0].imshow(orig_img[0], vmin=0, vmax=1, cmap='gray')
-        axs[0].axis('off')
-        axs[1].imshow(orig_img[0], vmin=0, vmax=1, cmap='gray')      
-        axs[1].axis('off')        
-        if boxes is not None:
-            nb = 0
-            for b in boxes[i]:
-                if scores is not None:
-                    scr = scores[i][nb]
-                else:
-                    scr = 0   
-                if scr > scr_threshold:             
-                    masked = nans.copy()
-                    masked[:, :][masks[i][nb] > mask_threshold] = nb              
-                    axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
-                    axs[i+1].plot(points[0][0], 512-points[0][1], color='blue', label='Recta min')
-                    axs[i+1].plot(points[1][0],512-points[1][1] , color='orange', label='Recta max')
-                    axs[i+1].plot(points[2][0], 512-points[2][1], color='green', label='Recta cpa')
-                    axs[i+1].scatter(256,256, color='purple', marker='o')
-                    if labels is not None:
-                        axs[i+1].annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
-    fig.suptitle(title)
-    plt.tight_layout()
-    plt.savefig(ofile)
-    plt.close()
-
-    #calculates diferent angles an parameters
+    
     ang_list=[]
-    date_time=datetime.strptime(f[:-6],"%Y%m%d_%H%M%S")
-    masked[masked == 0] = 1
-    cm = center_of_mass(np.nan_to_num(masked))#returns center of mass cordinates in the form (y,x)
-    center_x=imsize[0]
-    center_y=imsize[1]
-    x_dist = (cm[1]-center_x)
-    y_dist = (cm[0]-center_y) 
-    cm_ang=np.arctan2(y_dist,x_dist)+np.radians(270)
-    distance = [s[1] for s in pol_mask]
-    distance_abs= max(distance, key=abs)
-    idx_dist = distance.index(distance_abs)
-    apex_dist= distance[idx_dist] 
-    apex_ang=angles[idx_dist]
-    ang_list.extend([image_path, date_time, min_ang, max_ang, cpa_ang, wide_ang, cm[1], cm[0], cm_ang, apex_dist, apex_ang])                      
-    return ang_list
+    for i in range(len(masks[0])):
+        print("Mask "+str(i)+" of "+str(len(masks[0])-1))
+        if labels[0][i]==2:
+            #print("labels ok")
+            pol=rec2pol(masks[0][i],scores[0][i],labels[0][i],boxes[0][i],imsize=imsize)
+            
+            if (pol is not None):
+                #print("pol is ok")
+                pol_mask=pol[0]
+                center= pol[1]
+                masked=pol[2]
+                pts=pol[3]
+                #takes the min and max angles and calculates cpa and wide angles
+                angles = [s[1] for s in pol_mask]
+                ang=[]
+                points=[]
+                if len(angles)>0:
+                    min_ang = min(angles)
+                    max_ang = max(angles)
+                    cpa_ang=(max_ang+min_ang)/2
+                    wide_ang=(max_ang-min_ang)
+                    
 
+                    #calculates diferent angles an parameters
+                    
+                    date_time=datetime.strptime(f[:-6],"%Y%m%d_%H%M%S")
+                    cm_mask = nans.copy()
+                    cm_mask[:, :][masks[0][i] > mask_threshold] = 1  
+                    #cm_mask = np.where(masked == 0, 1, masked)#accomodates values of the mask to be able to calculate the center of mass with the following function
+                    cm = center_of_mass(np.nan_to_num(cm_mask))#returns center of mass cordinates in the form (y,x)
+                    center_x=imsize[0]/2
+                    center_y=imsize[1]/2
+                    x_dist = (cm[1]-center_x)
+                    y_dist = (cm[0]-center_y)
+                    cm_dist= math.sqrt(x_dist**2 + y_dist**2)
+                    cm_ang=np.arctan2(-y_dist,x_dist)#+np.radians(270)
+                    distance = [s[0] for s in pol_mask]
+                    distance_abs= max(distance, key=abs)
+                    idx_dist = distance.index(distance_abs)
+                    apex_dist= distance[idx_dist] 
+                    apex_ang=angles[idx_dist]
+                    apex_coord=pts[idx_dist]
+                    ang.append([min_ang,max_ang,cpa_ang,cm_ang])
+                    
+                    #transforms angles to degrees for display purposes
+                    angulo_max=np.degrees(max_ang)
+                    angulo_min=np.degrees(min_ang)
+                    angulo_cpa=np.degrees(cpa_ang)
+                    title=str(angulo_max)+"/"+str(angulo_cpa)+"/"+str(angulo_min)
 
+                    #obtains end points and direction for the lines
+                    for j in ang[0]:
+                        vector=np.array([np.cos(j), np.sin(j)])
+                        start_point = center
+                        x_end = start_point[0] + (imsize[0]/2) * vector[0]
+                        y_end = start_point[1] + (imsize[1]/2) * vector[1]
+                        x_points = np.array([start_point[0], x_end])
+                        y_points = np.array([start_point[1], y_end])
+                        points.append([x_points,y_points])
+
+                    #saves the image
+                    # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+                    # axs[0].imshow(orig_img[0], vmin=0, vmax=1, cmap='gray')
+                    # axs[0].axis('off')
+                    # axs[1].imshow(orig_img[0], vmin=0, vmax=1, cmap='gray')      
+                    # axs[1].axis('off')        
+                    # if boxes is not None:
+                    #     #print("boxes ok")
+                    #     if scores is not None:
+                    #         scr = scores[0][i]
+                    #     else:
+                    #         scr = 0   
+                    #         if scr > scr_threshold:
+                    #                 #print("score is ok")             
+                    #                 masked = nans.copy()
+                    #                 masked[:, :][masks[0][i] > mask_threshold] = 0              
+                    #                 axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
+                    #                 axs[i+1].plot(points[0][0], 512-points[0][1], color='blue', label='Recta min')
+                    #                 axs[i+1].plot(points[1][0],512-points[1][1] , color='orange', label='Recta max')
+                    #                 axs[i+1].plot(points[2][0], 512-points[2][1], color='green', label='Recta cpa')
+                    #                 axs[i+1].plot(points[3][0], 512-points[3][1], color='purple', label='Recta centro de masa')
+                    #                 axs[i+1].scatter(cm[1],cm[0], color='purple', marker='o')
+                    #                 axs[i+1].scatter(apex_coord[0],apex_coord[1], color='cyan', marker='o')
+                    #                 if labels is not None:
+                    #                     axs[i+1].annotate(obj_labels[labels[0][i]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[0])
+                    #         else:
+                    #              print("scr pequeño")
+                    # else:
+                    #      print("boxes is none")
+                    # fig.suptitle(title)
+                    # plt.tight_layout()
+                    # #fig.show()
+                    # plt.savefig(ofile)
+                    # plt.close()
+                    ang_list.append([image_path,i,date_time,scores[0][i], min_ang, max_ang, cpa_ang, wide_ang, cm[1], cm[0],cm_dist, cm_ang, apex_dist, apex_ang])          
+            
+        else:
+            print("Label different than 1")
+
+    return ang_list         
+        
 
 import pickle
 import os
@@ -167,14 +192,17 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
 from ext_libs.rebin import rebin
 
 
-data_dir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3/infer_neural_cme_seg_kincat/cor2_a/"
+data_dir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1/cor2_a/"
 image_dir="/gehme/data/stereo/secchi/L0/a/img/cor2/"
 imsize=[512,512] #shape of the mask image
 
 
+fa=0
 
-folders = os.listdir(data_dir)
+folders = np.sort(os.listdir(data_dir))
+
 for folder in folders:
+    print("Working on folder "+folder+", folder "+str(fa)+" of "+str(len(folders)-1))
     files=os.listdir(data_dir+folder)
     ang_data=[]
     for file in files:
@@ -187,23 +215,19 @@ for folder in folders:
                 scores = pickle.load(archivo_pickle)
                 labels= pickle.load(archivo_pickle)
                 boxes= pickle.load(archivo_pickle)
-
-            pol=rec2pol(mask,scores,labels,boxes,imsize=imsize)
-            if (pol is not None) :
-                pol_mask=pol[0]
-                center= pol[1]
-                masked=pol[2]
-                pts=pol[3]
-                f=file[:-11]
-                img=read_fits(img_path)
-                folder_path = data_dir+folder
-                final_path = os.path.join(folder_path, "stats")
-                if not os.path.exists(final_path):
-                    os.makedirs(final_path)
-                opath=final_path+"/"+str(f)+"_stats.png"
-                ang_list=plot_to_png(opath,img_path,[img],[mask], title=[f],labels=[labels], boxes=[boxes], scores=[scores],pol_mask=pol_mask, center=center,imsize=imsize)
-                ang_data.append(ang_list)
-
-    columnas = ['PATH', 'DATE_TIME', 'MIN_ANG','MAX_ANG','CPA_ANG','WIDE_ANG','MASS_CENTER_X','MASS_CENTER_Y','MASS_CENTER_ANG','APEX_RADIUS','APEX_ANG'] 
+                
+            f=file[:-11]
+            img=read_fits(img_path)
+            folder_path = data_dir+folder
+            final_path = os.path.join(folder_path, "stats")
+            if not os.path.exists(final_path):
+                os.makedirs(final_path)
+            opath=final_path+"/"+str(f)+"_stats.png"
+            ang_list=plot_to_png(opath,img_path,[img],[mask], title=[f],labels=[labels], boxes=[boxes], scores=[scores],imsize=imsize)
+            if ang_list!= None:
+                ang_data.extend(ang_list)
+    fa=fa+1
+    columnas = ['PATH',"MASK_LABEL",'DATE_TIME', "SCORE",'MIN_ANG','MAX_ANG','CPA_ANG','WIDE_ANG','MASS_CENTER_X','MASS_CENTER_Y','MASS_CENTER_RADIUS','MASS_CENTER_ANG','APEX_RADIUS','APEX_ANG'] 
+    
     df = pd.DataFrame(ang_data, columns=columnas)
     df.to_csv(final_path+'/'+folder+'_stats', index=False)

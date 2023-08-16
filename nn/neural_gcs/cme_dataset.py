@@ -18,20 +18,18 @@ class CmeDataset(Dataset):
         #find .csv files
         csv_path = [f for f in os.listdir(self.root_dir) if f.endswith('.csv')][0]
         self.csv_df = pd.read_csv(os.path.join(self.root_dir, csv_path))
-
-
-
-        
+       
     def __get_dirs(self, root_dir):
         imgs = []
         dirs = os.listdir(root_dir)
-        dirs = [d for d in dirs if not d.endswith('.csv')]
+        dirs = [int(d) for d in dirs if not d.endswith('.csv')]
+        dirs.sort()
         for d in dirs:
-            imgs.append(os.path.join(root_dir, d))
+            imgs.append(os.path.join(root_dir, str(d)))
         return imgs
     
     def __len__(self):
-        return len(self.imgs)
+        return len(self.imgs) # -1 because the last file is a .csv (only on reduced dataset)
     
     def __getitem__(self, idx):
         file = [f for f in os.listdir(self.imgs[idx]) if f.endswith(self.file_ext)]
@@ -50,7 +48,6 @@ class CmeDataset(Dataset):
         resize = torchvision.transforms.Resize(self.image_size, torchvision.transforms.InterpolationMode.BILINEAR)
         mask = resize(mask)
         occulter_mask = resize(occulter_mask)
-        mask = torch.flip(mask, dims=[1])
         parameters = file[0].split('_')
         parameters = parameters[:6]
         parameters = [float(p) for p in parameters]
@@ -66,8 +63,9 @@ class CmeDataset(Dataset):
         satpos = torch.squeeze(satpos)
         plotranges = torch.squeeze(plotranges)
 
-        
-
+        # plt.imshow(img[0,:,:])
+        # plt.show()
+        # plt.close()
 
         return img, parameters, mask, occulter_mask, satpos, plotranges
 
@@ -96,4 +94,3 @@ class CmeDataset(Dataset):
     #     torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     # ])
         return transform
-    

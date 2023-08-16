@@ -1,9 +1,7 @@
 import random
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 import numpy as np
 import torch.utils.data
 import cv2
-import torchvision.models.segmentation
 import torch
 import os
 import matplotlib.pyplot as plt
@@ -78,10 +76,7 @@ def loadData(imgs, batchSize, imageSize=[512,512], file_ext=".png", normalizatio
 
 #---------------------------------------------------------Fine_tune the pretrained R-CNN----------------------------------------------------------
 """
-
-
 """
-
 #Constants
 trainDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training'
 opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
