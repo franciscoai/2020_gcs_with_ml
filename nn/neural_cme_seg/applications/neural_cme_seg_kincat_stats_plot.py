@@ -65,7 +65,6 @@ for ext_folder in ext_folders:
     
     #generates graphics for the parameters
     for i in parameters:
-        
         a=[]
         for idx, row in df.iterrows():
             if i.endswith("ANG"):        
