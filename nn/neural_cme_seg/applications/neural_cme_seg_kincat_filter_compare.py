@@ -12,17 +12,19 @@ def get_kincat(odir):
 
     return df_full
 
-def get_seeds(folder,url):
-    
+def get_seeds(folder):
+    '''
+    This function downloads the seeds catalogue and saves it in the folder specified
+    '''
+    url= 'http://spaceweather.gmu.edu/seeds/secchi/detection_cor2/monthly/'  
+
     if os.path.exists(folder) and os.path.isdir(folder):
         files=os.listdir(folder)
         
     else:
         os.makedirs(folder)
-        
         response = requests.get(url)
         soup = BeautifulSoup(response.content, 'html.parser')
-
         for link in soup.find_all('a', href=True):
             href = link['href']
             if href.endswith('monthly.txt'):
@@ -30,9 +32,8 @@ def get_seeds(folder,url):
                 file_name = href.split('/')[-1]
                 file_response = requests.get(file_url)
                 if file_response.status_code == 200:
-                    with open(file_name, 'wb') as archivo:
+                    with open(folder+'/'+file_name, 'wb') as archivo:
                         archivo.write(file_response.content)
-
 
 import os
 import pandas as pd
@@ -40,8 +41,7 @@ import requests
 from bs4 import BeautifulSoup
 
 odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1/cor2_a/"
-folder="/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications/seeds"
-url= 'http://spaceweather.gmu.edu/seeds/secchi/detection_cor2/monthly/'  
+folder="/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications/seeds_catalogue"
 kincat=get_kincat(odir)
-sedds=get_seeds(folder,url)
+sedds=get_seeds(folder)
 print(kincat)

@@ -1,11 +1,9 @@
 import os
 import sys
 from astropy.io import fits
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 import numpy as np
 import torch.utils.data
 import cv2
-import torchvision.models.segmentation
 import torch
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -13,6 +11,7 @@ mpl.use('Agg')
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 from ext_libs.rebin import rebin
 import csv
+from nn.neural_cme_seg.neural_cme_seg import neural_cme_segmentation
 
 def correct_path(s):
     s = s.replace("(1)", "")
@@ -172,64 +171,6 @@ def get_paths_cme_exp_sources():
         event.append(cdict)
     return event
 
-def normalize(image):
-    '''
-    Normalizes the values of the input image to have a given range (as fractions of the sd around the mean)
-    maped to [0,1]. It clips output values outside [0,1]
-    '''
-    sd_range=1.
-    m = np.mean(image)
-    sd = np.std(image)
-    image = (image - m + sd_range * sd) / (2 * sd_range * sd)
-    image[image >1]=1
-    image[image <0]=0
-    return image
-
-
-def neural_cme_segmentation(model_param, img, device):
-    '''
-    Infers a cme segmentation mask in the input coronograph image (img) using the trauined R-CNN with weigths given by model_param
-    '''    
-    #loads model
-    model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True) 
-    in_features = model.roi_heads.box_predictor.cls_score.in_features 
-    model.roi_heads.box_predictor=FastRCNNPredictor(in_features,num_classes=3)
-    model.load_state_dict(model_param) #loads the last iteration of training 
-    model.to(device)# move model to the right device
-    model.eval()#set the model to evaluation state
-
-    #inference
-    images = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    #images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)        
-    images = normalize(images) #cv2.normalize(images, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F) # normalize to 0,1
-    oimages = images.copy()                                   
-    images = torch.as_tensor(images, dtype=torch.float32).unsqueeze(0)
-    images=images.swapaxes(1, 3).swapaxes(2, 3)
-    images = list(image.to(device) for image in images)
-    with torch.no_grad(): #runs the image through the net and gets a prediction for the object in the image.
-        pred = model(images)
-
-    # returns the network input image along with the infered masks, labels and scores
-    orig_img =  np.array(oimages)[:,:,0]
-    nmasks = len(pred[0]['masks'])
-    all_lbl = []
-    all_boxes = []
-    all_scores = []    
-    all_masks = [] 
-    if nmasks > 0:
-        for i in range(nmasks):
-            msk=pred[0]['masks'][i,0].detach().cpu().numpy()
-            all_masks.append(msk)
-            scr=pred[0]['scores'][i].detach().cpu().numpy()
-            all_scores.append(scr)
-            lbl = pred[0]['labels'][i].detach().cpu().numpy()
-            all_lbl.append(lbl)
-            box = pred[0]['boxes'][i].detach().cpu().numpy()
-            all_boxes.append(box)              
-    else:
-        os.error('Found no maks in the current image')
-    return orig_img, all_masks, all_scores, all_lbl, all_boxes
-
 def read_fits(file_path):
     imageSize=[512,512]
     try:       
@@ -291,14 +232,16 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
       
 #main
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3"
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
+model_version="v4"
 opath= model_path + "/infer_neural_cme_seg_exp_paper"
 file_ext=".png"
-trained_model = '3999.torch'
+trained_model = '6000.torch'
 do_run_diff = True # set to use running diff instead of base diff (False)
+occ_size = 0 # occulter radius in pixels. An artifitial occulter with constant value equal to the mean of the image is added before inference. Use 0 to avoid
 
 #main
-gpu=1 # GPU to use
+gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
 
@@ -311,7 +254,8 @@ for e in event:
     writer.writerow(e.values())
 file.close()
 
-model_param = torch.load(model_path + "/"+ trained_model)
+#loads nn model
+nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 
 for ev in event:
     for t in range(len(ev['pro_files'])):
@@ -324,7 +268,7 @@ for ev in event:
         print('Inference of imge:'+cimga)     
         try:
             img = read_fits(cimga) -read_fits(cprea) 
-            orig_imga, maska, scra, labelsa, boxesa  = neural_cme_segmentation(model_param, img, device)
+            orig_imga, maska, scra, labelsa, boxesa  = nn_seg.infer(img, occulter_size=occ_size)
         except:
             orig_imga = np.zeros((512,512))
             print(f'Inference skipped')
@@ -338,7 +282,7 @@ for ev in event:
         print('Inference of imge:'+cimgb)
         try:
             img = read_fits(cimgb) - read_fits(cpreb)
-            orig_imgb, maskb, scrb, labelsb, boxesb = neural_cme_segmentation(model_param, img, device)
+            orig_imgb, maskb, scrb, labelsb, boxesb = nn_seg.infer(img, occulter_size=occ_size)
         except:
             orig_imgb = np.zeros((512,512))
             print(f'Inference skipped')
@@ -352,7 +296,7 @@ for ev in event:
         print('Inference of imge:'+cimgl)
         try:
             img = read_fits(cimgl) - read_fits(cprel)
-            orig_imgl, maskl, scrl, labelsl, boxesl = neural_cme_segmentation(model_param, img, device)
+            orig_imgl, maskl, scrl, labelsl, boxesl = nn_seg.infer(img, occulter_size=occ_size)
         except:
             orig_imgl = np.zeros((512,512))
             print(f'Inference skipped')   
