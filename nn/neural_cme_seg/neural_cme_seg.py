@@ -6,6 +6,8 @@ import cv2
 import torchvision.models.segmentation
 import torch
 import matplotlib as mpl
+import math
+from datetime import datetime
 mpl.use('Agg')
 
 __author__ = "Francisco Iglesias"
@@ -43,8 +45,11 @@ class neural_cme_segmentation():
             # See https://arxiv.org/pdf/1512.03385.pdf
             self.trainable_backbone_layers = 3
         if version == 'v4':
+            self.labels=['Background','Occ','CME','CME','CME','CME','CME','CME'] # labels for the different classes
             self.num_classes = 3 # background, CME, occulter
             self.trainable_backbone_layers = 4
+            self.mask_threshold = 0.5 # value to consider a pixel belongs to the object
+            self.scr_threshold = 0.3 # only detections with score larger than this value are considered
         # innitializes the model
         self.model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True, trainable_backbone_layers=self.trainable_backbone_layers) 
         self.in_features = self.model.roi_heads.box_predictor.cls_score.in_features 
@@ -152,11 +157,13 @@ class neural_cme_segmentation():
             os.error('Found no maks in the current image')
         return orig_img, all_masks, all_scores, all_lbl, all_boxes
     
-    def test_mask(self, img, target, mask_threshold=0.5, model_param=None, resize=True, occulter_size=0):
+    def test_mask(self, img, target, mask_threshold=None, model_param=None, resize=True, occulter_size=0):
         """
         Makes an inference on img and return the mask that has the smallest loss wrt target binary mask
         mask_threshold: threshold for the predicted box pixels to be considered as part of the mask
         """
+        if mask_threshold is not None:
+            self.mask_threshold = mask_threshold
         orig_img, all_masks, all_scores, all_lbl, all_boxes = self.infer(img, model_param=model_param, resize=resize, occulter_size=occulter_size)
         if len(all_masks) == 0:
             print('Warning, no masks found in the image')
@@ -165,10 +172,108 @@ class neural_cme_segmentation():
         all_loss = []
         for i in range(len(all_masks)):
             msk = all_masks[i]
-            msk[msk > mask_threshold] = 1
-            msk[msk <= mask_threshold] = 0
+            msk[msk > self.mask_threshold] = 1
+            msk[msk <= self.mask_threshold] = 0
             all_loss.append(np.sum(np.abs(msk - target))/np.sum(target))
         # return the mask with the smallest loss
         imin = np.argmin(all_loss)
         return orig_img, all_masks[imin], all_scores[imin], all_lbl[imin], all_boxes[imin], all_loss[imin]
         
+
+    def _rec2pol(self, mask, score):
+        '''
+        Converts the x,y mask to polar coordinates
+        '''
+        nans = np.full(self.imsize, np.nan)
+        pol_mask=[]
+        if score > self.scr_threshold:
+            #creates an array with zero value inside the mask and Nan value outside             
+            masked = nans.copy()
+            masked[:, :][mask > self.mask_threshold] = 0   
+            #calculates geometric center of the image
+            height, width = masked.shape
+            center_x = width // 2
+            center_y = height // 2
+            #calculates distance to the point and the angle for the positive x axis
+            for x in range(width):
+                for y in range(height):
+                    value=masked[x,y]
+                    if not np.isnan(value):
+                        x_dist = (x-center_x)
+                        y_dist = (y-center_y)
+                        distance= math.sqrt(x_dist**2 + y_dist**2)
+                        angle=np.arctan2(y_dist,x_dist)+np.radians(270)
+                        pol_mask.append([distance,angle])
+            return pol_mask
+        else:
+            return None
+
+    def _compute_mask_prop(self, masks, scores, labels, boxes):    
+        '''
+        Computes the CPA, AW and apex radius for the given 'CME' masks.
+        If the mask label is not "CME", returns None
+        '''
+        prop_list=[]
+        for i in range(len(masks)):
+            if self.labels[labels[i]]=='CME':
+                pol_mask=self._rec2pol(masks[i],scores[i])
+                if (pol_mask is not None):               
+                    #takes the min and max angles and calculates cpa and wide angles
+                    angles = [s[1] for s in pol_mask]
+                    ang=[]
+                    if len(angles)>0:
+                        min_ang = min(angles)
+                        max_ang = max(angles)
+                        cpa_ang=(max_ang+min_ang)/2
+                        wide_ang=(max_ang-min_ang)
+                        
+                        #calculates diferent angles an parameters
+                        distance = [s[0] for s in pol_mask]
+                        distance_abs= max(distance, key=abs)
+                        idx_dist = distance.index(distance_abs)
+                        apex_dist= distance[idx_dist] 
+                        ang.append([min_ang,max_ang,cpa_ang])
+
+                        prop_list.append([i,float(scores[i]),cpa_ang, wide_ang, apex_dist])   
+                else:
+                    prop_list.append([i,float(scores[i]),None, None, None])
+            else:
+                prop_list.append([i,float(scores[i]),None, None, None])                                   
+        return prop_list         
+
+    def infer_event(self, imgs, model_param=None, resize=True, occulter_size=0, mask_threshold=None, scr_threshold=None):
+        '''
+        Infers masks for a temporal series of images belonging to the same event. It filters the masks found in the
+        indidivual images using morphological and kinematic consistency criteria
+
+        model_param: model parameters to use for inference. If None, the model parameters given at initialization are used
+        resize: if True, the input image is resized to the size of the training images
+        occulter_size: size of the artifitial occulter in the image. If 0, the occulter is not masked out        
+        '''
+        if mask_threshold is not None:
+            self.mask_threshold = mask_threshold
+        if scr_threshold is not None:
+            self.scr_threshold = scr_threshold
+
+        #Get the mas for all images in imgs
+        all_masks = []
+        all_scores = []
+        all_lbl = []
+        all_boxes = []
+        all_loss = []
+        all_orig_img = []
+        all_mask_prop = []
+        for i in range(len(imgs)):
+            #infer masks
+            orig_img, mask, score, lbl, box = self.infer(imgs[i], model_param=model_param, resize=resize, occulter_size=occulter_size[i])
+            all_orig_img.append(orig_img)            
+            all_masks.append(mask)
+            all_scores.append(score)
+            all_lbl.append(lbl)
+            all_boxes.append(box)
+            # compute cpa, aw and apex
+            mask_prop = self._compute_mask_prop(mask, score, lbl, box)
+            all_mask_prop.append(mask_prop)
+        # keeps only one mask per imgs based on cpa, aw and apex radius evolution consistency
+        ok_masks, ok_scores, ok_lbl, ok_boxes = self._filter_masks(all_masks, all_scores, all_lbl, all_boxes, all_mask_prop)
+        return all_orig_img, ok_masks, ok_scores, ok_lbl, ok_boxes

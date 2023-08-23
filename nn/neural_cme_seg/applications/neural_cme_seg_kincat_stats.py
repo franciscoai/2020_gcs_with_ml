@@ -56,7 +56,7 @@ def rec2pol(mask,scores,labels,boxes,imsize):
 
         return pol_mask,center,masked,pts
     except:
-        print("A parameter its None")
+        print("A parameter is None")
 
 
 
@@ -76,11 +76,8 @@ def plot_to_png(ofile,image_path,orig_img, masks,imsize, title=None, labels=None
     for i in range(len(masks[0])):
         print("Mask "+str(i)+" of "+str(len(masks[0])-1))
         if labels[0][i]==2:
-            #print("labels ok")
             pol=rec2pol(masks[0][i],scores[0][i],labels[0][i],boxes[0][i],imsize=imsize)
-            
             if (pol is not None):
-                #print("pol is ok")
                 pol_mask=pol[0]
                 center= pol[1]
                 masked=pol[2]

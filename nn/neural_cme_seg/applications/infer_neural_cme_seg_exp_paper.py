@@ -8,7 +8,7 @@ import torch
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.use('Agg')
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))))
 from ext_libs.rebin import rebin
 import csv
 from nn.neural_cme_seg.neural_cme_seg import neural_cme_segmentation
@@ -187,9 +187,9 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
     in a single image saved to ofile
     """    
     mask_threshold = 0.5 # value to consider a pixel belongs to the object
-    scr_threshold = 0.5 # only detections with score larger than this value are considered
-    color=['r','b','g','k','y']
-    obj_labels = ['Occ', 'CME','N/A','N/A']
+    scr_threshold = 0.3 # only detections with score larger than this value are considered
+    color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
+    obj_labels = ['Back', 'Occ','CME','N/A']
     #
     cmap = mpl.colors.ListedColormap(color)  
     nans = np.full(np.shape(orig_img[0]), np.nan)
@@ -238,7 +238,7 @@ opath= model_path + "/infer_neural_cme_seg_exp_paper"
 file_ext=".png"
 trained_model = '6000.torch'
 do_run_diff = True # set to use running diff instead of base diff (False)
-occ_size = 0 # occulter radius in pixels. An artifitial occulter with constant value equal to the mean of the image is added before inference. Use 0 to avoid
+occ_size = [0,45,90] # Artifitial occulter radius in pixels. Use 0 to avoid. [Stereo a/b C1, Stereo a/b C2, Lasco C2]
 
 #main
 gpu=0 # GPU to use
@@ -258,23 +258,45 @@ file.close()
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 
 for ev in event:
+    print(f'Processing event {ev["date"]}')
+
+    #cora    
+    all_occ_size = []
+    all_diff_img = []    
     for t in range(len(ev['pro_files'])):
-        #cora
         cimga= ev['ima1'][t]
+        # sets occ radius
+        if cimga.find('cor1') > 0:
+            cur_occ_size = occ_size[0]
+        elif cimga.find('cor2') > 0:
+            cur_occ_size = occ_size[1]     
+        else:
+            cur_occ_size = 0   
+        all_occ_size.append(cur_occ_size)
+        
         if do_run_diff:
             cprea = ev['ima0'][t]
         else:
             cprea = ev['pre_ima'][t]
-        print('Inference of imge:'+cimga)     
-        try:
-            img = read_fits(cimga) -read_fits(cprea) 
-            orig_imga, maska, scra, labelsa, boxesa  = nn_seg.infer(img, occulter_size=occ_size)
-        except:
-            orig_imga = np.zeros((512,512))
-            print(f'Inference skipped')
+            
+        img = read_fits(cimga) -read_fits(cprea) 
+        all_diff_img.append(img)
+    # inference of all images in the event
+    orig_img, mask, scr, labels, boxes  = nn_seg.infer_event(all_diff_img, occulter_size=all_occ_size)
 
-        #corb
+    #corb
+    all_occ_size = []
+    all_diff_img = []
+    for t in range(len(ev['pro_files'])):
         cimgb= ev['imb1'][t]
+        # sets occ radius
+        if cimgb.find('cor1') > 0:
+            cur_occ_size = occ_size[0]
+        elif cimgb.find('cor2') > 0:
+            cur_occ_size = occ_size[1]     
+        else:
+            cur_occ_size = 0  
+
         if do_run_diff:
             cpreb = ev['imb0'][t]
         else:
@@ -282,12 +304,18 @@ for ev in event:
         print('Inference of imge:'+cimgb)
         try:
             img = read_fits(cimgb) - read_fits(cpreb)
-            orig_imgb, maskb, scrb, labelsb, boxesb = nn_seg.infer(img, occulter_size=occ_size)
+            orig_imgb, maskb, scrb, labelsb, boxesb = nn_seg.infer(img, occulter_size=cur_occ_size)
         except:
             orig_imgb = np.zeros((512,512))
             print(f'Inference skipped')
-                
-        #lasco
+    # inference of all images in the event
+    orig_img, mask, scr, labels, boxes  = nn_seg.infer_event(all_diff_img, occulter_size=all_occ_size)
+            
+
+    #lasco
+    all_occ_size = []
+    all_diff_img = []
+    for t in range(len(ev['pro_files'])):
         cimgl= ev['lasco1'][t]
         if do_run_diff:
             cprel = ev['lasco0'][t]
@@ -296,12 +324,79 @@ for ev in event:
         print('Inference of imge:'+cimgl)
         try:
             img = read_fits(cimgl) - read_fits(cprel)
-            orig_imgl, maskl, scrl, labelsl, boxesl = nn_seg.infer(img, occulter_size=occ_size)
+            orig_imgl, maskl, scrl, labelsl, boxesl = nn_seg.infer(img, occulter_size=occ_size[2])
         except:
             orig_imgl = np.zeros((512,512))
             print(f'Inference skipped')   
 
-        ofile = os.path.join(opath,os.path.basename(ev['pro_files'][t])+'.png')
-        plot_to_png(ofile, [orig_imga,orig_imgb, orig_imgl], [maska,maskb,maskl], \
-                    title=[cimga, cprea, cimgb, cpreb, cimgl, cprel], labels=[labelsa,labelsb, labelsl], \
-                    boxes=[boxesa, boxesb, boxesl], scores=[scra, scrb, scrl])
+    # inference of all images in the event
+    orig_img, mask, scr, labels, boxes  = nn_seg.infer_event(all_diff_img, occulter_size=all_occ_size)
+            
+
+
+# for ev in event:
+#     print(f'Processing event {ev["date"]}')
+#     for t in range(len(ev['pro_files'])):
+#         #cora
+#         cimga= ev['ima1'][t]
+#         # sets occ radius
+#         if cimga.find('cor1') > 0:
+#             cur_occ_size = occ_size[0]
+#         elif cimga.find('cor2') > 0:
+#             cur_occ_size = occ_size[1]     
+#         else:
+#             cur_occ_size = 0   
+
+#         if do_run_diff:
+#             cprea = ev['ima0'][t]
+#         else:
+#             cprea = ev['pre_ima'][t]
+            
+#         print('Inference of imge:'+cimga)     
+#         try:
+#             img = read_fits(cimga) -read_fits(cprea) 
+#             orig_imga, maska, scra, labelsa, boxesa  = nn_seg.infer(img, occulter_size=cur_occ_size)
+#         except:
+#             orig_imga = np.zeros((512,512))
+#             print(f'Inference skipped')
+
+#         #corb
+#         cimgb= ev['imb1'][t]
+#         # sets occ radius
+#         if cimgb.find('cor1') > 0:
+#             cur_occ_size = occ_size[0]
+#         elif cimgb.find('cor2') > 0:
+#             cur_occ_size = occ_size[1]     
+#         else:
+#             cur_occ_size = 0  
+
+#         if do_run_diff:
+#             cpreb = ev['imb0'][t]
+#         else:
+#             cpreb = ev['pre_imb'][t]
+#         print('Inference of imge:'+cimgb)
+#         try:
+#             img = read_fits(cimgb) - read_fits(cpreb)
+#             orig_imgb, maskb, scrb, labelsb, boxesb = nn_seg.infer(img, occulter_size=cur_occ_size)
+#         except:
+#             orig_imgb = np.zeros((512,512))
+#             print(f'Inference skipped')
+                
+#         #lasco
+#         cimgl= ev['lasco1'][t]
+#         if do_run_diff:
+#             cprel = ev['lasco0'][t]
+#         else:
+#             cprel = ev['pre_lasco'][t]
+#         print('Inference of imge:'+cimgl)
+#         try:
+#             img = read_fits(cimgl) - read_fits(cprel)
+#             orig_imgl, maskl, scrl, labelsl, boxesl = nn_seg.infer(img, occulter_size=occ_size[2])
+#         except:
+#             orig_imgl = np.zeros((512,512))
+#             print(f'Inference skipped')   
+
+#         ofile = os.path.join(opath,os.path.basename(ev['pro_files'][t])+'.png')
+#         plot_to_png(ofile, [orig_imga,orig_imgb, orig_imgl], [maska,maskb,maskl], \
+#                     title=[cimga, cprea, cimgb, cpreb, cimgl, cprel], labels=[labelsa,labelsb, labelsl], \
+#                     boxes=[boxesa, boxesb, boxesl], scores=[scra, scrb, scrl])
