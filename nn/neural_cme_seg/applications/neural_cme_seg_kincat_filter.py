@@ -171,7 +171,7 @@ for ext_folder in ext_folders:
         df_filtered=filter_mask(df)
         # saves the filtered df
         os.makedirs(opath, exist_ok=True)
-        df.to_csv(opath+'/'+str(ext_folder)+'.csv', index=False)
+        df_filtered.to_csv(opath+'/'+str(ext_folder)+'.csv', index=False)
         graphics(df_filtered, parameters_to_plot, opath, fit_err_func, fit_func, in_cond)
     except:
         print('Error processing '+ext_folder)
