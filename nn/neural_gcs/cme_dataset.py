@@ -4,7 +4,7 @@ import torch
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-mpl.use('TkAgg')
+mpl.use('Agg')
 from torchvision.io import read_image
 from torch.utils.data import Dataset
 
@@ -48,6 +48,7 @@ class CmeDataset(Dataset):
         resize = torchvision.transforms.Resize(self.image_size, torchvision.transforms.InterpolationMode.BILINEAR)
         mask = resize(mask)
         occulter_mask = resize(occulter_mask)
+        #mask = torch.flip(mask, dims=[1])
         parameters = file[0].split('_')
         parameters = parameters[:6]
         parameters = [float(p) for p in parameters]
@@ -66,8 +67,7 @@ class CmeDataset(Dataset):
         # plt.imshow(img[0,:,:])
         # plt.show()
         # plt.close()
-
-        return img, parameters, mask, occulter_mask, satpos, plotranges
+        return img, parameters, mask, occulter_mask, satpos, plotranges, idx
 
     def __normalize(self, img):
         sd_range = 1
