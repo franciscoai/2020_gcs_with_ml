@@ -18,21 +18,22 @@ from torch.utils.data import random_split
 INFERENCE_MODE = False
 SAVE_MODEL = True
 LOAD_MODEL = False
-EPOCHS = 5
+BACKBONE_MODEL = 'maskrcnn'
+EPOCHS = 15
 BATCH_LIMIT = None
-BATCH_SIZE = 64
-IMG_SiZE = [512, 512]
+BATCH_SIZE = 32
+IMG_SiZE = [256, 256]
 GPU = 0
-LR = [1e-2, 1e-3]
+LR = [1e-1, 1e-3]
 # CMElon,CMElat,CMEtilt,height,k,ang
 GCS_PAR_RNG = torch.tensor([[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60]]) 
 LOSS_WEIGHTS = torch.tensor([100,100,100,10,1,10])
 TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_mariano'
-OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/cme_seg_training_mariano_fulldataset1"
+OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/cme_seg_training_mariano_fulldataset2"
 os.makedirs(OPATH, exist_ok=True)
 
 #Backbone Parameters
-TRAINABLE_LAYERS = 4
+TRAINABLE_LAYERS = 0
 
 def save_model(model, namefile):
     models_path = os.path.join(OPATH, 'models')
@@ -139,6 +140,7 @@ def optimize(batch_limit=BATCH_LIMIT):
         stop_flag = False
         total_batch_per_epoch = 0
         for i, (inputs, targets, mask, occulter_mask, satpos, plotranges, idx) in enumerate(cme_train_dataloader, 0):
+            model.backbone.eval()
             total_batch_per_epoch += 1
             inputs, targets = inputs.to(device), targets.to(device)
             # send inputs to model and get predictions
@@ -191,11 +193,10 @@ if __name__ == "__main__":
     print(f'Running on {device}')
 
     # Define model, criterion, optimizer and scheduler
-    backbone = torchvision.models.resnet18(weights='DEFAULT', num_classes=1000)
-    backbone = backbone.to(device)
-    model = Mlp_Resnet(backbone=backbone, gcs_par_rng=GCS_PAR_RNG, trainable_layers=TRAINABLE_LAYERS)
+    model = Mlp_Resnet(device=GPU, backbone_model=BACKBONE_MODEL, gcs_par_rng=GCS_PAR_RNG, trainable_layers=TRAINABLE_LAYERS, imsize=IMG_SiZE)
     criterion = torch.nn.MSELoss()
-    model_params = [param for param in model.backbone.parameters() if param.requires_grad] + [param for param in model.parameters() if param.requires_grad]
+    #model_params = [param for param in model.backbone.parameters() if param.requires_grad] + [param for param in model.parameters() if param.requires_grad]
+    model_params = [param for param in model.parameters() if param.requires_grad]
     optimizer = torch.optim.Adam(model_params, lr=LR[0])
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=(len(cme_train_dataloader)/BATCH_SIZE)*EPOCHS, eta_min=LR[1])
 
