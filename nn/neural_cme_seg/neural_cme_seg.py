@@ -241,10 +241,54 @@ class neural_cme_segmentation():
                 prop_list.append([i,float(scores[i]),None, None, None])                                   
         return prop_list         
 
-    def infer_event(self, imgs, model_param=None, resize=True, occulter_size=0, mask_threshold=None, scr_threshold=None):
+    def _filter_masks(self, dates, masks, scores, labels, boxes, mask_prop):
+        '''
+        Filters the masks based on the cpa, aw and apex radius evolution consistency
+        '''
+        cpa_criterion = np.radians(15.) # criterion for the cpa angle [deg]
+        apex_rad_crit = 0.2 # criterion for the apex radius [%]
+        date_crit = 5. # criterion for the date, max [hours] for an acceptable gap. if larger it keeps later group only
+        aw_crit = np.radians(15.) # criterion for the angular width [deg]
+
+        ok_masks, ok_scores, ok_lbl, ok_boxes = [], [], [], []
+        for i in range(len(masks)):
+            breakpoint()
+            # filters DATES too far from the median
+            x_points=np.array([i.timestamp() for i in dates])
+            date_diff = x_points[1:]-x_points[:-1]
+            date_diff = np.abs(date_diff-np.median(date_diff))
+            gap_idx = np.where(date_diff>date_crit*3600.)[0]
+            # keeps only the later group
+            if len(gap_idx)>0:
+                gap_idx = gap_idx[0]
+                df = df.iloc[gap_idx+1:]
+
+            # filters on 'CPA_ANG'
+            x_points=np.array([i.timestamp() for i in dates])
+            y_points=np.array(df['CPA_ANG'])
+            ok_idx = filter_param(x_points, y_points, linear_error, linear, [1.,1.], cpa_criterion, percentual=False)
+            df = df.iloc[ok_idx]
+
+            # filters on 'APEX_RADIUS'
+            x_points=np.array([i.timestamp() for i in dates])
+            y_points=np.array(df['APEX_RADIUS'])
+            ok_idx = filter_param(x_points,y_points, quadratic_error, quadratic,[0., 1.,1.], apex_rad_crit, percentual=True)
+            df = df.iloc[ok_idx]
+            
+            # filters on 'WIDTH_ANG'
+            x_points=np.array([i.timestamp() for i in dates])
+            y_points=np.array(df['WIDE_ANG'])
+            ok_idx = filter_param(x_points,y_points, linear_error, linear,[1.,1.], aw_crit, percentual=False)
+            df = df.iloc[ok_idx]
+
+        return ok_masks, ok_scores, ok_lbl, ok_boxes
+        
+    def infer_event(self, imgs, dates, model_param=None, resize=True, occulter_size=0, mask_threshold=None, scr_threshold=None):
         '''
         Infers masks for a temporal series of images belonging to the same event. It filters the masks found in the
-        indidivual images using morphological and kinematic consistency criteria
+        individual images using morphological and kinematic consistency criteria
+
+        dates: list of datetime objects with the date of each image
 
         model_param: model parameters to use for inference. If None, the model parameters given at initialization are used
         resize: if True, the input image is resized to the size of the training images
@@ -255,7 +299,7 @@ class neural_cme_segmentation():
         if scr_threshold is not None:
             self.scr_threshold = scr_threshold
 
-        #Get the mas for all images in imgs
+        #Get the mask for all images in imgs
         all_masks = []
         all_scores = []
         all_lbl = []
@@ -274,6 +318,6 @@ class neural_cme_segmentation():
             # compute cpa, aw and apex
             mask_prop = self._compute_mask_prop(mask, score, lbl, box)
             all_mask_prop.append(mask_prop)
-        # keeps only one mask per imgs based on cpa, aw and apex radius evolution consistency
-        ok_masks, ok_scores, ok_lbl, ok_boxes = self._filter_masks(all_masks, all_scores, all_lbl, all_boxes, all_mask_prop)
+        # keeps only one mask per img based on cpa, aw and apex radius evolution consistency
+        ok_masks, ok_scores, ok_lbl, ok_boxes = self._filter_masks(dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop)
         return all_orig_img, ok_masks, ok_scores, ok_lbl, ok_boxes

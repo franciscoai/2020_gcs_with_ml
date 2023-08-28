@@ -12,6 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
 from ext_libs.rebin import rebin
 import csv
 from nn.neural_cme_seg.neural_cme_seg import neural_cme_segmentation
+import datetime
 
 def correct_path(s):
     s = s.replace("(1)", "")
@@ -171,12 +172,15 @@ def get_paths_cme_exp_sources():
         event.append(cdict)
     return event
 
-def read_fits(file_path):
+def read_fits(file_path, header=False):
     imageSize=[512,512]
     try:       
         img = fits.open(file_path)[0].data
         img = rebin(img, imageSize)   
-        return img  
+        if header:
+            return img, fits.open(file_path)[0].header
+        else:
+            return img 
     except:
         print(f'WARNING. I could not find file {file_path}')
         return None
@@ -259,10 +263,10 @@ nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ t
 
 for ev in event:
     print(f'Processing event {ev["date"]}')
-
     #cora    
     all_occ_size = []
     all_diff_img = []    
+    all_dates = []
     for t in range(len(ev['pro_files'])):
         cimga= ev['ima1'][t]
         # sets occ radius
@@ -279,10 +283,13 @@ for ev in event:
         else:
             cprea = ev['pre_ima'][t]
             
-        img = read_fits(cimga) -read_fits(cprea) 
+        imga, ha = read_fits(cimga, header=True)
+        img = imga-read_fits(cprea) 
         all_diff_img.append(img)
+        # append DATE-OBS as datetime object
+        all_dates.append(datetime.datetime.strptime(ha['DATE-OBS'], '%Y-%m-%dT%H:%M:%S.%f'))
     # inference of all images in the event
-    orig_img, mask, scr, labels, boxes  = nn_seg.infer_event(all_diff_img, occulter_size=all_occ_size)
+    orig_img, mask, scr, labels, boxes  = nn_seg.infer_event(all_diff_img, all_dates, occulter_size=all_occ_size)
 
     #corb
     all_occ_size = []
