@@ -1,0 +1,43 @@
+Entrenamiento en set reducido utilizando mascaras:
+Posibles causas:
+    - Profundidad de la red. 
+        1. cme_seg_training_mariano_reduced: min 10, luego diverge a ~ 1000
+            * EPOCHS = 2000
+            * hidden_layer=[1024, 512, 256, 64]
+            * LeakyReLU()
+            * TRAINABLE_LAYERS = 3
+            * BATCH_SIZE = 16
+        2. cme_seg_training_mariano_reduced2 min 100, luego diverge a ~2000
+            * EPOCHS = 2000
+            * hidden_layer=[1024, 512, 256, 64]
+            * ReLU()
+            * TRAINABLE_LAYERS = 3
+            * BATCH_SIZE = 16
+        3. cme_seg_training_mariano_reduced3 min 2, oscila y sigue bajando
+            * EPOCHS = 2000
+            * hidden_layer=[256, 64]
+            * LeakyReLU()
+            * TRAINABLE_LAYERS = 3
+            * BATCH_SIZE = 64
+
+
+
+Entrenamiento en set completo utilizando mascaras:
+Posibles causas:
+    - Profundidad de la red. 
+        1. cme_seg_training_mariano_fulldataset0: min 1e3, no oscila, no converge
+            * restnet18
+            * Con Dropout con p=0.5
+            * EPOCHS = 5
+            * hidden_layer=[512, 256]
+            * LeakyReLU()
+            * TRAINABLE_LAYERS = 1
+            * BATCH_SIZE = 64
+        2. cme_seg_training_mariano_fulldataset1: 
+            * restnet18
+            * Con Dropout con p=0.5
+            * EPOCHS = 5
+            * hidden_layer=[512, 256]
+            * LeakyReLU()
+            * TRAINABLE_LAYERS = 4
+            * BATCH_SIZE = 64

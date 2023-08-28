@@ -13,4 +13,5 @@ def maskFromCloud(params, sat, satpos, imsize, plotranges):
     y = clouds[0, :, 2]
     p_x,p_y=deg2px(x,y,plotranges,imsize,sat)
     mask=get_mask_cloud(p_x,p_y,imsize)
+    mask = np.flip(mask, axis=0)
     return mask
