@@ -53,36 +53,54 @@ def get_seeds(folder,sat):
     return df_full
 
 def comparator(kincat,seeds):
+    columns=["PATH","KINCAT_DATE_TIME","SEEDS_DATE_TIME","KINCAT_CPA_ANG_MEDIAN","KINCAT_CPA_ANG_STD","SEEDS_CPA_ANG","KINCAT_WIDE_ANG_MEDIAN","KINCAT_WIDE_ANG_STD","SEEDS_WIDE_ANG"]
+    kincat_ang_col=['MIN_ANG', 'MAX_ANG','CPA_ANG', 'WIDE_ANG', 'MASS_CENTER_ANG', 'APEX_ANG']
+       
+    compare=[]
+    #converts to datetime objs and sort the df
     seeds['DATE_TIME'] = pd.to_datetime(seeds['DATE_TIME'], format="YYYY/MM/DD HH:MM:SS")
     kincat['DATE_TIME'] = pd.to_datetime(kincat['DATE_TIME'])
     kincat.sort_values(by='DATE_TIME', inplace=True)
     seeds.sort_values(by='DATE_TIME', inplace=True)
     kincat['DATE'] = kincat['DATE_TIME'].dt.date
     kincat['TIME'] = pd.to_datetime(kincat['DATE_TIME']).dt.time
+    #adjust the 0 degree to the nort
+    for i in kincat_ang_col:
+        kincat[i]=kincat[i]-np.radians(90)
+  
 
-    df = kincat.groupby('DATE').agg({'WIDE_ANG': ['mean', 'std'],'CPA_ANG': ['median', 'std'],})
+    #goups all the hours in each day and calculates medain a std of cpa_ang and wide_ang
+    df = kincat.groupby('DATE').agg({'WIDE_ANG': ['median', 'std'],'CPA_ANG': ['median', 'std'],})
     df = df.reset_index()
+    #calculate the unique dates in kincat and conservs only those ones in seeds
     unique_dates_kincat = kincat['DATE_TIME'].dt.date.unique()
     seeds = seeds[seeds['DATE_TIME'].dt.date.isin(unique_dates_kincat)].reset_index()
+    #keeps the first hour of everey day
+    kincat_min= kincat.groupby('DATE')['TIME'].min().reset_index()
     
-    kincat_data= kincat.groupby('DATE')['TIME'].min().reset_index()
-    for i in range(len(kincat_data)):
-        
-        
-        if kincat_data['DATE'][i] == (pd.to_datetime(seeds['DATE'][i])).date():
-
-
-
-
-
-            breakpoint()
-            return idx
+    #creates the list to compare the events in kincat and seeds
+    for i in range(len(kincat_min)):
+        kincat_min['DATE_TIME'] = kincat_min.apply(lambda row: datetime.combine(row['DATE'], row['TIME']), axis=1)
+        kincat_date=kincat_min["DATE_TIME"][i]
+        path=kincat.loc[kincat["DATE_TIME"]==kincat_date, "PATH"].values[0]
+        seeds['TIME_DIFF'] = seeds['DATE_TIME'] - pd.to_datetime(kincat_date)
+        positive_time_diff = seeds[seeds['TIME_DIFF'] >= pd.Timedelta(0)]
+        min_positive_idx = positive_time_diff['TIME_DIFF'].idxmin()
+        seeds_data = seeds.loc[min_positive_idx]
+        cpa_ang_seeds=np.radians(seeds_data["CPA_ANG"])
+        wide_ang_seeds=np.radians(seeds_data["WIDE_ANG"])
+        compare.append([path,kincat_date,seeds_data["DATE_TIME"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,df["WIDE_ANG"]["median"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds])
+    
+    compare = pd.DataFrame(compare, columns=columns)
+    return compare
 
 ################################################################################### MAIN ######################################################################################
 
 import os
-import pandas as pd
 import requests
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
 from datetime import timedelta, datetime
 
@@ -92,4 +110,27 @@ sat="cor2_a"#cor2_b
 
 kincat=get_kincat(odir,sat)
 seeds=get_seeds(folder,sat)
-final_df=comparator(kincat,seeds)
+df=comparator(kincat,seeds)
+
+
+fig, ax = plt.subplots(figsize=(6, 6))
+ax.scatter(df["KINCAT_CPA_ANG_MEDIAN"], df["SEEDS_CPA_ANG"], color='blue', label='CPA')
+ax.errorbar(df["KINCAT_CPA_ANG_MEDIAN"], df["SEEDS_CPA_ANG"], yerr=df["KINCAT_CPA_ANG_STD"], fmt='o', color='blue', ecolor='gray', capsize=5, label='STD')
+ax.plot([0, 7.5], [0, 7.5], color='red', linestyle='--')
+ax.set_xlabel('Kincat')
+ax.set_ylabel('Seeds')
+ax.set_title('CPA ANG')
+ax.legend()
+ax.grid(True)
+
+fig2, ax2 = plt.subplots(figsize=(6, 6))
+ax2.scatter(df["KINCAT_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"], color='blue', label='CPA')
+ax2.errorbar(df["KINCAT_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"], yerr=df["KINCAT_WIDE_ANG_STD"], fmt='o', color='blue', ecolor='gray', capsize=5, label='STD')
+ax2.plot([0, 7.5], [0, 7.5], color='red', linestyle='--')
+ax2.set_xlabel('Kincat')
+ax2.set_ylabel('Seeds')
+ax2.set_title('WIDE ANG')
+ax2.legend()
+ax2.grid(True)
+plt.show()
+plt.close()
