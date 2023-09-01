@@ -92,9 +92,6 @@ def linear(t,a,b):
 def linear_error(p, x, y, w):
     return w*(linear(x, *p) - y)
 
-# def sqrt_func(t,a,b,c):
-#     return np.sqrt(a*t + b) + c 
-
 def filter_param(x,y, error_func, fit_func, in_cond, criterion, percentual=True):
     '''
     Deletes the points that are more than criterion from the fit function given by fit_func
