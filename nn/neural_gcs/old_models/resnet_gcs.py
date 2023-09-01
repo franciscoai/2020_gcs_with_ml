@@ -19,12 +19,12 @@ INFERENCE_MODE = False
 SAVE_MODEL = True
 LOAD_MODEL = False
 BACKBONE_MODEL = 'maskrcnn'
-EPOCHS = 15
+EPOCHS = 5
 BATCH_LIMIT = None
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 IMG_SiZE = [256, 256]
 GPU = 0
-LR = [1e-1, 1e-3]
+LR = [1e-3, 1e-4]
 # CMElon,CMElat,CMEtilt,height,k,ang
 GCS_PAR_RNG = torch.tensor([[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60]]) 
 LOSS_WEIGHTS = torch.tensor([100,100,100,10,1,10])

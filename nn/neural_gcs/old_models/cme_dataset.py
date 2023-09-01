@@ -34,11 +34,11 @@ class CmeDataset(Dataset):
     def __getitem__(self, idx):
         file = [f for f in os.listdir(self.imgs[idx]) if f.endswith(self.file_ext)]
         mask_dir = os.path.join(self.imgs[idx], 'mask')
-        img = read_image(os.path.join(self.imgs[idx], file[0]), mode=torchvision.io.image.ImageReadMode.GRAY)
+        img = read_image(os.path.join(self.imgs[idx], file[0]), mode=torchvision.io.image.ImageReadMode.RGB)
         mask = read_image(os.path.join(mask_dir, '2.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
         img[0,:,:] = mask
-        # img[1,:,:] = mask
-        # img[2,:,:] = mask
+        img[1,:,:] = mask
+        img[2,:,:] = mask
         img = img.float()
         img = self.__normalize(img)
         img = self.transform(img)
@@ -57,6 +57,7 @@ class CmeDataset(Dataset):
         plotranges = torch.tensor(eval(self.csv_df["plotranges"].iloc[idx]), dtype=torch.float32)
         
         #Squeeze everything
+        img = torch.squeeze(img)
         parameters = torch.squeeze(parameters)
         mask = torch.squeeze(mask)
         occulter_mask = torch.squeeze(occulter_mask)
@@ -66,7 +67,7 @@ class CmeDataset(Dataset):
         # plt.imshow(img[0,:,:])
         # plt.show()
         # plt.close()
-        return img, parameters #, mask, occulter_mask, satpos, plotranges, idx
+        return img, parameters, mask, occulter_mask, satpos, plotranges, idx
 
     def __normalize(self, img):
         sd_range = 1
