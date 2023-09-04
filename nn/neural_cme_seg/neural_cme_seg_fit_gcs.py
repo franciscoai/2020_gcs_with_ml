@@ -21,7 +21,7 @@ __email__ = "franciscoaiglesias@gmail.com"
 
 def load_data(dpath):
     """
-    Load all .fits files from directory dpath in order and in blocks grouped by the file basename using '_' separator
+    Load all .fits files from directory dpath in order and in blocks grouped by the file basename using the last '_' separator
     :param dpath: directory path
     :return: images and headers lists
     """
@@ -45,7 +45,8 @@ def load_data(dpath):
     osatpos = []
     oplotranges = []
     ofilenames = []
-    files_base = [os.path.basename(f).split('_')[0] for f in filenames]
+    # splits based on the last '_' separator, keeps the first part
+    files_base = [f.split('_')[0] + '_' + f.split('_')[1] for f in filenames]
     for f in np.unique(files_base):
         idx = [i for i, x in enumerate(files_base) if x == f]
         omasks.append([masks[i] for i in idx])
@@ -105,9 +106,9 @@ def mask_error(gcs_par, satpos, plotranges, masks, imsize):
 Fits a filled masks created with GCS model to the data
 '''
 #Constants
-dpath =  '/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20130209_filter_True'
+dpath =  '/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20130424_filter_True'
 opath = dpath + '/gcs_fit'
-manual_gcs = '/gehme/projects/2019_cme_expansion/repo_fran/2020_cme_expansion/GCSs/GCS_20130209/2.sav'
+manual_gcs = '/gehme/projects/2019_cme_expansion/repo_fran/2020_cme_expansion/GCSs/GCS_20130424/1.sav'
 imsize = [512, 512] # image size
 
 # Load data

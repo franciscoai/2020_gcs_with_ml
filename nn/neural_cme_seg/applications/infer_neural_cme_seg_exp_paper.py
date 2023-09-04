@@ -274,6 +274,7 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
                     h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
                     h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
                     h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
+                    
 
                     fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
 

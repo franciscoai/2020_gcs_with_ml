@@ -3,10 +3,10 @@ import numpy as np
 
 def center_rSun_pixel(headers, plotranges, sat):
     '''
-    Gets the location of Suncenter in pixels
+    Gets the location of Suncenter in deg
     '''    
-    x_cS = headers[sat]['CRPIX1'] #(headers[sat]['CRPIX1']*plotranges[sat][sat]*2) / headers[sat]['NAXIS1'] - plotranges[sat][sat]
-    y_cS = headers[sat]['CRPIX2'] #(headers[sat]['CRPIX2']*plotranges[sat][sat]*2) / headers[sat]['NAXIS2'] - plotranges[sat][sat]
+    x_cS = (headers[sat]['CRPIX1']*plotranges[sat][sat]*2) / headers[sat]['NAXIS1'] - plotranges[sat][sat] #  headers[sat]['CRPIX1'] 
+    y_cS = (headers[sat]['CRPIX2']*plotranges[sat][sat]*2) / headers[sat]['NAXIS2'] - plotranges[sat][sat] #  headers[sat]['CRPIX2'] 
     return x_cS, y_cS
 
 def deg2px(x,y,plotranges,imsize,sat):
