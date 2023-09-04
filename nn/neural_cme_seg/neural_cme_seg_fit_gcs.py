@@ -6,6 +6,7 @@ from scipy.optimize import least_squares
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import sys
+from scipy.io import readsav
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 from nn.utils.gcs_mask_generator import maskFromCloud_3d
 from pyGCS_raytrace import pyGCS
@@ -18,48 +19,75 @@ __maintainer__ = "Francisco Iglesias"
 __email__ = "franciscoaiglesias@gmail.com"
 
 
-def load_data(dpath, nsat=3):
+def load_data(dpath):
     """
-    Load all .fits files from directory dpath in order
+    Load all .fits files from directory dpath in order and in blocks grouped by the file basename using '_' separator
     :param dpath: directory path
-    :nsat: number of satellites (views) to use. Rearanges the lists in blocks of nsat
     :return: images and headers lists
     """
-    images = []
+    masks = []
     headers = []
     filenames = []
-    for filename in sorted(os.listdir(dpath)):
-        if filename.endswith(".fits"):
-            filenames.append(filename)
-            hdu = fits.open(os.path.join(dpath, filename))
-            images.append(hdu[0].data)
-            hdr = hdu[0].header
-            headers.append(hdr) 
+    files = sorted(os.listdir(dpath))
+    files =[f for f in files if f.endswith(".fits")]
+    for f in files:
+        filenames.append(f)
+        hdu = fits.open(os.path.join(dpath, f))
+        masks.append(hdu[0].data)
+        hdr = hdu[0].header
+        headers.append(hdr) 
 
     #satpos and plotranges
     satpos, plotranges = pyGCS.processHeaders(headers)  
 
-    # rearrange lists in blocks of nsat
-    images = np.array(images)
-    filenames = np.array(filenames)
-    satpos = np.array(satpos)
-    plotranges = np.array(plotranges)
-    images = images.reshape(-1, nsat, images.shape[1], images.shape[2])
-    filenames = filenames.reshape(-1, nsat)
-    satpos = satpos.reshape(-1, nsat, satpos.shape[1])
-    plotranges = plotranges.reshape(-1, nsat, plotranges.shape[1])
-    # transform back to list
-    images = images.tolist()
-    filenames = filenames.tolist()
-    satpos = satpos.tolist()
-    plotranges = plotranges.tolist()
+    # reshape the lists in blocks based on the file basename
+    omasks =[]
+    osatpos = []
+    oplotranges = []
+    ofilenames = []
+    files_base = [os.path.basename(f).split('_')[0] for f in filenames]
+    for f in np.unique(files_base):
+        idx = [i for i, x in enumerate(files_base) if x == f]
+        omasks.append([masks[i] for i in idx])
+        osatpos.append([satpos[i] for i in idx])
+        oplotranges.append([plotranges[i] for i in idx])
+        ofilenames.append([filenames[i] for i in idx])
+  
+    return omasks, ofilenames, osatpos, oplotranges
 
-    return images, filenames, satpos, plotranges
-
-def mask_error(gcs_par, satpos, plotranges, masks):
+def plot_to_png(ofile, fnames,omask, fitmask):
     """
-    Computes the error between the masks and the GCS model
-    :param gcs_par: GCS model parameters
+    plots the original mask and the fitted masks to a png file
+    """    
+    color=['b','r','g','k','y','m','c','w','b','r','g','k','y','m','c','w']
+    cmap = mpl.colors.ListedColormap(color)  
+    nans = np.full(np.shape(omask[0]), np.nan)
+    fig, axs = plt.subplots(2, 3, figsize=[20,10])
+    axs = axs.ravel()
+    for i in range(len(fnames)):
+        axs[i].imshow(omask[i], vmin=0, vmax=1, cmap='gray', origin='lower')
+        axs[i].axis('off')
+        axs[i+3].imshow(fitmask[i], vmin=0, vmax=1, cmap='gray', origin='lower')        
+        axs[i+3].axis('off')        
+        # masked = nans.copy()
+        # masked[:, :][omask[i] > 0.1] = 0              
+        # axs[i].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
+        # masked = nans.copy()
+        # masked[:, :][fitmask[i] > 0.1] = 0
+        # axs[i+3].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
+    axs[0].set_title(f'Cor A: {fnames[0]}')
+    axs[1].set_title(f'Cor B: {fnames[1]}')
+    axs[2].set_title(f'Lasco: {fnames[2]}')   
+
+    plt.tight_layout()
+    plt.savefig(ofile)
+    plt.close()
+
+def mask_error(gcs_par, satpos, plotranges, masks, imsize):
+    """
+    Computes the error between the input masks and the maks from GCS model
+    :param gcs_par: GCS model parameters. The param are: CMElon, CMElat, CMEtilt, k, ang, , height0, height1, height2, ...
+                    For all images they are all the same except for height, wich is different for each set of three images (time instant)
     :param satpos: satellite position
     :param plotranges: plot ranges
     :param masks: masks to compare
@@ -67,22 +95,36 @@ def mask_error(gcs_par, satpos, plotranges, masks):
     """
     error = 0
     for i in range(masks.shape[0]):
-        mask = maskFromCloud_3d(gcs_par, 0, satpos, plotranges, masks.shape[1:])
-        error += np.sum(np.abs(mask - masks[i]))
+        this_gcs_par = [gcs_par[0], gcs_par[1], gcs_par[2], gcs_par[5+i], gcs_par[3], gcs_par[4]] 
+        mask = maskFromCloud_3d(this_gcs_par, satpos, imsize, plotranges[0])
+        error += mask - masks[i]
     return error
-
 
 ############ Main
 '''
 Fits a filled masks created with GCS model to the data
 '''
 #Constants
-dpath =  '/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20130424_filter_True'
-nsat = 3 # number of satellites (views) to use
+dpath =  '/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20130209_filter_True'
+opath = dpath + '/gcs_fit'
+manual_gcs = '/gehme/projects/2019_cme_expansion/repo_fran/2020_cme_expansion/GCSs/GCS_20130209/2.sav'
 imsize = [512, 512] # image size
 
 # Load data
-images, fnames, satpos, plotranges = load_data(dpath, nsat=nsat)
+omask, fnames, satpos, plotranges = load_data(dpath)
 
-gcs_param_ini = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5]) # initial guess for GCS model parameters
-mask = maskFromCloud_3d(gcs_param_ini, satpos[0], imsize, plotranges[0]) # initial mask
+#loads manual gcs for IDL .save file
+#CMElon, CMElat, CMEtilt, height, k, ang
+gcs_param_ini = readsav(manual_gcs, python_dict=True)
+gcs_param_ini = [np.degrees(float(gcs_param_ini['sgui']['lon'])), np.degrees(float(gcs_param_ini['sgui']['lat'])), np.degrees(float(gcs_param_ini['sgui']['rot'])),
+                float(gcs_param_ini['sgui']['hgt']), float(gcs_param_ini['sgui']['rat']), np.degrees(float(gcs_param_ini['sgui']['han']))]
+
+# crate opath
+os.makedirs(opath, exist_ok=True)
+
+# fits gcs model to all images simultaneosly
+mask = maskFromCloud_3d(gcs_param_ini, satpos[1], imsize, plotranges[1])
+ofile = os.path.join(opath, 'gcs_fit.png')
+plot_to_png(ofile, fnames[1], omask[1], mask)
+
+breakpoint()

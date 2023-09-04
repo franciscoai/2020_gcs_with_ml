@@ -19,16 +19,14 @@ def maskFromCloud(params, sat, satpos, imsize, plotranges):
 def maskFromCloud_3d(params, satpos, imsize, plotranges):
     '''
     Same as maskFromCloud but returns as many mask as satpos provided
+    :params: CMElon, CMElat, CMEtilt, height, k, ang, satpos
     '''
     clouds = pyGCS.getGCS(params[0], params[1], params[2], params[3], params[4], params[5], satpos)        
     all_mask = []
     for sat in range(len(satpos)):       
         x = clouds[sat, :, 1]
         y = clouds[0, :, 2]
-        p_x,p_y=deg2px(x,y,plotranges,imsize,sat)
-        if sat==2:
-            breakpoint()
+        p_x,p_y=deg2px(x,y,plotranges, imsize, sat)
         mask=get_mask_cloud(p_x,p_y,imsize)
-        mask = np.flip(mask, axis=0)
         all_mask.append(mask)
     return all_mask

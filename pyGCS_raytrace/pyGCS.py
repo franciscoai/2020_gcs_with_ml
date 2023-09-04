@@ -199,8 +199,6 @@ def processHeaders(headers):
         xaxrange = [float(thisHead['CRPIX1'])*float(thisHead['CDELT1'])/rSun, (float(thisHead['NAXIS1'])-float(thisHead['CRPIX1']))*float(thisHead['CDELT1'])/rSun]
         yaxrange = [float(thisHead['CRPIX2'])*float(thisHead['CDELT2'])/rSun, (float(thisHead['NAXIS2'])-float(thisHead['CRPIX2']))*float(thisHead['CDELT2'])/rSun]
         plotranges.append([-xaxrange[0], xaxrange[1], -yaxrange[0], yaxrange[1]])  
-        if thisHead['TELESCOP'] == 'SOHO':    
-            breakpoint()      
     return satpos, plotranges
 
 

@@ -348,15 +348,15 @@ nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ t
 
 for ev in event:
     print(f'Processing event {ev["date"]}')
-    ev_opath = os.path.join(opath, ev['date'].split('/')[-1]) + '_filter_'+str(filter)
-    #corb
-    imgs_labels = ['imb1', 'imb0','pre_imb']
-    orig_imgb, datesb, maskb, scrb, labelsb, boxesb, mask_porpb, ha  = inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=filter) 
-    datesb = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesb]       
+    ev_opath = os.path.join(opath, ev['date'].split('/')[-1]) + '_filter_'+str(filter)   
     #cora    
     imgs_labels = ['ima1', 'ima0','pre_ima']
-    orig_imga, datesa, maska, scra, labelsa, boxesa, mask_porpa, hb = inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=filter)
+    orig_imga, datesa, maska, scra, labelsa, boxesa, mask_porpa, ha = inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=filter)
     datesa = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesa]      
+    #corb
+    imgs_labels = ['imb1', 'imb0','pre_imb']
+    orig_imgb, datesb, maskb, scrb, labelsb, boxesb, mask_porpb, hb  = inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=filter) 
+    datesb = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesb]        
     #lasco
     imgs_labels = ['lasco1', 'lasco0','pre_lasco']
     orig_imgl, datesl, maskl, scrl, labelsl, boxesl, mask_porpl, hl  = inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=filter)
