@@ -269,11 +269,7 @@ class neural_cme_segmentation():
                         distance_abs= max(distance, key=abs)
                         idx_dist = distance.index(distance_abs)
                         apex_dist= distance[idx_dist] * plate_scl
-                        # if self.debug_flag == 5:
-                        #     plt.hist(angles, bins=50)
-                        #     plt.savefig(self.plot_params + '/angles_hist.png')
-                        #     plt.close()
-                        #     breakpoint()                                       
+                                                              
                         if filter_halos:
                             if wide_ang < self.max_wide_ang:
                                 prop_list.append([i,float(scores[i]),cpa_ang, wide_ang, apex_dist])  
