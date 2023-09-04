@@ -120,11 +120,11 @@ def comparator(kincat,seeds,vourlidas):
     for i in kincat_ang_col:
         
         if i=="WIDE_ANG":
-            kincat[i]=abs(np.degrees(kincat[i]))
+            kincat[i]=np.degrees(kincat[i])
         
         else:
-            kincat[i]=-np.degrees(kincat[i])+270
-        kincat.loc[kincat[i] < 0, i] += 360 
+            kincat[i]= np.degrees(kincat[i])-90#-np.degrees(kincat[i])+270
+        #kincat.loc[kincat[i] < 0, i] += 360 
     
     
 
