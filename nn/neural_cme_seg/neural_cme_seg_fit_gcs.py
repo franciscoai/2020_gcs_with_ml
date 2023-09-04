@@ -1,14 +1,13 @@
 import os
 import numpy as np
 import cv2
-import torch
 import matplotlib as mpl
 from scipy.optimize import least_squares
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-from nn.utils.gcs_mask_generator import maskFromCloud
+from nn.utils.gcs_mask_generator import maskFromCloud_3d
 from pyGCS_raytrace import pyGCS
 mpl.use('Agg')
 
@@ -42,13 +41,20 @@ def load_data(dpath, nsat=3):
 
     # rearrange lists in blocks of nsat
     images = np.array(images)
-    headers = np.array(headers)
     filenames = np.array(filenames)
+    satpos = np.array(satpos)
+    plotranges = np.array(plotranges)
     images = images.reshape(-1, nsat, images.shape[1], images.shape[2])
-    headers = headers.reshape(-1, nsat)
     filenames = filenames.reshape(-1, nsat)
+    satpos = satpos.reshape(-1, nsat, satpos.shape[1])
+    plotranges = plotranges.reshape(-1, nsat, plotranges.shape[1])
+    # transform back to list
+    images = images.tolist()
+    filenames = filenames.tolist()
+    satpos = satpos.tolist()
+    plotranges = plotranges.tolist()
 
-    return images, fnames, satpos, plotranges
+    return images, filenames, satpos, plotranges
 
 def mask_error(gcs_par, satpos, plotranges, masks):
     """
@@ -61,7 +67,7 @@ def mask_error(gcs_par, satpos, plotranges, masks):
     """
     error = 0
     for i in range(masks.shape[0]):
-        mask = maskFromCloud(gcs_par, 0, satpos, plotranges, masks.shape[1:])
+        mask = maskFromCloud_3d(gcs_par, 0, satpos, plotranges, masks.shape[1:])
         error += np.sum(np.abs(mask - masks[i]))
     return error
 
@@ -78,5 +84,5 @@ imsize = [512, 512] # image size
 # Load data
 images, fnames, satpos, plotranges = load_data(dpath, nsat=nsat)
 
-#
-breakpoint()
+gcs_param_ini = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5]) # initial guess for GCS model parameters
+mask = maskFromCloud_3d(gcs_param_ini, satpos[0], imsize, plotranges[0]) # initial mask

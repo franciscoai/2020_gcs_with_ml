@@ -270,10 +270,10 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
                     sz_ratio = np.array(masked.shape)/np.array([h0['NAXIS1'], h0['NAXIS2']])
                     h0['NAXIS1'] = masked.shape[0]
                     h0['NAXIS2'] = masked.shape[1]
-                    h0['CDELT1'] = h0['CDELT1']*sz_ratio[0]
-                    h0['CDELT2'] = h0['CDELT2']*sz_ratio[1]
-                    h0['CRPIX2'] = int(h0['CRPIX2']/sz_ratio[1])
-                    h0['CRPIX1'] = int(h0['CRPIX1']/sz_ratio[1]) 
+                    h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
+                    h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
+                    h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
+                    h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
 
                     fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
 

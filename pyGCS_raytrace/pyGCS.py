@@ -176,22 +176,19 @@ def processHeaders(headers):
         # Stonyhurst coords for the sats
         thisHead = headers[i]
         # GEHME corrects header for SOHO 2023/08/07
-        try: # 
-            if thisHead['TELESCOP'] == 'SOHO': 
-                # Header fix
-                thisHead['OBSRVTRY'] = 'SOHO'
-                coordL2 = get_horizons_coord(-21, datetime.datetime.strptime(thisHead['DATE-OBS'], "%Y-%m-%dT%H:%M:%S.%f"), 'id')
-                #coordL2ston = get_body_heliographic_stonyhurst('-21', time=datetime.datetime.strptime(thisHead['DATE-OBS'], "%Y-%m-%dT%H:%M:%S.%f"))
-                #coordL2carr = coordL2ston.transform_to(sunpy.coordinates.frames.HeliographicCarrington)
-                coordL2carr = coordL2.transform_to(sunpy.coordinates.frames.HeliographicCarrington(observer='earth'))
-                coordL2ston = coordL2.transform_to(sunpy.coordinates.frames.HeliographicStonyhurst)
-                thisHead['DSUN_OBS'] = coordL2.radius.m
-                thisHead['CRLT_OBS'] = coordL2carr.lat.deg
-                thisHead['CRLN_OBS'] = coordL2carr.lon.deg
-                thisHead['HGLT_OBS'] = coordL2ston.lat.deg
-                thisHead['HGLN_OBS'] = coordL2ston.lon.deg
-        except:
-            continue
+        if thisHead['TELESCOP'] == 'SOHO': 
+            # Header fix
+            thisHead['OBSRVTRY'] = 'SOHO'
+            coordL2 = get_horizons_coord(-21, datetime.datetime.strptime(thisHead['DATE-OBS'], "%Y-%m-%dT%H:%M:%S.%f"), 'id')
+            #coordL2ston = get_body_heliographic_stonyhurst('-21', time=datetime.datetime.strptime(thisHead['DATE-OBS'], "%Y-%m-%dT%H:%M:%S.%f"))
+            #coordL2carr = coordL2ston.transform_to(sunpy.coordinates.frames.HeliographicCarrington)
+            coordL2carr = coordL2.transform_to(sunpy.coordinates.frames.HeliographicCarrington(observer='earth'))
+            coordL2ston = coordL2.transform_to(sunpy.coordinates.frames.HeliographicStonyhurst)
+            thisHead['DSUN_OBS'] = coordL2.radius.m
+            thisHead['CRLT_OBS'] = coordL2carr.lat.deg
+            thisHead['CRLN_OBS'] = coordL2carr.lon.deg
+            thisHead['HGLT_OBS'] = coordL2ston.lat.deg
+            thisHead['HGLN_OBS'] = coordL2ston.lon.deg
         # GEHME changed HGLN_OBS to CRLN_OBS : 2023/06/30
         satpos.append([float(thisHead['CRLN_OBS']), float(thisHead['HGLT_OBS']), float(thisHead['CROTA'])])
         # GEHME changed to use the correct Sun center 2023/08/07
@@ -201,7 +198,9 @@ def processHeaders(headers):
         # plotranges.append([-xaxrange, xaxrange, -yaxrange, yaxrange])
         xaxrange = [float(thisHead['CRPIX1'])*float(thisHead['CDELT1'])/rSun, (float(thisHead['NAXIS1'])-float(thisHead['CRPIX1']))*float(thisHead['CDELT1'])/rSun]
         yaxrange = [float(thisHead['CRPIX2'])*float(thisHead['CDELT2'])/rSun, (float(thisHead['NAXIS2'])-float(thisHead['CRPIX2']))*float(thisHead['CDELT2'])/rSun]
-        plotranges.append([-xaxrange[0], xaxrange[1], -yaxrange[0], yaxrange[1]])        
+        plotranges.append([-xaxrange[0], xaxrange[1], -yaxrange[0], yaxrange[1]])  
+        if thisHead['TELESCOP'] == 'SOHO':    
+            breakpoint()      
     return satpos, plotranges
 
 
