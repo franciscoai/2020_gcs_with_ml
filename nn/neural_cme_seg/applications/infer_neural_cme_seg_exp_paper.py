@@ -316,6 +316,7 @@ def inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=T
         all_headers.append(ha)
     # inference of all images in the event
     #print(f'Running inference for {imgs_labels[0]} dates {all_dates}')
+    breakpoint()
     out =  nn_seg.infer_event(all_diff_img, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=ev_opath+'/'+imgs_labels[0])
     return out + (all_headers,)
 
