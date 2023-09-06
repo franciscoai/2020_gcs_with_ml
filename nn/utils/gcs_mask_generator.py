@@ -16,7 +16,7 @@ def maskFromCloud(params, sat, satpos, imsize, plotranges):
     mask = np.flip(mask, axis=0)
     return mask
 
-def maskFromCloud_3d(params, satpos, imsize, plotranges):
+def maskFromCloud_3d(params, satpos, imsize, plotranges, occ_size=None):
     '''
     Same as maskFromCloud but returns as many mask as satpos provided
     :params: CMElon, CMElat, CMEtilt, height, k, ang, satpos
@@ -27,6 +27,9 @@ def maskFromCloud_3d(params, satpos, imsize, plotranges):
         x = clouds[sat, :, 1]
         y = clouds[0, :, 2]
         p_x,p_y=deg2px(x,y,plotranges, imsize, sat)
-        mask=get_mask_cloud(p_x,p_y,imsize)
+        if occ_size is None:
+            mask=get_mask_cloud(p_x,p_y,imsize)
+        else:
+            mask=get_mask_cloud(p_x,p_y,imsize, occ_size=occ_size[sat])
         all_mask.append(mask)
     return all_mask
