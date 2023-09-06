@@ -317,7 +317,7 @@ parameters_to_plot =  ['WIDE_ANG','MASS_CENTER_RADIUS','MASS_CENTER_ANG','APEX_R
 fit_err_func = [linear_error, quadratic_error, linear_error, quadratic_error, linear_error, linear_error, linear_error, linear_error]
 fit_func = [linear, quadratic, linear, quadratic, linear, linear, linear, linear]
 in_cond= [[1.,1.],[1.,1.,1.],[1.,1.],[1.,1.,1.],[1.,1.],[1.,1.],[1.,1.],[1.,1.]]
-
+breakpoint()
 ext_folders = os.listdir(data_dir)
 for ext_folder in ext_folders:
     try:
@@ -333,6 +333,7 @@ for ext_folder in ext_folders:
 
         # saves the filtered df
         os.makedirs(opath, exist_ok=True)
+        
         df_filtered.to_csv(opath+'/'+str(ext_folder)+'.csv', index=False)
         graphics(df_filtered, parameters_to_plot, opath, fit_err_func, fit_func, in_cond)
     except:
