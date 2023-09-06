@@ -10,6 +10,7 @@ from scipy.io import readsav
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 from nn.utils.gcs_mask_generator import maskFromCloud_3d
 from pyGCS_raytrace import pyGCS
+import pickle
 mpl.use('Agg')
 
 __author__ = "Francisco Iglesias"
@@ -61,7 +62,12 @@ def load_data(dpath, occ_size, select=None):
     ofilenames = []
     oocc_sizes = []
     # splits based on the last '_' separator, keeps the first part
-    files_base = [f.split('_')[0] + '_' + f.split('_')[1] for f in filenames]
+    num_of_us = f.count('_')
+    if num_of_us >=1:
+        files_base = ["".join(f.rsplit('_')[0:-1]) for f in filenames]
+    else:
+        print('Error: The filenames of a single time instant must have the same basename and end with _0 (cor A), _1 (cor B) or _2 (lasco))')
+
     for f in np.unique(files_base):
         idx = [i for i, x in enumerate(files_base) if x == f]
         omasks.append(np.array([masks[i] for i in idx]))
@@ -86,7 +92,7 @@ def plot_to_png(ofile, fnames,omask, fitmask, manual_mask):
     color=['b','r','g','k','y','m','c','w','b','r','g','k','y','m','c','w']
     cmap = mpl.colors.ListedColormap(color)  
     nans = np.full(np.shape(omask[0]), np.nan)
-    fig, axs = plt.subplots(3, 3, figsize=[20,20])
+    fig, axs = plt.subplots(3, 3, figsize=[10,10])
     axs = axs.ravel()
     for i in range(len(fnames)):
         axs[i].imshow(omask[i], vmin=0, vmax=1, cmap='gray', origin='lower')
@@ -111,24 +117,28 @@ def plot_to_png(ofile, fnames,omask, fitmask, manual_mask):
     axs[0].set_ylabel('Neural mask')
     axs[3].set_ylabel('Fit to neural mask')
     axs[6].set_ylabel('Manual fit')
-
-    plt.tight_layout()
+    #plt.tight_layout()
     plt.savefig(ofile)
     plt.close()
 
-def plot_gcs_param_vs_time(fit_par, gcs_manual_par, opath):
+def plot_gcs_param_vs_time(fit_par, gcs_manual_par, opath, ylim=None):
     """
     Plots the 6 gcs parameters vs time
     :param fit_par: fit parameters, list of [CMElon, CMElat, CMEtilt,height, k, ang]
     :param gcs_manual_par: manual gcs parameters, list of [CMElon, CMElat, CMEtilt,height, k, ang]
     :param opath: output path
+    :param ylim: y limits
     """
-    fig, axs = plt.subplots(3, 2, figsize=[20,20])
+    fig, axs = plt.subplots(3, 2, figsize=[15,10])
     axs = axs.ravel()
     for t in range(len(fit_par)):
         for i in range(6):
-            axs[i].plot(t, fit_par[t][i], 'o', color='r')
-            axs[i].plot(t, gcs_manual_par[t][i], 'o', color='b')
+            axs[i].plot(t, fit_par[t][i], 'o', color='r', label='fit')
+            axs[i].plot(t, gcs_manual_par[t][i], 'o', color='b', label='manual')
+            if ylim is not None:
+                axs[i].set_ylim(ylim[i])
+            if t==0 and i==0:
+                axs[i].legend()
     axs[0].set_ylabel('CMElon')
     axs[1].set_ylabel('CMElat')
     axs[2].set_ylabel('CMEtilt')
@@ -165,10 +175,10 @@ def gcs_mask_error(gcs_par, satpos, plotranges, masks, mask_total_px, imsize, oc
 Fits a filled masks created with GCS model to the data
 '''
 #Constants
-dpath =  '/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20130424_filter_True'
+dpath =  '/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20101214_filter_True'
 opath = dpath + '/gcs_fit'
 select = [-4, -3, -2, -1] # select the time instants to fit, in order as read from dpath
-manual_gcs = '/gehme/projects/2019_cme_expansion/repo_fran/2020_cme_expansion/GCSs/GCS_20130424'
+manual_gcs = '/gehme/projects/2019_cme_expansion/repo_fran/2020_cme_expansion/GCSs/GCS_20101214'
 imsize = [512, 512] # image size
 gcs_par_range = [[-180,180],[-90,90],[-90,90],[1,50],[0.1,0.9], [1,80]] # bounds for the fit gcs parameters
 occ_size = [90,35,75] # Artifitial occulter radius in pixels. Use 0 to avoid. [Stereo a/b C1, Stereo a/b C2, Lasco C2]
@@ -180,11 +190,14 @@ mask_total_px = [np.sum(m, axis=(1,2)) for m in meas_masks] # total number of px
 #CMElon, CMElat, CMEtilt, height, k, ang
 gcs_files= sorted(os.listdir(manual_gcs))
 gcs_files =[f for f in gcs_files if f.endswith(".sav")]
+gcs_files = sorted(gcs_files, key=lambda x: x[0] != 'm')
 gcs_manual_par = []
 for f in gcs_files:
     temp = readsav(os.path.join(manual_gcs, f))
     gcs_manual_par.append([np.degrees(float(temp['sgui']['lon'])), np.degrees(float(temp['sgui']['lat'])), np.degrees(float(temp['sgui']['rot'])),
                 float(temp['sgui']['hgt']), float(temp['sgui']['rat']), np.degrees(float(temp['sgui']['han']))])
+# keeps only select
+gcs_manual_par = [gcs_manual_par[i] for i in select]
 
 # crate opath
 os.makedirs(opath, exist_ok=True)
@@ -192,7 +205,7 @@ os.makedirs(opath, exist_ok=True)
 # fits gcs model to all images simultaneosly
 
 #inital  conditions
-gcs_param_ini = gcs_manual_par[select[-3]]
+gcs_param_ini = gcs_manual_par[-2]
 ini_cond =  np.array([gcs_param_ini[0], gcs_param_ini[1], gcs_param_ini[2], gcs_param_ini[4], gcs_param_ini[5]])
 ini_cond = np.append(ini_cond, np.arange(len(meas_masks))+gcs_param_ini[3])
 up_bounds= np.array([gcs_par_range[0][1], gcs_par_range[1][1], gcs_par_range[2][1], gcs_par_range[4][1], gcs_par_range[5][1]])
@@ -200,23 +213,29 @@ up_bounds= np.append(up_bounds, np.full(len(meas_masks), gcs_par_range[3][1]))
 low_bounds= np.array([gcs_par_range[0][0], gcs_par_range[1][0], gcs_par_range[2][0], gcs_par_range[4][0], gcs_par_range[5][0]])
 low_bounds= np.append(low_bounds, np.full(len(meas_masks), gcs_par_range[3][0]))
 
+ini_cond *= np.random.uniform(0.7, 0.95, len(ini_cond))
+
 print('Fitting GCS model with initial conditions: ', ini_cond)
 fit=least_squares(gcs_mask_error, ini_cond , method='trf', 
                   kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'mask_total_px':mask_total_px, 'occ_size':occ_sizes}, 
                   verbose=2, bounds=(low_bounds,up_bounds), diff_step=.5, xtol=1e-15) #, x_scale=scales)
 print('The fit parameters are: ', fit.x)
 
+# saves to pickle
+with open(os.path.join(opath, 'gcs_fit.pkl'), 'wb') as f:
+    pickle.dump(fit, f)
+
 # plots manual and fit gcs param vs time
 gcs_fit_par = []
 for i in range(len(meas_masks)):
     gcs_fit_par.append([fit.x[0], fit.x[1], fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]])
-plot_gcs_param_vs_time(gcs_fit_par, gcs_manual_par[select], opath)
+plot_gcs_param_vs_time(gcs_fit_par, gcs_manual_par, opath, ylim=gcs_par_range)
 
 # plots the fit mask along with the original masks
 for i in range(len(meas_masks)):
     gcs_param = [fit.x[0], fit.x[1], fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]]
     mask = maskFromCloud_3d(gcs_param, satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
-    mask_manual = maskFromCloud_3d(gcs_manual_par[select[i]], satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
+    mask_manual = maskFromCloud_3d(gcs_manual_par[i], satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
     cfname = fnames[i][0].split('_')[0] + '_' + fnames[i][0].split('_')[1]
     ofile = os.path.join(opath, f'{cfname}_gcs_fit.png')
     plot_to_png(ofile, fnames[i], meas_masks[i], mask, mask_manual)

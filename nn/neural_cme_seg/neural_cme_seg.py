@@ -504,6 +504,16 @@ class neural_cme_segmentation():
         plot_params: if dedined to an output dir path, plots the evolution of the cpa, aw and apex radius for all the masks found and the filtered ones
         plate_scl: plate scale [arcsec/px] for each input image to scale the apex radius accordingly
         filter_halos: if True, filters the masks which boxes center is within the occulter size
+
+        returns
+        all_orig_img: list of the original images after normalization
+        ok_dates: list of datetime objects with the date of each image with a consistent mask
+        all_masks: list with one masks for each image
+        all_scores: list with the score of each mask
+        all_lbl: list with the label of each mask
+        all_boxes: list with the box of each mask
+        all_mask_prop: list with the mask properties for each mask. Each maks's prop has the following format: [mask_id,score,cpa_ang, wide_ang, apex_dist]
+
         '''
         if mask_threshold is not None:
             self.mask_threshold = mask_threshold
