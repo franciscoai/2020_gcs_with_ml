@@ -54,27 +54,29 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
     nans = np.full(np.shape(orig_img[0]), np.nan)
     fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
     axs = axs.ravel()
+    
     for i in range(len(orig_img)):
 
         axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
         axs[i].axis('off')
         axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
         axs[i+1].axis('off')        
-        if boxes is not None:
-            nb = 0
+        if boxes[i] is not None:
+            nb = 2
             for b in boxes[i]:
-                if scores is not None:
-                    scr = scores[i][nb]
+                if scores[i] is not None:
+                    scr = scores[i]
                 else:
                     scr = 0   
                 if scr > scr_threshold:             
                     masked = nans.copy()
-                    masked[:, :][masks[i][nb] > mask_threshold] = nb              
+                    masked[:, :][masks[i] > mask_threshold] = nb              
                     axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
-                    box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
+                    box =  mpl.patches.Rectangle(boxes[i][0:2],boxes[i][2]-boxes[i][0],boxes[i][3]-boxes[i][1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
                     axs[i+1].add_patch(box)
-                    if labels is not None:
-                        axs[i+1].annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
+                    if labels[i] is not None: 
+                        
+                        axs[i+1].annotate(obj_labels[labels[i]]+':'+'{:.2f}'.format(scr),xy=boxes[i][0:2], fontsize=15, color=color[nb])
                 nb+=1
     # axs[0].set_title(f'Cor A: {len(boxes[0])} objects detected') 
     # axs[1].set_title(f'Cor B: {len(boxes[1])} objects detected')               
@@ -90,7 +92,7 @@ def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scor
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
 repo_dir =  os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 helcat_db =  repo_dir + "/nn_training/kincat/helcatslist_20160601.txt" # kincat database
-level = 'L0' # fits reduction level
+level = 'L1' # fits reduction level
 filter_pol_images = True
 downloaded_files_list = repo_dir + '/nn_training/kincat/helcatslist_20160601_sta_downloaded.csv' # list of downloaded files
 units= ["-","-","yyyymmdd","hhmm","yyyymmdd","hhmm","deg","lon","old","deg","deg","deg", "yyyymmdd","hhmm","km/s","g","km/s","LON","LAT","km/s","LON","LAT","km/s","LON","LAT"]
@@ -136,7 +138,8 @@ for i in range(len(catalogue.index)):
     date_helcat = datetime.strptime((catalogue["PRE_DATE"][i]+" "+catalogue["PRE_TIME"][i]),'%Y-%m-%d %H:%M') #forms datetime object
     start_date = date_helcat - timedelta(hours=1)
     end_date= datetime.strptime((catalogue["LAST_DATE"][i]+" "+catalogue["LAST_TIME"][i]),'%Y-%m-%d %H:%M') #forms datetime object
-    index=catalogue["CME"][i]
+    #index=catalogue["CME"][i]
+    
     if filter_pol_images:
         # if downloaded["DATE_TIME"] is at 08 minutes drop it
         downloaded = downloaded[~(downloaded["DATE_TIME"].dt.minute == 8)]        
@@ -150,6 +153,7 @@ for i in range(len(catalogue.index)):
         all_dates=[]
         all_occ_size=[]
         all_plate_scl=[]
+        file_names=[]
         for j in range(len(files)-1):
 
             print(f'Processing {j} of {len(files)-1}')
@@ -163,9 +167,12 @@ for i in range(len(catalogue.index)):
                 header=fits.getheader(file[0])
                 f=files[j+1]
                 filename=f[49:-4]
+                folder_name=files[0][49:-17]
+                final_path=opath+"/"+folder_name+"/filtered/"
                 date= datetime.strptime(filename[0:-6],'%Y%m%d_%H%M%S')
-                os.makedirs(os.path.join(opath, str(index)),exist_ok=True)
-                ofile = os.path.join(opath, str(index), filename )
+                os.makedirs(os.path.join(opath, str(folder_name)),exist_ok=True)
+                ofile = os.path.join(opath, str(folder_name), filename )
+                
                 hdu = fits.PrimaryHDU(img, header=header)
                 hdu.writeto(ofile+".fits", overwrite=True)
                 if header['NAXIS1'] != imsize_nn[0]:
@@ -176,21 +183,30 @@ for i in range(len(catalogue.index)):
                 all_images.append(img)
                 all_dates.append(date)
                 all_occ_size.append(occ_size)
-        #breakpoint()      
-        all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop =  nn_seg.infer_event(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=opath+'/'+index+'/'+'mask_props')
-        data_kincat=[]
-        for i in range(len(all_mask_prop)):
-            all_mask_prop[i]
-            
-            data_kincat.append([ok_dates[i],all_mask_prop[i]])
-
-        breakpoint()
-        #Saves mask parameters in pickle file
+                file_names.append(filename)
+             
+        all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop =  nn_seg.infer_event(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=final_path+'mask_props')
+        
         if len(all_masks)>0:
-            plot_to_png(ofile+".png", [all_orig_img], [all_masks], title=[f], labels=[all_lbl], boxes=[all_boxes], scores=[all_scores])
+            for i in range(len(all_images)):
+
+                plot_to_png(opath+"/"+folder_name+"/"+file_names[i]+".png", [all_orig_img[i]], [all_masks[i]], title=[file_names[i]], labels=[all_lbl[i]], boxes=[all_boxes[i]], scores=[all_scores[i]])
         
         else:
-            print("No CME detected :-/")                        
+            print("No CME detected :-/")        
+
+        data_kincat=[]
+        for i in range(len(all_mask_prop)):
+            if all(elemento is not None for elemento in all_mask_prop[i]):
+                prop_list = all_mask_prop[i].tolist()
+                prop_list.insert(0,ok_dates[i])
+                data_kincat.append(prop_list)
+
+        df = pd.DataFrame(data_kincat, columns=kincat_col_names)
+        
+        df.to_csv(final_path+folder_name+'_filtered_stats', index=False)
+
+                       
 
 
 
