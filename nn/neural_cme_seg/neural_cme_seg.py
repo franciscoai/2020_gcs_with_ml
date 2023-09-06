@@ -375,7 +375,7 @@ class neural_cme_segmentation():
         cpa_criterion = np.radians(20.) # criterion for the cpa angle [deg]
         apex_rad_crit = 0.2 # criterion for the apex radius [%]
         date_crit = 5. # criterion for the date, max [hours] for an acceptable gap. if larger it keeps later group only
-        aw_crit = np.radians(20.) # criterion for the angular width [deg]
+        aw_crit = np.radians(15.) # criterion for the angular width [deg]
         
         # keeps only a max of two masks per image with the highest score
         for i in range(len(dates)):
@@ -435,7 +435,7 @@ class neural_cme_segmentation():
         all_lbl = all_lbl[ok_idx]
         all_boxes = all_boxes[ok_idx]
         all_mask_prop = all_mask_prop[ok_idx]
-        all_dates = all_dates[ok_idx]
+        all_dates = all_dates[ok_idx]        
 
         # # filters on 'APEX_RADIUS'
         # x_points =np.array([i.timestamp() for i in all_dates])
@@ -453,7 +453,7 @@ class neural_cme_segmentation():
         # # filters on 'WIDTH_ANG'
         # x_points=np.array([i.timestamp() for i in all_dates])
         # y_points =np.array(all_mask_prop[:,3]).astype('float32')
-        # ok_idx = self._filter_param(x_points,y_points, linear_error, linear,[1.,1.], aw_crit, percentual=False)
+        # ok_idx = self._filter_param(x_points,y_points, linear_error, linear,[0.,1.], aw_crit, percentual=False)
         # all_masks = all_masks[ok_idx]
         # all_scores = all_scores[ok_idx]
         # all_lbl = all_lbl[ok_idx]
@@ -461,13 +461,17 @@ class neural_cme_segmentation():
         # all_mask_prop = all_mask_prop[ok_idx]
         # all_dates = all_dates[ok_idx]
 
-        #if multiple maks remain for a single date, keeps the one with highest score
+        # filters on 'WIDTH_ANG'
+        # if multiple maks remain for a single date, keeps the one with WD closest to the median
         ok_idx = []
+        x_points=np.array([i.timestamp() for i in all_dates])
+        y_points =np.array(all_mask_prop[:,3]).astype('float32')
+        median_aw = np.median(y_points)
         for i in np.unique(all_dates):
             date_idx = np.where(all_dates == i)[0]
             if len(date_idx) > 1:
-                score_idx = np.argmax(all_scores[date_idx])
-                ok_idx.append(date_idx[score_idx])
+                aw_idx = np.argmin(np.abs(y_points[date_idx]-median_aw))
+                ok_idx.append(date_idx[aw_idx])
             else:
                 ok_idx.append(date_idx[0])                  
         all_masks = all_masks[ok_idx]
@@ -476,6 +480,22 @@ class neural_cme_segmentation():
         all_boxes = all_boxes[ok_idx]
         all_mask_prop = all_mask_prop[ok_idx]
         all_dates = all_dates[ok_idx]
+
+        # #if multiple maks remain for a single date, keeps the one with highest score
+        # ok_idx = []
+        # for i in np.unique(all_dates):
+        #     date_idx = np.where(all_dates == i)[0]
+        #     if len(date_idx) > 1:
+        #         score_idx = np.argmax(all_scores[date_idx])
+        #         ok_idx.append(date_idx[score_idx])
+        #     else:
+        #         ok_idx.append(date_idx[0])                  
+        # all_masks = all_masks[ok_idx]
+        # all_scores = all_scores[ok_idx]
+        # all_lbl = all_lbl[ok_idx]
+        # all_boxes = all_boxes[ok_idx]
+        # all_mask_prop = all_mask_prop[ok_idx]
+        # all_dates = all_dates[ok_idx]
         
         #converts the first dim of all ouput np arrays to list of arrays
         all_masks = [all_masks[i,:,:] for i in range(len(all_dates))]
