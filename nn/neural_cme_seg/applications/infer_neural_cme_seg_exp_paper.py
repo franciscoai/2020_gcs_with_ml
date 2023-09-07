@@ -319,11 +319,19 @@ def inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=T
     
     # adds mask_prop to headers as keywords, [mask_id,score,cpa_ang, wide_ang, apex_dist]
     for i in range(len(all_headers)):
-        all_headers[i]['NN_SCORE'] = mask_porp[i][1]
-        all_headers[i]['NN_C_ANG'] = mask_porp[i][2]
-        all_headers[i]['NN_W_ANG'] = mask_porp[i][3]
-        all_headers[i]['NN_APEX'] = mask_porp[i][4]
-
+        if mask_porp[i][1] is not None:
+            all_headers[i]['NN_SCORE'] = mask_porp[i][1]
+            all_headers[i]['NN_C_ANG'] = np.degrees(mask_porp[i][2])
+            all_headers[i]['NN_W_ANG'] = np.degrees(mask_porp[i][3])
+            # apex rom px to solar radii
+            apex_sr = mask_porp[i][4] * all_plate_scl[i] / all_headers[i]['RSUN']
+            all_headers[i]['NN_APEX'] = apex_sr
+        else:
+            all_headers[i]['NN_SCORE'] = 'None'
+            all_headers[i]['NN_C_ANG'] = 'None'
+            all_headers[i]['NN_W_ANG'] = 'None'
+            all_headers[i]['NN_APEX'] = 'None'
+            
     return  orig_img, dates, mask, scr, labels, boxes, mask_porp, all_headers
 
 #main
