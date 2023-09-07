@@ -55,12 +55,19 @@ def load_data(dpath, occ_size, select=None):
     #satpos and plotranges
     satpos, plotranges = pyGCS.processHeaders(headers)  
 
+    #loads mask properties from headers
+    masks_prop = []
+    for i in range(len(headers)):
+        prop = [headers[i]['NN_SCORE'], headers[i]['NN_C_ANG'], headers[i]['NN_W_ANG'], headers[i]['NN_APEX']]
+        masks_prop.append(prop)
+
     # reshape the lists in blocks based on the file basename
     omasks =[]
     osatpos = []
     oplotranges = []
     ofilenames = []
     oocc_sizes = []
+    omasks_prop = []
     # splits based on the last '_' separator, keeps the first part
     num_of_us = f.count('_')
     if num_of_us >=1:
@@ -75,6 +82,7 @@ def load_data(dpath, occ_size, select=None):
         oplotranges.append([plotranges[i] for i in idx])
         ofilenames.append([filenames[i] for i in idx])
         oocc_sizes.append([occ_sizes[i] for i in idx])
+        omasks_prop.append([masks_prop[i] for i in idx])
     
     if select is not None:
         omasks = [omasks[i] for i in select]
@@ -82,8 +90,9 @@ def load_data(dpath, occ_size, select=None):
         oplotranges = [oplotranges[i] for i in select]
         ofilenames = [ofilenames[i] for i in select]
         oocc_sizes = [oocc_sizes[i] for i in select]
+        omasks_prop = [omasks_prop[i] for i in select]
   
-    return omasks, ofilenames, osatpos, oplotranges, oocc_sizes
+    return omasks, ofilenames, osatpos, oplotranges, oocc_sizes, omasks_prop
 
 def plot_to_png(ofile, fnames,omask, fitmask, manual_mask):
     """
@@ -129,7 +138,7 @@ def plot_gcs_param_vs_time(fit_par, gcs_manual_par, opath, ylim=None):
     :param opath: output path
     :param ylim: y limits
     """
-    fig, axs = plt.subplots(3, 2, figsize=[15,10])
+    fig, axs = plt.subplots(3, 2, figsize=[12,8])
     axs = axs.ravel()
     for t in range(len(fit_par)):
         for i in range(6):
@@ -166,7 +175,7 @@ def gcs_mask_error(gcs_par, satpos, plotranges, masks, mask_total_px, imsize, oc
     for i in range(len(masks)):
         this_gcs_par = [gcs_par[0], gcs_par[1], gcs_par[2], gcs_par[5+i], gcs_par[3], gcs_par[4]] 
         mask = maskFromCloud_3d(this_gcs_par, satpos[i], imsize, plotranges[i], occ_size=occ_size[i])
-        error.append(np.sum(np.abs(np.array(mask) - masks[i]), axis=(1,2))/mask_total_px[i])
+        error.append(np.mean((np.array(mask) - masks[i]), axis=(1,2))**2)#/mask_total_px[i])
         #print(gcs_par, np.mean(error))
     return np.array(error).flatten()
 
@@ -175,17 +184,18 @@ def gcs_mask_error(gcs_par, satpos, plotranges, masks, mask_total_px, imsize, oc
 Fits a filled masks created with GCS model to the data
 '''
 #Constants
-dpath =  '/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20101214_filter_True'
+dpath =  '/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20130424_filter_True'
 opath = dpath + '/gcs_fit'
 select = [-4, -3, -2, -1] # select the time instants to fit, in order as read from dpath
-manual_gcs = '/gehme/projects/2019_cme_expansion/repo_fran/2020_cme_expansion/GCSs/GCS_20101214'
+manual_gcs = '/gehme/projects/2019_cme_expansion/repo_fran/2020_cme_expansion/GCSs/GCS_20130424'
 imsize = [512, 512] # image size
 gcs_par_range = [[-180,180],[-90,90],[-90,90],[1,50],[0.1,0.9], [1,80]] # bounds for the fit gcs parameters
 occ_size = [90,35,75] # Artifitial occulter radius in pixels. Use 0 to avoid. [Stereo a/b C1, Stereo a/b C2, Lasco C2]
 
 # Load data
-meas_masks, fnames, satpos, plotranges, occ_sizes= load_data(dpath, occ_size, select=select)
+meas_masks, fnames, satpos, plotranges, occ_sizes, masks_prop= load_data(dpath, occ_size, select=select)
 mask_total_px = [np.sum(m, axis=(1,2)) for m in meas_masks] # total number of px in the mask
+
 #loads manual gcs for IDL .sav file
 #CMElon, CMElat, CMEtilt, height, k, ang
 gcs_files= sorted(os.listdir(manual_gcs))
@@ -203,19 +213,50 @@ gcs_manual_par = [gcs_manual_par[i] for i in select]
 os.makedirs(opath, exist_ok=True)
 
 # fits gcs model to all images simultaneosly
-
-#inital  conditions
-gcs_param_ini = gcs_manual_par[-2]
-ini_cond =  np.array([gcs_param_ini[0], gcs_param_ini[1], gcs_param_ini[2], gcs_param_ini[4], gcs_param_ini[5]])
-ini_cond = np.append(ini_cond, np.arange(len(meas_masks))+gcs_param_ini[3])
+# bounds
 up_bounds= np.array([gcs_par_range[0][1], gcs_par_range[1][1], gcs_par_range[2][1], gcs_par_range[4][1], gcs_par_range[5][1]])
 up_bounds= np.append(up_bounds, np.full(len(meas_masks), gcs_par_range[3][1]))
 low_bounds= np.array([gcs_par_range[0][0], gcs_par_range[1][0], gcs_par_range[2][0], gcs_par_range[4][0], gcs_par_range[5][0]])
 low_bounds= np.append(low_bounds, np.full(len(meas_masks), gcs_par_range[3][0]))
+#inital  conditions from masks_prop
+# gcs_param_ini = gcs_manual_par[-2]
+# ini_cond =  np.array([gcs_param_ini[0], gcs_param_ini[1], gcs_param_ini[2], gcs_param_ini[4], gcs_param_ini[5]])
+# ini_cond = np.append(ini_cond, np.arange(len(meas_masks))+gcs_param_ini[3])
 
-ini_cond *= np.random.uniform(0.7, 0.95, len(ini_cond))
+# CMElat from LASCO maks CPA
+ini_lat = np.median([masks_prop[i][2][1] for i in range(len(masks_prop))])
+print(ini_lat)
+# change from 0 to 360 to -90 to 90
+if ini_lat > 90 and ini_lat < 180:
+    ini_lat = 180 - ini_lat 
+elif ini_lat > 180 and ini_lat < 270:
+    ini_lat = -(ini_lat - 180)
+elif ini_lat > 270 and ini_lat < 360:
+    ini_lat -= 360
+
+# ang from the min mask AW
+ini_ang = np.min([masks_prop[i][j][2] for i in range(len(masks_prop)) for j in range(len(masks_prop[i]))])/2.
+# heights from each LASCO mask height
+ini_height = [masks_prop[i][2][3] for i in range(len(masks_prop))]
+# k at half the bounds
+ini_k = (gcs_par_range[4][0] + gcs_par_range[4][1])/2.
+# CMElon from LASCO mask CPA
+ini_lon = np.median([masks_prop[2][0]])
+if ini_lon < 90 or ini_lon > 270:
+    ini_lon = 90
+else:
+    ini_lon = -90
+ini_cond = np.array([ini_lon, ini_lat, 0, ini_k, ini_ang]+ini_height).flatten()
+# if initial conditions are outside bounds use the closest
+if np.any(ini_cond < low_bounds) or np.any(ini_cond > up_bounds):
+    print('Warning: Initial conditions are outside bounds. Using closest bounds')
+    ini_cond = np.clip(ini_cond, low_bounds, up_bounds)
 
 print('Fitting GCS model with initial conditions: ', ini_cond)
+fit=least_squares(gcs_mask_error, ini_cond , method='trf', 
+                  kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'mask_total_px':mask_total_px, 'occ_size':occ_sizes}, 
+                  verbose=2, bounds=(low_bounds,up_bounds), diff_step=.5, xtol=1e-15) #, x_scale=scales)
+ini_cond = fit.x
 fit=least_squares(gcs_mask_error, ini_cond , method='trf', 
                   kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'mask_total_px':mask_total_px, 'occ_size':occ_sizes}, 
                   verbose=2, bounds=(low_bounds,up_bounds), diff_step=.5, xtol=1e-15) #, x_scale=scales)
@@ -228,7 +269,7 @@ with open(os.path.join(opath, 'gcs_fit.pkl'), 'wb') as f:
 # plots manual and fit gcs param vs time
 gcs_fit_par = []
 for i in range(len(meas_masks)):
-    gcs_fit_par.append([fit.x[0], fit.x[1], fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]])
+    gcs_fit_par.append([fit.x[0], fit.x[1], -fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]]) # TODO the tilt signs seems to be OPOSITE in pyGCS???
 plot_gcs_param_vs_time(gcs_fit_par, gcs_manual_par, opath, ylim=gcs_par_range)
 
 # plots the fit mask along with the original masks
