@@ -16,6 +16,7 @@ class Sirats_net(torch.nn.Module):
             f'cuda:{device}') if torch.cuda.is_available() else torch.device('cpu')
         print(f'\nUsing device: {self.device}\n')
         self.imsize = imsize
+        self.loss_weights = torch.tensor([100,100,100,10,1,10])
 
         # conv params
         self.block1 = self._generate_block(
@@ -31,13 +32,13 @@ class Sirats_net(torch.nn.Module):
         
         # fc
         self.fc = torch.nn.Sequential(
-            torch.nn.Dropout(),
-            torch.nn.Linear(30*30*128, 2048),
+            #torch.nn.Dropout(),
+            torch.nn.Linear(30*30*128, 4096),
             torch.nn.ReLU(inplace=True),
-            torch.nn.Dropout(),
-            torch.nn.Linear(2048,1024),
+            #torch.nn.Dropout(),
+            torch.nn.Linear(4096, 2048),
             torch.nn.ReLU(inplace=True),
-            torch.nn.Linear(1024,output_size),
+            torch.nn.Linear(2048, output_size),
         )
         
         # send to device
@@ -60,21 +61,47 @@ class Sirats_net(torch.nn.Module):
         optimizer.zero_grad()
         loss_value.backward()
         optimizer.step()
-        scheduler.step()
+        #scheduler.step()
         return loss_value
+    
+    def infer(self, img):
+        self.eval()
+        with torch.inference_mode():
+            predictions = self.forward(img[None, :, :, :])
+        return predictions
+    
+    def custom_loss(self, predictions, targets, device='cuda:0'):
+        self.loss_weights = self.loss_weights.to(device)
+        loss = torch.mean((predictions - targets) / self.loss_weights[None,:])**2
+        return loss
 
-    def plot_loss(self, losses, epoch_list, batch_size, opath):
+    def plot_loss(self, losses, epoch_list, batch_size, opath, plot_epoch=True):
         plt.plot(np.arange(len(losses))*batch_size, losses)
         plt.yscale('log')
         plt.xlabel('# Image')
         plt.ylabel('Loss')
         plt.grid("both")
         # add vertical line every epoch
-        for epoch in range(len(epoch_list)):
-            plt.axvline(x=epoch*epoch_list[epoch]
-                        * batch_size, color='r', linestyle='--')
+        if plot_epoch:
+            for epoch in range(len(epoch_list)):
+                plt.axvline(x=epoch*epoch_list[epoch]
+                            * batch_size, color='r', linestyle='--')
         plt.savefig(opath)
         plt.close()
+
+    def save_model(self, opath):
+        models_path = os.path.join(opath, 'models')
+        os.makedirs(models_path, exist_ok=True)
+        torch.save(self.state_dict(), models_path+'/model.pth')
+        return models_path+'/model.pth'
+
+    def load_model(self, opath):
+        models_path = os.path.join(opath, 'models')
+        if os.path.exists(models_path+'/model.pth'):
+            self.load_state_dict(torch.load(models_path+'/model.pth'))
+            return models_path+'/model.pth'
+        else:
+            return None
 
     def _generate_block(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, pool=True, pool_params=[1, 1, 0]):
         return torch.nn.Sequential(
