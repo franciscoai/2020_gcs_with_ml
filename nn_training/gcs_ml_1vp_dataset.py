@@ -59,7 +59,7 @@ n_sat = 1 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names
-par_num = 100000  # total number of samples that will be generated for each param (there are nsat images per param combination)
+par_num = 1000  # total number of samples that will be generated for each param (there are nsat images per param combination)
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 same_corona=True # Set to True use a single corona back for all par_num cases
 
@@ -74,7 +74,7 @@ otype="png" # set the ouput file type: 'png' or 'fits'
 im_range=2. # range of the color scale of the output final syntethyc image in std dev around the mean
 back_rnd_rot=False # set to randomly rotate the background image around its center
 inner_hole_mask=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
-mask_from_cloud=False #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
+mask_from_cloud=True #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
 
 # generate param arrays
@@ -86,9 +86,9 @@ for (rng, num) in zip(par_rng, par_num):
         np.random.shuffle(cpar)
     all_par.append(cpar)
 
-
-# Save configuration to .CSV
+sceond_mask = None
 os.makedirs(OPATH, exist_ok=True)
+# Save configuration to .CSV
 date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
 configfile_name = OPATH + '/' + date_str+'Set_Parameters.csv'
 set = pd.DataFrame(np.column_stack(all_par), columns=par_names)
@@ -97,9 +97,9 @@ df = pd.DataFrame(pd.read_csv(configfile_name))
 mask_prev = None
 
 #check last image made
-last_id = sorted([int(i) for i in os.listdir(OPATH) if not i.endswith('.csv')])[-1]-1
-if last_id>=0:
-    df = df.iloc[last_id:]
+# last_id = sorted([int(i) for i in os.listdir(OPATH) if not i.endswith('.csv')])[-1]-1
+# if last_id>=0:
+#     df = df.iloc[last_id:]
 
 
 # generate views
@@ -153,11 +153,9 @@ for row in df.index:
             print(f'WARNING: CME number {row} mask is null because it is probably behind the occulter, skipping all views...')
             break
 
-        #background corona
-        back = back_corona[sat]
-        if back_rnd_rot:
-            back =  scipy.ndimage.rotate(back, np.random.randint(low=0, high=360), reshape=False)
-        level_back = np.mean(back)     
+        #mask for occulter
+        arr = np.zeros(xx.shape)
+        arr[r <= size_occ[sat]] = 1     
 
         #Total intensity (Btot) figure from raytrace:     
         if synth_int_image:          
@@ -169,11 +167,13 @@ for row in df.index:
             int_frope = np.random.uniform(low=2, high=10, size=2) * np.random.choice([-1,1], size=2)
             btot1 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*height_diff,aspect_ratio_frope, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.7, out_sig=0.1, nel=1e5)
             btot11 = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*height_diff*1.2,aspect_ratio_frope, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.7, out_sig=0.1, nel=1e5)
-            btot = btot0 + int_frope[0]*btot1-int_frope[1]*btot11
+            btot = btot0 + int_frope[0]*btot1-int_frope[1]*btot11         
 
-            #mask for occulter
-            arr = np.zeros(xx.shape)
-            arr[r <= size_occ[sat]] = 1          
+            #background corona
+            back = back_corona[sat]
+            if back_rnd_rot:
+                back =  scipy.ndimage.rotate(back, np.random.randint(low=0, high=360), reshape=False)
+            level_back = np.mean(back)
 
             #cme
             #adds a random patchy spatial variation of the cme only 
@@ -185,7 +185,6 @@ for row in df.index:
                 noise=np.random.normal(loc=cme_noise[0]*m, scale=cme_noise[1]*np.abs(m), size=imsize)
                 btot[btot > 0]+=noise[btot > 0]    
             #Randomly adds the previous CME to have two in one image
-            sceond_mask = None
             if two_cmes and np.random.choice([True,False,False]): # only for sat 0 for now
                 if mask_prev is None:
                     btot_prev = btot
