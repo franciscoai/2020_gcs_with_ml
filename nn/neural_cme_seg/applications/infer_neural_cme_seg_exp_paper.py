@@ -273,8 +273,7 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
                     h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
                     h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
                     h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
-                    h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
-                    
+                    h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1])                    
 
                     fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
 
@@ -316,9 +315,24 @@ def inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=T
         all_headers.append(ha)
     # inference of all images in the event
     #print(f'Running inference for {imgs_labels[0]} dates {all_dates}')
-    breakpoint()
-    out =  nn_seg.infer_event(all_diff_img, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=ev_opath+'/'+imgs_labels[0])
-    return out + (all_headers,)
+    orig_img, dates, mask, scr, labels, boxes, mask_porp =  nn_seg.infer_event(all_diff_img, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=ev_opath+'/'+imgs_labels[0])
+    
+    # adds mask_prop to headers as keywords, [mask_id,score,cpa_ang, wide_ang, apex_dist]
+    for i in range(len(all_headers)):
+        if mask_porp[i][1] is not None:
+            all_headers[i]['NN_SCORE'] = mask_porp[i][1]
+            all_headers[i]['NN_C_ANG'] = np.degrees(mask_porp[i][2])
+            all_headers[i]['NN_W_ANG'] = np.degrees(mask_porp[i][3])
+            # apex rom px to solar radii
+            apex_sr = mask_porp[i][4] * all_plate_scl[i] / all_headers[i]['RSUN']
+            all_headers[i]['NN_APEX'] = apex_sr
+        else:
+            all_headers[i]['NN_SCORE'] = 'None'
+            all_headers[i]['NN_C_ANG'] = 'None'
+            all_headers[i]['NN_W_ANG'] = 'None'
+            all_headers[i]['NN_APEX'] = 'None'
+            
+    return  orig_img, dates, mask, scr, labels, boxes, mask_porp, all_headers
 
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
