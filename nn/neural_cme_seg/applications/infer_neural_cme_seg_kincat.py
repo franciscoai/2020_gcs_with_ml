@@ -136,7 +136,7 @@ nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ t
 for i in range(len(catalogue.index)):
     print("Reading date range nª "+str(i))
     date_helcat = datetime.strptime((catalogue["PRE_DATE"][i]+" "+catalogue["PRE_TIME"][i]),'%Y-%m-%d %H:%M') #forms datetime object
-    start_date = date_helcat - timedelta(hours=1)
+    start_date = date_helcat 
     end_date= datetime.strptime((catalogue["LAST_DATE"][i]+" "+catalogue["LAST_TIME"][i]),'%Y-%m-%d %H:%M') #forms datetime object
     #index=catalogue["CME"][i]
     

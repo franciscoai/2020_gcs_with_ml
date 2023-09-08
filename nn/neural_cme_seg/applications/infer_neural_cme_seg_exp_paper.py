@@ -8,7 +8,9 @@ import torch
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.use('Agg')
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))))
+
 from ext_libs.rebin import rebin
 import csv
 from nn.neural_cme_seg.neural_cme_seg import neural_cme_segmentation
@@ -335,7 +337,7 @@ def inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=T
     return  orig_img, dates, mask, scr, labels, boxes, mask_porp, all_headers
 
 #main
-#------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
+#------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 model_version="v4"
 opath= model_path + "/infer_neural_cme_seg_exp_paper_filtered"
