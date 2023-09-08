@@ -8,7 +8,9 @@ import torch
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.use('Agg')
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))))
+
 from ext_libs.rebin import rebin
 import csv
 from nn.neural_cme_seg.neural_cme_seg import neural_cme_segmentation
