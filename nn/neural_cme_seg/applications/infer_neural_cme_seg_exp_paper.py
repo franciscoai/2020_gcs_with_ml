@@ -321,7 +321,7 @@ def inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=T
     return out + (all_headers,)
 
 #main
-#------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
+#------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 model_version="v4"
 opath= model_path + "/infer_neural_cme_seg_exp_paper_filtered"
