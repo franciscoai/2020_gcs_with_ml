@@ -1,6 +1,16 @@
-def get_NN(odir,sat):
+
+import os
+import requests
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from bs4 import BeautifulSoup
+from datetime import timedelta, datetime, time
+from scipy.optimize import least_squares
+
+def get_NN(iodir,sat):
     df_list=[]
-    odir=odir+sat+"/"
+    odir=iodir+'/'+sat+"/"
     ext_folders = os.listdir(odir)
     for ext_folder in ext_folders:
         odir_filter=odir+ext_folder+"/filtered"
@@ -11,11 +21,6 @@ def get_NN(odir,sat):
     df_full = pd.concat(df_list, ignore_index=True)
 
     return df_full
-
-
-
-
-
 
 
 def get_seeds(folder,sat):
@@ -70,25 +75,23 @@ def get_vourlidas(folder,sat):
         files=os.listdir(folder)
         df_list=[]
         for i in files:
-    
             path=folder+"/"+i
             df=pd.read_csv(path, header=None)
-
             new_header = df.iloc[0]  
             df = df[1:]  
             df.columns = new_header
             df = df[df["CPA"] != '    -999']
             if sat=="cor2_a":
-                df = df[df["S/C"] != "B"]
+                df = df[df["S/C"] == "A"]
+            elif sat=="cor2_b":
+                df = df[df["S/C"] == "B"]
             else:
-                df = df[df["S/C"] != "A"]
+                print("satellite not recognized")
+                breakpoint()
             df_list.append(df)
-        
         df_full = pd.concat(df_list, ignore_index=True)
         for i in cols:
             df_full[i] = df_full[i].astype(float)
-
-
     else:
         os.makedirs(folder)
         response = requests.get(url)
@@ -102,7 +105,6 @@ def get_vourlidas(folder,sat):
                 if file_response.status_code == 200:
                     with open(folder+'/'+file_name, 'wb') as archivo:
                         archivo.write(file_response.content)
-
     return df_full
 
 
@@ -124,18 +126,14 @@ def comparator(NN,seeds,vourlidas):
     
     #adjust the 0 degree to the nort
     for i in NN_ang_col:
-        
         if i=="WIDE_ANG":
             NN[i]=np.degrees(NN[i])
-        
         else:
             NN[i]= np.degrees(NN[i])-90#-np.degrees(NN[i])+270
-        #NN.loc[NN[i] < 0, i] += 360 
-    
-    
+        NN.loc[NN[i] < 0, i] += 360   
 
     #goups all the hours in each day and calculates medain a std of cpa_ang and wide_ang
-    df = NN.groupby('DATE').agg({'WIDE_ANG': ['median', 'std'],'CPA_ANG': ['median', 'std'],})
+    df = NN.groupby('DATE').agg({'WIDE_ANG': ['min', 'std'],'CPA_ANG': ['median', 'std'],})
     df = df.reset_index()
     #calculate the unique dates in NN and conservs only those ones in seeds
     unique_dates_NN = NN['DATE_TIME'].dt.date.unique()
@@ -165,112 +163,179 @@ def comparator(NN,seeds,vourlidas):
         cpa_ang_vourlidas=vourlidas_data["CPA"]
         wide_ang_vourlidas=vourlidas_data["Width"]
         if (NN_min["DATE_TIME"][i]<=vourlidas_data["Date_Time"]<=NN_max["DATE_TIME"][i])and(NN_min["DATE_TIME"][i]<=seeds_data["DATE_TIME"]<=NN_max["DATE_TIME"][i]):
-            compare.append([NN_date,seeds_data["DATE_TIME"],vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,cpa_ang_vourlidas,df["WIDE_ANG"]["median"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,wide_ang_vourlidas])
+            compare.append([NN_date,seeds_data["DATE_TIME"],vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,wide_ang_vourlidas])
         elif (NN_min["DATE_TIME"][i]<=vourlidas_data["Date_Time"]<=NN_max["DATE_TIME"][i]) and not(NN_min["DATE_TIME"][i]<=seeds_data["DATE_TIME"]<=NN_max["DATE_TIME"][i]):
-            compare.append([NN_date,np.nan,vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],np.nan,cpa_ang_vourlidas,df["WIDE_ANG"]["median"][i],df["WIDE_ANG"]["std"][i],np.nan,wide_ang_vourlidas])
+            compare.append([NN_date,np.nan,vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],np.nan,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],np.nan,wide_ang_vourlidas])
         elif not(NN_min["DATE_TIME"][i]<=vourlidas_data["Date_Time"]<=NN_max["DATE_TIME"][i])and(NN_min["DATE_TIME"][i]<=seeds_data["DATE_TIME"]<=NN_max["DATE_TIME"][i]):
-            compare.append([NN_date,seeds_data["DATE_TIME"],np.nan,df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,np.nan,df["WIDE_ANG"]["median"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,np.nan])
+            compare.append([NN_date,seeds_data["DATE_TIME"],np.nan,df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,np.nan,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,np.nan])
     compare = pd.DataFrame(compare, columns=columns)
     return compare
 
+def linear(t,a,b):
+    return a*t + b
+
+def linear_error(p, x, y):
+    return (linear(x, *p) - y)
+
+def plot_fit(axis,xdf, ydf):
+    '''
+    This function adss a plot of a linear fit of the input axis
+    and prints in the leyend the fit line equation and the pearson corr coeficient
+    '''
+    x = xdf.values
+    y = ydf.values
+    # remove nans in both arrays keeping the same indexes
+    ok_ind = np.logical_and(~np.isnan(x), ~np.isnan(y))
+    x = x[ok_ind]
+    y = y[ok_ind]
+    #fit and plot with initial conditions [1,0] using least squares
+    fit=least_squares(linear_error, [1,0], loss='soft_l1', kwargs={'x': x, 'y': y}) # fit that ingnore outliers   
+    label = f"y={fit.x[0]:.2f}x+{fit.x[1]:.2f}\nR={np.corrcoef(x, y)[0,1]:.2f}"
+    axis.plot(x, linear(x, *fit.x), color='red', linestyle='--', label=label, linewidth=1.5)
+    return axis
+
+def get_r(xdf,ydf):
+    x = xdf.values
+    y = ydf.values
+    # remove nans in both arrays keeping the same indexes
+    ok_ind = np.logical_and(~np.isnan(x), ~np.isnan(y))
+    x = x[ok_ind]
+    y = y[ok_ind]   
+    return f'r={np.corrcoef(x, y)[0,1]:.2f} ({len(x)})'  
 ################################################################################### MAIN ######################################################################################
-
-import os
-import requests
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from bs4 import BeautifulSoup
-from datetime import timedelta, datetime, time
-
-odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1/"
+odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1"
 folder="/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications"
 sat="cor2_a"#cor2_b
 
+#-----------------
+plot_dir=odir+'/'+sat+'_comparison'
+os.makedirs(plot_dir, exist_ok=True)
 
 NN=get_NN(odir,sat)
 seeds=get_seeds(folder,sat)
 vourlidas= get_vourlidas(folder,sat)
 df=comparator(NN,seeds,vourlidas)
 
-#breakpoint()
+date_to_tag_vourlidas = pd.to_datetime([datetime(2008, 5, 17)])
+date_to_tag_seeds = pd.to_datetime([datetime(2008, 5, 17)])
+
 fig, ax = plt.subplots(figsize=(6, 6))
-ax.errorbar(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"], xerr=df["NN_CPA_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label='VOURLIDAS')
-ax.errorbar(df["NN_CPA_ANG_MEDIAN"], df["SEEDS_CPA_ANG"], xerr=df["NN_CPA_ANG_STD"], fmt='o', color='blue', ecolor='gray', capsize=5, label='SEEDS')
-ax.plot([0, 450], [0, 450], color='red', linestyle='--')
+label = 'VOURLIDAS ; '+get_r(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"])
+ax.errorbar(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"], xerr=df["NN_CPA_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label=label)
+# add a tag to the plot
+breakpoint()
+for date in date_to_tag_vourlidas:
+    x = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["NN_CPA_ANG_MEDIAN"]
+    y = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["VOURLIDAS_CPA_ANG"]
+    if len(x) > 0:
+        ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+label = 'SEEDS ; '+get_r(df["NN_CPA_ANG_MEDIAN"], df["SEEDS_CPA_ANG"])
+ax.errorbar(df["NN_CPA_ANG_MEDIAN"], df["SEEDS_CPA_ANG"], xerr=df["NN_CPA_ANG_STD"], fmt='o', color='blue', ecolor='gray', capsize=5, label=label)
+# add a tag to the plot
+for date in date_to_tag_seeds:
+    x = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["NN_CPA_ANG_MEDIAN"]
+    y = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["SEEDS_CPA_ANG"]
+    if len(x) > 0:
+        ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+ax.plot([0, 450], [0, 450], color='black', linestyle='-',linewidth=0.5)
 ax.set_xlim(0, ax.get_xlim()[1])
-ax.set_xlabel('Neural Segmentation')
-ax.set_title('CPA ANG')
+ax.set_xlabel('NN')
+ax.set_title('CPA [deg]')
 ax.legend()
 ax.grid(True)
-fig.savefig(folder+"/plots/"'CPA_ANG_all.png', dpi=300, bbox_inches='tight')
-
+fig.savefig(plot_dir + '/CPA_ANG_all.png', dpi=300, bbox_inches='tight')
 
 fig2, ax2 = plt.subplots(figsize=(6, 6))
-ax2.errorbar(df["NN_WIDE_ANG_MEDIAN"], df["VOURLIDAS_WIDE_ANG"], xerr=df["NN_WIDE_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label='VOURLIDAS')
-ax2.errorbar(df["NN_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"], xerr=df["NN_WIDE_ANG_STD"], fmt='o', color='blue', ecolor='gray', capsize=5, label='SEEDS')
-ax2.plot([0, 350], [0, 350], color='red', linestyle='--')
+label = 'VOURLIDAS ; '+get_r(df["NN_WIDE_ANG_MEDIAN"], df["VOURLIDAS_WIDE_ANG"])
+ax2.errorbar(df["NN_WIDE_ANG_MEDIAN"], df["VOURLIDAS_WIDE_ANG"], xerr=df["NN_WIDE_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label=label)
+# add a tag to the plot
+for date in date_to_tag_vourlidas:
+    x = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["NN_WIDE_ANG_MEDIAN"]
+    y = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["VOURLIDAS_WIDE_ANG"]
+    if len(x) > 0:
+        ax2.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+label = 'SEEDS ; '+get_r(df["NN_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"])
+ax2.errorbar(df["NN_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"], xerr=df["NN_WIDE_ANG_STD"], fmt='o', color='blue', ecolor='gray', capsize=5, label=label)
+# add a tag to the plot
+for date in date_to_tag_seeds:
+    x = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["NN_WIDE_ANG_MEDIAN"]
+    y = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["SEEDS_WIDE_ANG"]
+    if len(x) > 0:
+        ax2.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+ax2.plot([0, 300], [0, 300], color='black', linestyle='-',linewidth=0.5)
 ax2.set_xlim(0, ax2.get_xlim()[1])
-ax2.set_xlabel('Neural Segmentation')
-ax2.set_title('WIDE ANG')
+ax2.set_xlabel('NN')
+ax2.set_title('AW [deg]')
 ax2.legend()
 ax2.grid(True)
-fig2.savefig(folder+"/plots/"'WIDE_ANG_all.png', dpi=300, bbox_inches='tight')
-
-
-
+fig2.savefig(plot_dir + '/WIDE_ANG_all.png', dpi=300, bbox_inches='tight')
 
 
 fig3, (ax3, ax4, ax5) = plt.subplots(1, 3, figsize=(18, 6))
-
-ax3.errorbar(df["SEEDS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"], fmt='o', color='purple', ecolor='gray', capsize=5, label='VOURLIDAS vs SEEDS')
-ax3.plot([0, 350], [0, 350], color='red', linestyle='--')
+ax3.errorbar(df["SEEDS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='VOURLIDAS vs SEEDS')
+plot_fit(ax3,df["SEEDS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"])
+ax3.plot([0, 350], [0, 350], color='black', linestyle='-',linewidth=0.5)
 ax3.set_xlim(0, ax3.get_xlim()[1])
-ax3.set_xlabel('Neural Segmentation')
-ax3.set_title('WIDE ANG')
+ax3.set_xlabel('Seeds')
+ax3.set_ylabel('Vourlidas')
+ax3.set_title('AW [deg]')
 ax3.legend()
 ax3.grid(True)
-ax4.errorbar(df["SEEDS_WIDE_ANG"], df["NN_WIDE_ANG_MEDIAN"], fmt='o', color='purple', ecolor='gray', capsize=5, label='NN vs SEEDS')
-ax4.plot([0, 450], [0, 450], color='red', linestyle='--')
+ax4.errorbar( df["NN_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='NN vs SEEDS')
+plot_fit(ax4,df["NN_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"])
+ax4.plot([0, 450], [0, 450], color='black', linestyle='-',linewidth=0.5)
 ax4.set_xlim(0, ax4.get_xlim()[1])
-ax4.set_xlabel('Neural Segmentation')
-ax4.set_title('WIDE ANG')
+ax4.set_ylabel('Seeds')
+ax4.set_xlabel('NN')
+ax4.set_title('AW [deg]')
 ax4.legend()
 ax4.grid(True)
-ax5.errorbar(df["VOURLIDAS_WIDE_ANG"], df["NN_CPA_WIDE_MEDIAN"], fmt='o', color='purple', ecolor='gray', capsize=5, label='NN vs VOURLIDAS')
-ax5.plot([0, 550], [0, 550], color='red', linestyle='--')
+ax5.errorbar(df["NN_WIDE_ANG_MEDIAN"],df["VOURLIDAS_WIDE_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='NN vs VOURLIDAS')
+plot_fit(ax5,df["NN_WIDE_ANG_MEDIAN"], df["VOURLIDAS_WIDE_ANG"])
+ax5.plot([0, 550], [0, 550], color='black', linestyle='-',linewidth=0.5)
 ax5.set_xlim(0, ax5.get_xlim()[1])
-ax5.set_xlabel('Neural Segmentation')
-ax5.set_title('WIDE ANG')
+ax5.set_ylabel('Vourlidas')
+ax5.set_xlabel('NN')
+ax5.set_title('AW [deg]')
 ax5.legend()
 ax5.grid(True)
-fig3.savefig(folder+"/plots/"+'WIDE_ANG.png', dpi=300, bbox_inches='tight')
+fig3.savefig(plot_dir + '/WIDE_ANG.png', dpi=300, bbox_inches='tight')
              
 fig4, (ax6, ax7, ax8) = plt.subplots(1, 3, figsize=(18, 6))
-ax6.errorbar(df["SEEDS_CPA_ANG"], df["VOURLIDAS_CPA_ANG"], fmt='o', color='purple', ecolor='gray', capsize=5, label='VOURLIDAS vs SEEDS')
-ax6.plot([0, 650], [0, 650], color='red', linestyle='--')
+ax6.errorbar(df["SEEDS_CPA_ANG"], df["VOURLIDAS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='VOURLIDAS vs SEEDS')
+plot_fit(ax6,df["SEEDS_CPA_ANG"], df["VOURLIDAS_CPA_ANG"])
+ax6.plot([0, 650], [0, 650], color='black', linestyle='-',linewidth=0.5)
 ax6.set_xlim(0, ax6.get_xlim()[1])
-ax6.set_xlabel('Neural Segmentation')
-ax6.set_title('CPA ANG')
+ax6.set_xlabel('Seeds')
+ax6.set_ylabel('Vourlidas')
+ax6.set_title('CPA [deg]')
 ax6.legend()
 ax6.grid(True)
-ax7.errorbar(df["SEEDS_CPA_ANG"], df["NN_CPA_ANG_MEDIAN"], fmt='o', color='purple', ecolor='gray', capsize=5, label='NN vs SEEDS')
-ax7.plot([0, 750], [0, 750], color='red', linestyle='--')
+ax7.errorbar( df["NN_CPA_ANG_MEDIAN"], df["SEEDS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='NN vs SEEDS')
+plot_fit(ax7,df["NN_CPA_ANG_MEDIAN"], df["SEEDS_CPA_ANG"])
+ax7.plot([0, 500], [0, 500], color='black', linestyle='-',linewidth=0.5)
 ax7.set_xlim(0, ax7.get_xlim()[1])
-ax7.set_xlabel('Neural Segmentation')
-ax7.set_title('CPA ANG')
+ax7.set_ylabel('Seeds')
+ax7.set_xlabel('NN')
+ax7.set_title('CPA [deg]')
 ax7.legend()
 ax7.grid(True)
-ax8.errorbar(df["VOURLIDAS_CPA_ANG"], df["NN_CPA_ANG_MEDIAN"], fmt='o', color='purple', ecolor='gray', capsize=8, label='NN vs VOURLIDAS')
-ax8.plot([0, 880], [0, 880], color='red', linestyle='--')
-ax8.set_xlim(0, ax8.get_xlim()[1])
-ax8.set_xlabel('Neural Segmentation')
-ax8.set_title('CPA ANG')
+# print thge date of all events that have Seeds/NN CPA > 1.5
+print(f'Seeds/NN CPA>1.5 \n',df.loc[df["SEEDS_CPA_ANG"]/df["NN_CPA_ANG_MEDIAN"]>1.5]["NN_DATE_TIME"])
+print(f'Seeds/NN CPA<0.5 \n',df.loc[df["SEEDS_CPA_ANG"]/df["NN_CPA_ANG_MEDIAN"]<0.5]["NN_DATE_TIME"])
+
+breakpoint()
+ax8.errorbar(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=8, label='NN vs VOURLIDAS')
+plot_fit(ax8,df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"])
+ax8.plot([0, 500], [0, 500], color='black', linestyle='-',linewidth=0.5)
+#ax8.set_xlim(0, ax8.get_xlim()[1])
+ax8.set_ylabel('Vourlidas')
+ax8.set_xlabel('NN')
+ax8.set_title('CPA [deg]')
 ax8.legend()
 ax8.grid(True)
-fig3.savefig(folder+"/plots/"'CPA_ANG.png', dpi=300, bbox_inches='tight')
+fig4.savefig(plot_dir + '/CPA_ANG.png', dpi=300, bbox_inches='tight')
              
-
 plt.show()
 plt.close()
 

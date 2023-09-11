@@ -9,7 +9,7 @@ import warnings
 from torchvision.io import read_image
 from torch.utils.data import Dataset
 
-class CmeDataset(Dataset):
+class Cme_1VP_Dataset(Dataset):
     def __init__(self, root_dir:str, file_ext:str='.png', img_size:list=[512, 512]):
         self.root_dir = root_dir
         self.imgs = self.__get_dirs(self.root_dir)

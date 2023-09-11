@@ -8,17 +8,17 @@ import matplotlib as mpl
 #mpl.use('TkAgg')
 mpl.use('Agg')
 from torch.utils.data import DataLoader
-from cme_dataset import CmeDataset
+from nn.neural_gcs.cme_1VP_dataset import Cme_1VP_Dataset
 from sirats_model import Sirats_net
 from nn.utils.gcs_mask_generator import maskFromCloud
 from torch.utils.data import random_split
 
 # Train Parameters
 DEVICE = 0
-INFERENCE_MODE = True
+INFERENCE_MODE = False
 SAVE_MODEL = True
 LOAD_MODEL = True
-EPOCHS = 200
+EPOCHS = 42
 BATCH_LIMIT = None
 BATCH_SIZE = 32
 IMG_SiZE = [512, 512]
@@ -27,8 +27,8 @@ LR = [1e-3, 1e-5]
 # CMElon,CMElat,CMEtilt,height,k,ang
 GCS_PAR_RNG = torch.tensor([[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60]]) 
 LOSS_WEIGHTS = torch.tensor([100,100,100,10,1,10])
-TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_mariano'
-OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_200epochs"
+TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_1VP_100k'
+OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_42epochs_1VP_100k"
 os.makedirs(OPATH, exist_ok=True)
 
 def plot_masks(img, mask, target, prediction, occulter_mask, satpos, plotranges, opath, namefile):
@@ -97,8 +97,8 @@ def run_training():
 
 
 if __name__ == '__main__':
-    dataset = CmeDataset(root_dir=TRAINDIR, img_size=IMG_SiZE)
-    train_dataset, test_dataset = random_split(dataset, [int(len(dataset) * 0.8), int(len(dataset) * 0.2)])
+    dataset = Cme_1VP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE)
+    train_dataset, test_dataset = random_split(dataset, [int(len(dataset) * 0.90), int(len(dataset) * 0.1)])
     cme_train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     cme_test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
