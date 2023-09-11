@@ -148,6 +148,7 @@ def comparator(NN,seeds,vourlidas):
         NN_min['DATE_TIME'] = NN_min.apply(lambda row: datetime.combine(row['DATE'], row['TIME']), axis=1)
         NN_max['DATE_TIME'] = NN_max.apply(lambda row: datetime.combine(row['DATE'], row['TIME']), axis=1)
         NN_date=NN_min["DATE_TIME"][i]
+        
         #path=NN.loc[NN["DATE_TIME"]==NN_date, "PATH"].values[0]
         seeds['TIME_DIFF'] = seeds['DATE_TIME'] - pd.to_datetime(NN_date)
         time_diff_seeds = seeds[seeds['TIME_DIFF'] >= pd.Timedelta(0)]
@@ -157,18 +158,24 @@ def comparator(NN,seeds,vourlidas):
         wide_ang_seeds=seeds_data["WIDE_ANG"]
 
         vourlidas['Time_Diff'] = vourlidas['Date_Time'] - pd.to_datetime(NN_date)
+        
         time_diff_vourlidas = vourlidas[vourlidas['Time_Diff'] >= pd.Timedelta(0)]
         idx_vourlidas = time_diff_vourlidas['Time_Diff'].idxmin()
         vourlidas_data = vourlidas.loc[idx_vourlidas]
         cpa_ang_vourlidas=vourlidas_data["CPA"]
         wide_ang_vourlidas=vourlidas_data["Width"]
-        if (NN_min["DATE_TIME"][i]<=vourlidas_data["Date_Time"]<=NN_max["DATE_TIME"][i])and(NN_min["DATE_TIME"][i]<=seeds_data["DATE_TIME"]<=NN_max["DATE_TIME"][i]):
+        NN_prev=NN_min["DATE_TIME"][i]-pd.Timedelta(hours=4)
+        NN_post=NN_max["DATE_TIME"][i]+pd.Timedelta(hours=4)
+        if (NN_prev<=vourlidas_data["Date_Time"]<=NN_post)and(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
             compare.append([NN_date,seeds_data["DATE_TIME"],vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,wide_ang_vourlidas])
-        elif (NN_min["DATE_TIME"][i]<=vourlidas_data["Date_Time"]<=NN_max["DATE_TIME"][i]) and not(NN_min["DATE_TIME"][i]<=seeds_data["DATE_TIME"]<=NN_max["DATE_TIME"][i]):
+        elif (NN_prev<=vourlidas_data["Date_Time"]<=NN_post) and not(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
             compare.append([NN_date,np.nan,vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],np.nan,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],np.nan,wide_ang_vourlidas])
-        elif not(NN_min["DATE_TIME"][i]<=vourlidas_data["Date_Time"]<=NN_max["DATE_TIME"][i])and(NN_min["DATE_TIME"][i]<=seeds_data["DATE_TIME"]<=NN_max["DATE_TIME"][i]):
+        elif not(NN_prev<=vourlidas_data["Date_Time"]<=NN_post)and(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
+            
             compare.append([NN_date,seeds_data["DATE_TIME"],np.nan,df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,np.nan,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,np.nan])
     compare = pd.DataFrame(compare, columns=columns)
+    
+    #vourlidas.loc[vourlidas["Date_Time"]=="2008-05-17 10:37:30"]
     return compare
 
 def linear(t,a,b):
@@ -223,7 +230,7 @@ fig, ax = plt.subplots(figsize=(6, 6))
 label = 'VOURLIDAS ; '+get_r(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"])
 ax.errorbar(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"], xerr=df["NN_CPA_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label=label)
 # add a tag to the plot
-breakpoint()
+
 for date in date_to_tag_vourlidas:
     x = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["NN_CPA_ANG_MEDIAN"]
     y = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["VOURLIDAS_CPA_ANG"]
@@ -324,7 +331,7 @@ ax7.grid(True)
 print(f'Seeds/NN CPA>1.5 \n',df.loc[df["SEEDS_CPA_ANG"]/df["NN_CPA_ANG_MEDIAN"]>1.5]["NN_DATE_TIME"])
 print(f'Seeds/NN CPA<0.5 \n',df.loc[df["SEEDS_CPA_ANG"]/df["NN_CPA_ANG_MEDIAN"]<0.5]["NN_DATE_TIME"])
 
-breakpoint()
+
 ax8.errorbar(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=8, label='NN vs VOURLIDAS')
 plot_fit(ax8,df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"])
 ax8.plot([0, 500], [0, 500], color='black', linestyle='-',linewidth=0.5)
