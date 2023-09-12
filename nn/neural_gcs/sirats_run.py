@@ -3,6 +3,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 import torch
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 #mpl.use('TkAgg')
@@ -18,7 +19,7 @@ DEVICE = 0
 INFERENCE_MODE = False
 SAVE_MODEL = True
 LOAD_MODEL = True
-EPOCHS = 42
+EPOCHS = 200
 BATCH_LIMIT = None
 BATCH_SIZE = 32
 IMG_SiZE = [512, 512]
@@ -28,7 +29,7 @@ LR = [1e-3, 1e-5]
 GCS_PAR_RNG = torch.tensor([[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60]]) 
 LOSS_WEIGHTS = torch.tensor([100,100,100,10,1,10])
 TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_1VP_100k'
-OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_42epochs_1VP_100k"
+OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_200epochs_1VP_100k"
 os.makedirs(OPATH, exist_ok=True)
 
 def plot_masks(img, mask, target, prediction, occulter_mask, satpos, plotranges, opath, namefile):
@@ -97,8 +98,14 @@ def run_training():
 
 
 if __name__ == '__main__':
+    # train_dataset, test_dataset = random_split(dataset, [int(len(dataset) * 0.90), int(len(dataset) * 0.1)])
     dataset = Cme_1VP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE)
-    train_dataset, test_dataset = random_split(dataset, [int(len(dataset) * 0.90), int(len(dataset) * 0.1)])
+    total_samples = len(dataset)
+    train_size = 95000
+    train_indices = random.sample(range(total_samples), train_size)
+    test_indices = list(set(range(total_samples)) - set(train_indices))
+    train_dataset = torch.utils.data.Subset(dataset, train_indices)
+    test_dataset = torch.utils.data.Subset(dataset, test_indices)
     cme_train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     cme_test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 

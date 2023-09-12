@@ -32,17 +32,15 @@ class Cme_1VP_Dataset(Dataset):
         return len(self.imgs)
     
     def __getitem__(self, idx):
-        file = next((f for f in os.listdir(self.imgs[idx]) if f.endswith(self.file_ext)), None)
-        if file is None:
-            raise FileNotFoundError("No file with the specified extension found in directory.")
+        # file = next((f for f in os.listdir(self.imgs[idx]) if f.endswith(self.file_ext)), None)
+        # if file is None:
+        #     raise FileNotFoundError("No file with the specified extension found in directory.")
 
         mask_dir = os.path.join(self.imgs[idx], 'mask')
         
-        img = read_image(os.path.join(self.imgs[idx], file), mode=torchvision.io.image.ImageReadMode.GRAY)
         mask = read_image(os.path.join(mask_dir, '2.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
+        img = torch.zeros((1, mask.shape[1], mask.shape[2]))
         img[0, :, :] = mask
-        # img[1, :, :] = mask
-        # img[2, :, :] = mask
 
         img = img.float()
         img = self.__normalize(img)
@@ -59,8 +57,11 @@ class Cme_1VP_Dataset(Dataset):
         mask = resize(mask)
         occulter_mask = resize(occulter_mask)
 
-        targets = file.split('_')[:6]
-        targets = [float(p) for p in targets]
+        # CMElon,CMElat,CMEtilt,height,k,ang
+        labels = ["CMElon", "CMElat", "CMEtilt", "height", "k", "ang"]
+        targets = []
+        for label in labels:
+            targets.append(self.csv_df[label].iloc[idx])
         targets = torch.tensor(targets, dtype=torch.float32)
 
         satpos = torch.tensor(eval(self.csv_df["satpos"].iloc[idx]), dtype=torch.float32)
@@ -68,12 +69,13 @@ class Cme_1VP_Dataset(Dataset):
 
         #Squeeze everything
         #img = torch.squeeze(img)
-        targets = torch.squeeze(targets)
-        mask = torch.squeeze(mask)
+        #targets = torch.squeeze(targets)
+        #mask = torch.squeeze(mask)
         occulter_mask = torch.squeeze(occulter_mask)
         satpos = torch.squeeze(satpos)
         plotranges = torch.squeeze(plotranges)
 
+        breakpoint()
 
         return img, targets, mask, occulter_mask, satpos, plotranges, idx
 
