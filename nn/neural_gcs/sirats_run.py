@@ -10,12 +10,14 @@ mpl.use('Agg')
 #mpl.use('TkAgg')
 from torch.utils.data import DataLoader
 from nn.neural_gcs.cme_1VP_dataset import Cme_1VP_Dataset
+from nn.neural_gcs.cme_2VP_dataset import Cme_2VP_Dataset
 from nn.neural_gcs.sirats_model import Sirats_net
 from nn.utils.gcs_mask_generator import maskFromCloud
 #from torch.utils.data import random_split
 
 # Train Parameters
 DEVICE = 0
+TWOVP_MODE = False
 INFERENCE_MODE = False
 SAVE_MODEL = True
 LOAD_MODEL = True
@@ -79,34 +81,52 @@ def run_training():
         epoch_list.append(total_batches_per_epoch)  # Store the total number of batches processed
         total_batches_per_epoch = 0
 
+        if not TWOVP_MODE:
+            for i, (img, targets, mask, occulter_mask, satpos, plotranges, idx) in enumerate(cme_train_dataloader, 0):
+                total_batches_per_epoch += 1
+                loss_value = model.optimize_model(img, targets, loss_fn, optimizer, scheduler)
+                train_losses_per_batch.append(loss_value.detach().cpu())
+                train_onlyepoch_losses.append(loss_value.detach().cpu())
 
-        for i, (img, targets, mask, occulter_mask, satpos, plotranges, idx) in enumerate(cme_train_dataloader, 0):
-            total_batches_per_epoch += 1
-            loss_value = model.optimize_model(img, targets, loss_fn, optimizer, scheduler)
-            train_losses_per_batch.append(loss_value.detach().cpu())
-            train_onlyepoch_losses.append(loss_value.detach().cpu())
+                if i % 10 == 0:            
+                    print(f'Epoch: {epoch + 1}, Image: {(i + 1) * BATCH_SIZE}, Batch: {i + 1}, Loss: {loss_value:.5f}, learning rate: {optimizer.param_groups[-1]["lr"]:.7f}')
 
-            if i % 10 == 0:            
-                print(f'Epoch: {epoch + 1}, Image: {(i + 1) * BATCH_SIZE}, Batch: {i + 1}, Loss: {loss_value:.5f}, learning rate: {optimizer.param_groups[-1]["lr"]:.7f}')
+                if i % 50 == 0:
+                    model.plot_loss(train_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "train_loss.png"), plot_epoch=False)
 
-            if i % 50 == 0:
-                model.plot_loss(train_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "train_loss.png"), plot_epoch=False)
+                if i == BATCH_LIMIT:
+                    break
+            mean_train_losses_per_batch.append(np.mean(train_onlyepoch_losses))
+        else:
+            for i, (img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx) in enumerate(cme_train_dataloader, 0):
+                total_batches_per_epoch += 1
+                loss_value = model.optimize_model(img, targets, loss_fn, optimizer, scheduler)
+                train_losses_per_batch.append(loss_value.detach().cpu())
+                train_onlyepoch_losses.append(loss_value.detach().cpu())
 
-            if i == BATCH_LIMIT:
-                break
-        mean_train_losses_per_batch.append(np.mean(train_onlyepoch_losses))
+                if i % 10 == 0:            
+                    print(f'Epoch: {epoch + 1}, Image: {(i + 1) * BATCH_SIZE}, Batch: {i + 1}, Loss: {loss_value:.5f}, learning rate: {optimizer.param_groups[-1]["lr"]:.7f}')
 
-        # Save model
-        if SAVE_MODEL:
-            status = model.save_model(OPATH)
-            print(f"\nModel saved at: {status}\n")
+                if i % 50 == 0:
+                    model.plot_loss(train_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "train_loss.png"), plot_epoch=False)
+
+                if i == BATCH_LIMIT:
+                    break
+            mean_train_losses_per_batch.append(np.mean(train_onlyepoch_losses))
 
         # Test
-        for i, (img, targets, mask, occulter_mask, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
-            loss_test = model.test_model(img, targets, loss_fn)
-            test_losses_per_batch.append(loss_test.detach().cpu())
-            test_onlyepoch_losses.append(loss_test.detach().cpu())
-        mean_test_error_in_batch.append(np.mean(test_onlyepoch_losses))
+        if not TWOVP_MODE:
+            for i, (img, targets, mask, occulter_mask, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
+                loss_test = model.test_model(img, targets, loss_fn)
+                test_losses_per_batch.append(loss_test.detach().cpu())
+                test_onlyepoch_losses.append(loss_test.detach().cpu())
+            mean_test_error_in_batch.append(np.mean(test_onlyepoch_losses))
+        else:
+            for i, (img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
+                loss_test = model.test_model(img, targets, loss_fn)
+                test_losses_per_batch.append(loss_test.detach().cpu())
+                test_onlyepoch_losses.append(loss_test.detach().cpu())
+            mean_test_error_in_batch.append(np.mean(test_onlyepoch_losses))
 
         print(f'Epoch: {epoch + 1}, Test Loss: {loss_test:.5f}\n')
         model.plot_loss(test_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "test_loss.png"), plot_epoch=False)
@@ -115,13 +135,17 @@ def run_training():
         model.plot_loss(mean_train_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "mean_train_loss.png"), plot_epoch=True, meanLoss=True)
         model.plot_loss(mean_test_error_in_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "mean_test_loss.png"), plot_epoch=True, meanLoss=True)
 
-        if i == BATCH_LIMIT:
-            break
-
+        # Save model
+        if SAVE_MODEL:
+            status = model.save_model(OPATH)
+            print(f"\nModel saved at: {status}\n")
 
 if __name__ == '__main__':
     # train_dataset, test_dataset = random_split(dataset, [int(len(dataset) * 0.90), int(len(dataset) * 0.1)])
-    dataset = Cme_1VP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE)
+    if not TWOVP_MODE:
+        dataset = Cme_1VP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE)
+    else:
+        dataset = Cme_2VP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE)
     total_samples = len(dataset)
     train_size = TRAIN_IDX_SIZE
     train_indices = random.sample(range(total_samples), train_size)
@@ -131,7 +155,7 @@ if __name__ == '__main__':
     cme_train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     cme_test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-    model = Sirats_net(device=DEVICE, output_size=6, imsize=IMG_SiZE)
+    model = Sirats_net(device=DEVICE, output_size=6, imsize=IMG_SiZE, twoVP_mode=TWOVP_MODE)
     if LOAD_MODEL:
         status = model.load_model(OPATH)
         if status:
@@ -151,9 +175,18 @@ if __name__ == '__main__':
         run_training()
     else:
         data_iter = iter(cme_test_dataloader)
-        for i in range(10):
-            img, targets, mask, occulter_mask, satpos, plotranges, idx = next(data_iter)
-            img, targets, mask, occulter_mask, satpos, plotranges, idx = img[0], targets[0], mask[0], occulter_mask[0], satpos[0], plotranges[0], idx[0]
-            img = img.to(DEVICE)
-            predictions = model.infer(img)
-            plot_masks(img, mask, targets, predictions, occulter_mask, satpos, plotranges, opath=OPATH, namefile=f'targetVinfered_{idx}.png')
+        if not TWOVP_MODE:
+            for i in range(10):
+                img, targets, mask, occulter_mask, satpos, plotranges, idx = next(data_iter)
+                img, targets, mask, occulter_mask, satpos, plotranges, idx = img[0], targets[0], mask[0], occulter_mask[0], satpos[0], plotranges[0], idx[0]
+                img = img.to(DEVICE)
+                predictions = model.infer(img)
+                plot_masks(img, mask, targets, predictions, occulter_mask, satpos, plotranges, opath=OPATH, namefile=f'targetVinfered_{idx}.png')
+        else:
+            for i in range(10):
+                img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx = next(data_iter)
+                img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx = img[0], targets[0], sat1_mask[0], sat2_mask[0], occulter_mask_sat1[0], occulter_mask_sat2[0], satpos[0], plotranges[0], idx[0]
+                img = img.to(DEVICE)
+                predictions = model.infer(img)
+                plot_masks(img, sat1_mask, targets, predictions, occulter_mask_sat1, satpos, plotranges, opath=OPATH, namefile=f'targetVinfered_{idx}.png')
+                plot_masks(img, sat2_mask, targets, predictions, occulter_mask_sat2, satpos, plotranges, opath=OPATH, namefile=f'targetVinfered_{idx}.png')

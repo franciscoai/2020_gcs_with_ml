@@ -9,7 +9,7 @@ import warnings
 from torchvision.io import read_image
 from torch.utils.data import Dataset
 
-class Cme_1VP_Dataset(Dataset):
+class Cme_2VP_Dataset(Dataset):
     def __init__(self, root_dir:str, file_ext:str='.png', img_size:list=[512, 512]):
         self.root_dir = root_dir
         self.imgs = self.__get_dirs(self.root_dir)
@@ -48,12 +48,14 @@ class Cme_1VP_Dataset(Dataset):
         img = self.__normalize(img)
         img = self.transform(img)
 
-        occulter_mask = read_image(os.path.join(mask_dir, '1.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
+        occulter_mask_sat1 = read_image(os.path.join(mask_dir, 'sat1_occ.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
+        occulter_mask_sat2 = read_image(os.path.join(mask_dir, 'sat2_occ.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             mask = mask.new_tensor(mask > 0, dtype=torch.uint8)
-            occulter_mask = occulter_mask.new_tensor(occulter_mask > 0, dtype=torch.uint8)
+            occulter_mask_sat1 = occulter_mask_sat1.new_tensor(occulter_mask_sat1 > 0, dtype=torch.uint8)
+            occulter_mask_sat2 = occulter_mask_sat2.new_tensor(occulter_mask_sat2 > 0, dtype=torch.uint8)
 
         resize = torchvision.transforms.Resize(self.image_size, torchvision.transforms.InterpolationMode.BILINEAR)
         mask = resize(mask)
@@ -77,7 +79,7 @@ class Cme_1VP_Dataset(Dataset):
         satpos = torch.squeeze(satpos)
         plotranges = torch.squeeze(plotranges)
 
-        return img, targets, mask, occulter_mask, satpos, plotranges, idx
+        return img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx
 
 
     def __normalize(self, img):
