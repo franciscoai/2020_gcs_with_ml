@@ -35,51 +35,60 @@ class Cme_2VP_Dataset(Dataset):
         # file = next((f for f in os.listdir(self.imgs[idx]) if f.endswith(self.file_ext)), None)
         # if file is None:
         #     raise FileNotFoundError("No file with the specified extension found in directory.")
+        try:
+            mask_dir = os.path.join(self.imgs[idx], 'mask')
+            
+            sat1_mask = read_image(os.path.join(mask_dir, 'sat1.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
+            sat2_mask = read_image(os.path.join(mask_dir, 'sat2.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
+            img = torch.zeros((2, sat1_mask.shape[1], sat1_mask.shape[2]))
+            img[0, :, :] = sat1_mask
+            img[1, :, :] = sat2_mask
 
-        mask_dir = os.path.join(self.imgs[idx], 'mask')
-        
-        sat1_mask = read_image(os.path.join(mask_dir, 'sat1.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
-        sat2_mask = read_image(os.path.join(mask_dir, 'sat2.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
-        img = torch.zeros((2, sat1_mask.shape[1], sat1_mask.shape[2]))
-        img[0, :, :] = sat1_mask
-        img[1, :, :] = sat2_mask
+            img = img.float()
+            img = self.__normalize(img)
+            img = self.transform(img)
 
-        img = img.float()
-        img = self.__normalize(img)
-        img = self.transform(img)
+            occulter_mask_sat1 = read_image(os.path.join(mask_dir, 'sat1_occ.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
+            occulter_mask_sat2 = read_image(os.path.join(mask_dir, 'sat2_occ.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
 
-        occulter_mask_sat1 = read_image(os.path.join(mask_dir, 'sat1_occ.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
-        occulter_mask_sat2 = read_image(os.path.join(mask_dir, 'sat2_occ.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                sat1_mask = sat1_mask.new_tensor(sat1_mask > 0, dtype=torch.uint8)
+                sat2_mask = sat2_mask.new_tensor(sat2_mask > 0, dtype=torch.uint8)
+                occulter_mask_sat1 = occulter_mask_sat1.new_tensor(occulter_mask_sat1 > 0, dtype=torch.uint8)
+                occulter_mask_sat2 = occulter_mask_sat2.new_tensor(occulter_mask_sat2 > 0, dtype=torch.uint8)
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            mask = mask.new_tensor(mask > 0, dtype=torch.uint8)
-            occulter_mask_sat1 = occulter_mask_sat1.new_tensor(occulter_mask_sat1 > 0, dtype=torch.uint8)
-            occulter_mask_sat2 = occulter_mask_sat2.new_tensor(occulter_mask_sat2 > 0, dtype=torch.uint8)
+            resize = torchvision.transforms.Resize(self.image_size, torchvision.transforms.InterpolationMode.BILINEAR)
+            sat1_mask = resize(sat1_mask)
+            sat2_mask = resize(sat2_mask)
+            occulter_mask_sat1 = resize(occulter_mask_sat1)
+            occulter_mask_sat2 = resize(occulter_mask_sat2)
 
-        resize = torchvision.transforms.Resize(self.image_size, torchvision.transforms.InterpolationMode.BILINEAR)
-        mask = resize(mask)
-        occulter_mask = resize(occulter_mask)
+            # CMElon,CMElat,CMEtilt,height,k,ang
+            labels = ["CMElon", "CMElat", "CMEtilt", "height", "k", "ang"]
+            targets = []
+            for label in labels:
+                targets.append(self.csv_df[label].iloc[idx])
+            targets = torch.tensor(targets, dtype=torch.float32)
 
-        # CMElon,CMElat,CMEtilt,height,k,ang
-        labels = ["CMElon", "CMElat", "CMEtilt", "height", "k", "ang"]
-        targets = []
-        for label in labels:
-            targets.append(self.csv_df[label].iloc[idx])
-        targets = torch.tensor(targets, dtype=torch.float32)
+            satpos = torch.tensor(eval(self.csv_df["satpos"].iloc[idx]), dtype=torch.float32)
+            plotranges = torch.tensor(eval(self.csv_df["plotranges"].iloc[idx]), dtype=torch.float32)
 
-        satpos = torch.tensor(eval(self.csv_df["satpos"].iloc[idx]), dtype=torch.float32)
-        plotranges = torch.tensor(eval(self.csv_df["plotranges"].iloc[idx]), dtype=torch.float32)
+            #Squeeze everything
+            #img = torch.squeeze(img)
+            #targets = torch.squeeze(targets)
+            #mask = torch.squeeze(mask)
+            occulter_mask_sat1 = torch.squeeze(occulter_mask_sat1)
+            occulter_mask_sat2 = torch.squeeze(occulter_mask_sat2)
+            satpos = torch.squeeze(satpos)
+            plotranges = torch.squeeze(plotranges)
 
-        #Squeeze everything
-        #img = torch.squeeze(img)
-        #targets = torch.squeeze(targets)
-        #mask = torch.squeeze(mask)
-        occulter_mask = torch.squeeze(occulter_mask)
-        satpos = torch.squeeze(satpos)
-        plotranges = torch.squeeze(plotranges)
+            return img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx
+        except :
+            print(f"Error in {self.imgs[idx]}")
+            img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx = self.__getitem__(idx+1)
+            return img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx
 
-        return img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx
 
 
     def __normalize(self, img):

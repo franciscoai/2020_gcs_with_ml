@@ -1,6 +1,6 @@
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 import torch
 import numpy as np
 import random
@@ -17,11 +17,11 @@ from nn.utils.gcs_mask_generator import maskFromCloud
 
 # Train Parameters
 DEVICE = 0
-TWOVP_MODE = False
+TWOVP_MODE = True
 INFERENCE_MODE = False
 SAVE_MODEL = True
 LOAD_MODEL = True
-EPOCHS = 200
+EPOCHS = 25
 BATCH_LIMIT = None
 BATCH_SIZE = 32
 TRAIN_IDX_SIZE = 9500
@@ -31,8 +31,8 @@ LR = [1e-3, 1e-5]
 # CMElon,CMElat,CMEtilt,height,k,ang
 GCS_PAR_RNG = torch.tensor([[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60]]) 
 LOSS_WEIGHTS = torch.tensor([100,100,100,10,1,10])
-TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_mariano'
-OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_1VP_200E"
+TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_2VP_10k'
+OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_2VP_10k_25E"
 os.makedirs(OPATH, exist_ok=True)
 
 
@@ -76,6 +76,7 @@ def run_training():
     total_batches_per_epoch = 0
 
     for epoch in range(EPOCHS):
+        model.train()
         train_onlyepoch_losses = []
         test_onlyepoch_losses = []
         epoch_list.append(total_batches_per_epoch)  # Store the total number of batches processed
@@ -115,6 +116,7 @@ def run_training():
             mean_train_losses_per_batch.append(np.mean(train_onlyepoch_losses))
 
         # Test
+        model.eval()
         if not TWOVP_MODE:
             for i, (img, targets, mask, occulter_mask, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
                 loss_test = model.test_model(img, targets, loss_fn)
@@ -132,13 +134,13 @@ def run_training():
         model.plot_loss(test_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "test_loss.png"), plot_epoch=False)
         
         # Plot mean loss per epoch
-        model.plot_loss(mean_train_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "mean_train_loss.png"), plot_epoch=True, meanLoss=True)
-        model.plot_loss(mean_test_error_in_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "mean_test_loss.png"), plot_epoch=True, meanLoss=True)
+        model.plot_loss(mean_train_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "mean_train_loss.png"), plot_epoch=False, meanLoss=True)
+        model.plot_loss(mean_test_error_in_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "mean_test_loss.png"), plot_epoch=False, meanLoss=True)
 
         # Save model
         if SAVE_MODEL:
             status = model.save_model(OPATH)
-            print(f"\nModel saved at: {status}\n")
+            print(f"Model saved at: {status}\n")
 
 if __name__ == '__main__':
     # train_dataset, test_dataset = random_split(dataset, [int(len(dataset) * 0.90), int(len(dataset) * 0.1)])
@@ -166,7 +168,7 @@ if __name__ == '__main__':
     num_parameters = sum(p.numel() for p in model.parameters())
     print(f'Number of parameters: {num_parameters}\n')
 
-    optimizer = torch.optim.Adadelta(model.parameters(), lr=LR[0])
+    optimizer = torch.optim.Adadelta(model.parameters(), lr=LR[0], weight_decay=0.95)
     #optimizer = torch.optim.Adam(model.parameters(), lr=LR[0])
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, (len(cme_train_dataloader) / BATCH_SIZE) * EPOCHS, eta_min=LR[1])
     loss_fn = torch.nn.MSELoss()

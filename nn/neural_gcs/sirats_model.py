@@ -45,10 +45,10 @@ class Sirats_net(torch.nn.Module):
 
         # fc
         self.fc = torch.nn.Sequential(
-            #torch.nn.Dropout(),
+            torch.nn.Dropout(),
             torch.nn.Linear(30*30*128, 4096),
             torch.nn.ReLU(inplace=True),
-            #torch.nn.Dropout(),
+            torch.nn.Dropout(),
             torch.nn.Linear(4096, 2048),
             torch.nn.ReLU(inplace=True),
             torch.nn.Linear(2048, output_size),
