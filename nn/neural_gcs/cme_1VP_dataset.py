@@ -75,8 +75,6 @@ class Cme_1VP_Dataset(Dataset):
         satpos = torch.squeeze(satpos)
         plotranges = torch.squeeze(plotranges)
 
-        breakpoint()
-
         return img, targets, mask, occulter_mask, satpos, plotranges, idx
 
 

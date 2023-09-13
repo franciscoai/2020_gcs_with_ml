@@ -95,6 +95,8 @@ set = pd.DataFrame(np.column_stack(all_par), columns=par_names)
 set.to_csv(configfile_name)
 df = pd.DataFrame(pd.read_csv(configfile_name))
 mask_prev = None
+satpos_all = []
+plotranges_all = []
 
 #check last image made
 # last_id = sorted([int(i) for i in os.listdir(OPATH) if not i.endswith('.csv')])[-1]-1
@@ -268,4 +270,11 @@ for row in df.index:
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)
             fig=save_png(arr_cloud,ofile=ofile, range=[0, 1])     
 
+    #save satpos and plotranges
+    satpos_all.append(satpos)
+    plotranges_all.append(plotranges)
 
+#add satpos and plotranges to dataframe and save csv
+df['satpos'] = satpos_all
+df['plotranges'] = plotranges_all
+df.to_csv(configfile_name)

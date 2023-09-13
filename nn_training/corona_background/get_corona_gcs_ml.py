@@ -36,8 +36,8 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None):
     
     cor2_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2"
     lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_back_database/lasco"
-    h_cor2b="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2/cor2_b/20090726_090730_14c2B.fits"
-    h_cor2a="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2/cor2_a/20090531_160730_14c2A.fits" 
+    h_cor2b="/gehme/data/stereo/secchi/L1/b/img/cor2/20130209/20130209_062400_14c2B.fts"
+    h_cor2a="/gehme/data/stereo/secchi/L1/a/img/cor2/20130209/20130209_062400_14c2A.fts" 
     h_lasco="path/to/lasco/header"
     size_occ=[2.6, 3.7, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun]
     # size_occ=[1.4, 1.4, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun] 
