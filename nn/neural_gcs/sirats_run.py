@@ -1,18 +1,18 @@
-import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+import os
 import torch
 import numpy as np
 import random
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-#mpl.use('TkAgg')
 mpl.use('Agg')
+#mpl.use('TkAgg')
 from torch.utils.data import DataLoader
 from nn.neural_gcs.cme_1VP_dataset import Cme_1VP_Dataset
-from sirats_model import Sirats_net
+from nn.neural_gcs.sirats_model import Sirats_net
 from nn.utils.gcs_mask_generator import maskFromCloud
-from torch.utils.data import random_split
+#from torch.utils.data import random_split
 
 # Train Parameters
 DEVICE = 0
@@ -22,15 +22,17 @@ LOAD_MODEL = True
 EPOCHS = 200
 BATCH_LIMIT = None
 BATCH_SIZE = 32
+TRAIN_IDX_SIZE = 9500
 IMG_SiZE = [512, 512]
 GPU = 0
 LR = [1e-3, 1e-5]
 # CMElon,CMElat,CMEtilt,height,k,ang
 GCS_PAR_RNG = torch.tensor([[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60]]) 
 LOSS_WEIGHTS = torch.tensor([100,100,100,10,1,10])
-TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_1VP_100k'
-OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_200epochs_1VP_100k"
+TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training_mariano'
+OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_1VP_200E"
 os.makedirs(OPATH, exist_ok=True)
+
 
 def plot_masks(img, mask, target, prediction, occulter_mask, satpos, plotranges, opath, namefile):
     img = img.cpu().detach().numpy()
@@ -63,20 +65,26 @@ def plot_masks(img, mask, target, prediction, occulter_mask, satpos, plotranges,
     plt.savefig(os.path.join(masks_dir, namefile))
     plt.close()
 
-
 def run_training():
     train_losses_per_batch = []
-    total_batches_per_epoch = 0
+    mean_train_losses_per_batch = []
+    test_losses_per_batch = []
+    mean_test_error_in_batch = []
     epoch_list = []
+    total_batches_per_epoch = 0
 
     for epoch in range(EPOCHS):
+        train_onlyepoch_losses = []
+        test_onlyepoch_losses = []
         epoch_list.append(total_batches_per_epoch)  # Store the total number of batches processed
         total_batches_per_epoch = 0
+
 
         for i, (img, targets, mask, occulter_mask, satpos, plotranges, idx) in enumerate(cme_train_dataloader, 0):
             total_batches_per_epoch += 1
             loss_value = model.optimize_model(img, targets, loss_fn, optimizer, scheduler)
             train_losses_per_batch.append(loss_value.detach().cpu())
+            train_onlyepoch_losses.append(loss_value.detach().cpu())
 
             if i % 10 == 0:            
                 print(f'Epoch: {epoch + 1}, Image: {(i + 1) * BATCH_SIZE}, Batch: {i + 1}, Loss: {loss_value:.5f}, learning rate: {optimizer.param_groups[-1]["lr"]:.7f}')
@@ -86,22 +94,36 @@ def run_training():
 
             if i == BATCH_LIMIT:
                 break
+        mean_train_losses_per_batch.append(np.mean(train_onlyepoch_losses))
+
+        # Save model
+        if SAVE_MODEL:
+            status = model.save_model(OPATH)
+            print(f"\nModel saved at: {status}\n")
+
+        # Test
+        for i, (img, targets, mask, occulter_mask, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
+            loss_test = model.test_model(img, targets, loss_fn)
+            test_losses_per_batch.append(loss_test.detach().cpu())
+            test_onlyepoch_losses.append(loss_test.detach().cpu())
+        mean_test_error_in_batch.append(np.mean(test_onlyepoch_losses))
+
+        print(f'Epoch: {epoch + 1}, Test Loss: {loss_test:.5f}\n')
+        model.plot_loss(test_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "test_loss.png"), plot_epoch=False)
+        
+        # Plot mean loss per epoch
+        model.plot_loss(mean_train_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "mean_train_loss.png"), plot_epoch=True, meanLoss=True)
+        model.plot_loss(mean_test_error_in_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "mean_test_loss.png"), plot_epoch=True, meanLoss=True)
 
         if i == BATCH_LIMIT:
             break
-
-    # Save model
-    if SAVE_MODEL:
-        status = model.save_model(OPATH)
-        print(f"\nModel saved at: {status}\n")
-
 
 
 if __name__ == '__main__':
     # train_dataset, test_dataset = random_split(dataset, [int(len(dataset) * 0.90), int(len(dataset) * 0.1)])
     dataset = Cme_1VP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE)
     total_samples = len(dataset)
-    train_size = 95000
+    train_size = TRAIN_IDX_SIZE
     train_indices = random.sample(range(total_samples), train_size)
     test_indices = list(set(range(total_samples)) - set(train_indices))
     train_dataset = torch.utils.data.Subset(dataset, train_indices)

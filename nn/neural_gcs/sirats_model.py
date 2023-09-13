@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(
 
 
 class Sirats_net(torch.nn.Module):
-    def __init__(self, device, output_size=6, imsize=[512, 512]):
+    def __init__(self, device, output_size=6, imsize=[512, 512], twoVP_mode=False):
         super(Sirats_net, self).__init__()
 
         # general params
@@ -18,18 +18,31 @@ class Sirats_net(torch.nn.Module):
         self.imsize = imsize
         self.loss_weights = torch.tensor([100,100,100,10,1,10])
 
-        # conv params
-        self.block1 = self._generate_block(
-            in_channels=1, out_channels=48, kernel_size=2, stride=2, padding=0, pool=True, pool_params=[3, 1, 1])
-        self.block2 = self._generate_block(
-            in_channels=48, out_channels=128, kernel_size=5, stride=3, padding=2, pool=True, pool_params=[3, 1, 1])
-        self.block3 = self._generate_block(
-            in_channels=128, out_channels=192, kernel_size=3, stride=3, padding=2, pool=False)
-        self.block4 = self._generate_block(
-            in_channels=192, out_channels=192, kernel_size=3, stride=1, padding=1, pool=False)
-        self.block5 = self._generate_block(
-            in_channels=192, out_channels=128, kernel_size=3, stride=1, padding=1, pool=True, pool_params=[3, 1, 1])
-        
+        if not twoVP_mode:
+            # conv params for 1VP
+            self.block1 = self._generate_block(
+                in_channels=1, out_channels=48, kernel_size=2, stride=2, padding=0, pool=True, pool_params=[3, 1, 1])
+            self.block2 = self._generate_block(
+                in_channels=48, out_channels=128, kernel_size=5, stride=3, padding=2, pool=True, pool_params=[3, 1, 1])
+            self.block3 = self._generate_block(
+                in_channels=128, out_channels=192, kernel_size=3, stride=3, padding=2, pool=False)
+            self.block4 = self._generate_block(
+                in_channels=192, out_channels=192, kernel_size=3, stride=1, padding=1, pool=False)
+            self.block5 = self._generate_block(
+                in_channels=192, out_channels=128, kernel_size=3, stride=1, padding=1, pool=True, pool_params=[3, 1, 1])
+        else:
+            # conv params for 2VP
+            self.block1 = self._generate_block(
+                in_channels=2, out_channels=48, kernel_size=2, stride=2, padding=0, pool=True, pool_params=[3, 1, 1])
+            self.block2 = self._generate_block(
+                in_channels=48, out_channels=128, kernel_size=5, stride=3, padding=2, pool=True, pool_params=[3, 1, 1])
+            self.block3 = self._generate_block(
+                in_channels=128, out_channels=192, kernel_size=3, stride=3, padding=2, pool=False)
+            self.block4 = self._generate_block(
+                in_channels=192, out_channels=192, kernel_size=3, stride=1, padding=1, pool=False)
+            self.block5 = self._generate_block(
+                in_channels=192, out_channels=128, kernel_size=3, stride=1, padding=1, pool=True, pool_params=[3, 1, 1])
+
         # fc
         self.fc = torch.nn.Sequential(
             #torch.nn.Dropout(),
@@ -64,6 +77,12 @@ class Sirats_net(torch.nn.Module):
         #scheduler.step()
         return loss_value
     
+    def test_model(self, img, targets, loss):
+        img, target = img.to(self.device), targets.to(self.device)
+        self.output_params = self.forward(img)
+        loss_value = loss(self.output_params, target)
+        return loss_value
+    
     def infer(self, img):
         self.eval()
         with torch.inference_mode():
@@ -75,19 +94,29 @@ class Sirats_net(torch.nn.Module):
         loss = torch.mean((predictions - targets) / self.loss_weights[None,:])**2
         return loss
 
-    def plot_loss(self, losses, epoch_list, batch_size, opath, plot_epoch=True):
-        plt.plot(np.arange(len(losses))*batch_size, losses)
-        plt.yscale('log')
-        plt.xlabel('# Image')
-        plt.ylabel('Loss')
-        plt.grid("both")
-        # add vertical line every epoch
-        if plot_epoch:
-            for epoch in range(len(epoch_list)):
-                plt.axvline(x=epoch*epoch_list[epoch]
-                            * batch_size, color='r', linestyle='--')
-        plt.savefig(opath)
-        plt.close()
+    def plot_loss(self, losses, epoch_list, batch_size, opath, plot_epoch=True, meanLoss=False):
+        if not meanLoss:
+            plt.plot(np.arange(len(losses))*batch_size, losses)
+            plt.yscale('log')
+            plt.xlabel('# Image')
+            plt.ylabel('Loss')
+            plt.grid("both")
+            # add vertical line every epoch
+            if plot_epoch:
+                for epoch in range(len(epoch_list)):
+                    plt.axvline(x=epoch*epoch_list[epoch]
+                                * batch_size, color='r', linestyle='--')
+            plt.savefig(opath)
+            plt.close()
+        else:
+            plt.plot(losses)
+            plt.yscale('log')
+            plt.xlabel('# Epoch')
+            plt.ylabel('Mean Loss')
+            plt.grid("both")
+            plt.savefig(opath)
+            plt.close()
+
 
     def save_model(self, opath):
         models_path = os.path.join(opath, 'models')
