@@ -4,16 +4,19 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath
 import torch
 import numpy as np
 import random
+import torchvision
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.use('Agg')
 #mpl.use('TkAgg')
+from pyGCS_raytrace import pyGCS
+from astropy.io import fits
 from torch.utils.data import DataLoader
 from nn.neural_gcs.cme_1VP_dataset import Cme_1VP_Dataset
 from nn.neural_gcs.cme_2VP_dataset import Cme_2VP_Dataset
 from nn.neural_gcs.sirats_model import Sirats_net
 from nn.utils.gcs_mask_generator import maskFromCloud
-#from torch.utils.data import random_split
+
 
 # Train Parameters
 DEVICE = 0
@@ -21,21 +24,65 @@ TWOVP_MODE = True
 INFERENCE_MODE = False
 SAVE_MODEL = True
 LOAD_MODEL = True
-EPOCHS = 25
+EPOCHS = 50
 BATCH_LIMIT = None
 BATCH_SIZE = 32
 TRAIN_IDX_SIZE = 9500
 SEED = 42
 IMG_SiZE = [512, 512]
 GPU = 0
-LR = [1e-3, 1e-5]
+LR = [1e-3, 1e-4]
 # CMElon,CMElat,CMEtilt,height,k,ang
 GCS_PAR_RNG = torch.tensor([[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60]]) 
 LOSS_WEIGHTS = torch.tensor([100,100,100,10,1,10])
-TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_2VP_10k'
-OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_2VP_10k_25E"
+TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_2VP_100k'
+OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_2VP_100k_50E"
 os.makedirs(OPATH, exist_ok=True)
 
+
+def test_specific_image():
+    sat1_path = "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20110317_filter_True/FMwLASCO201103173_0.fits"
+    sat2_path = "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20110317_filter_True/FMwLASCO201103173_1.fits"
+    resize = torchvision.transforms.Resize(IMG_SiZE, torchvision.transforms.InterpolationMode.BILINEAR)
+    #read fits
+    sat1 = fits.open(sat1_path)[0].data
+    sat2 = fits.open(sat2_path)[0].data
+    sat1_h = fits.open(sat1_path)[0].header
+    sat2_h = fits.open(sat2_path)[0].header
+    headers = [sat1_h, sat2_h]
+    satpos, plotranges = pyGCS.processHeaders(headers)
+    satpos = np.array(satpos)
+    plotranges = np.array(plotranges)
+    img = torch.tensor([sat1, sat2])
+    img = img.float()
+    sd_range = 1
+    m = torch.mean(img)
+    sd = torch.std(img)
+    img = (img - m + sd_range * sd) / (2 * sd_range * sd)
+    img[img > 1] = 1
+    img[img < 0] = 0
+    img = resize(img)
+    img = img.to(DEVICE)
+    predictions = model.infer(img)
+    predictions = predictions.cpu().detach().numpy()
+    img = img.cpu().detach().numpy()
+    predictions = np.squeeze(predictions)
+    mask_infered_sat1 = maskFromCloud(predictions, sat=0, satpos=[satpos[0,:]], imsize=IMG_SiZE, plotranges=[plotranges[0,:]])
+    mask_infered_sat2 = maskFromCloud(predictions, sat=0, satpos=[satpos[1,:]], imsize=IMG_SiZE, plotranges=[plotranges[1,:]])
+    
+    fig, ax = plt.subplots(1, 2, figsize=(9, 5))
+    # tigh layout
+    fig.tight_layout()
+    fig.suptitle("Lasco specific image")
+    ax[0].imshow(mask_infered_sat1)
+    ax[0].imshow(img[0,:,:], vmin=0, vmax=1, alpha=0.4, cmap='Reds')
+    ax[1].imshow(mask_infered_sat2)
+    ax[1].imshow(img[1,:,:], vmin=0, vmax=1, alpha=0.4, cmap='Reds')
+
+    masks_dir = os.path.join(OPATH, 'masks')
+    os.makedirs(masks_dir, exist_ok=True)
+    plt.savefig(os.path.join(masks_dir, 'test_image.png'))
+    plt.close()
 
 def plot_masks(img, mask, target, prediction, occulter_mask, satpos, plotranges, opath, namefile):
     img = img.cpu().detach().numpy()
@@ -63,6 +110,36 @@ def plot_masks(img, mask, target, prediction, occulter_mask, satpos, plotranges,
             ax[i].imshow(mask_infered, alpha=0.4)
             ax[i].set_title(f'Prediction Mask: {loss}')
     
+    masks_dir = os.path.join(opath, 'masks')
+    os.makedirs(masks_dir, exist_ok=True)
+    plt.savefig(os.path.join(masks_dir, namefile))
+    plt.close()
+
+def plot_mask_2VP(img, sat1_mask, sat2_mask, target, prediction, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, opath, namefile):
+    img = img.cpu().detach().numpy()
+    target = target.cpu().detach().numpy()
+    prediction = prediction.cpu().detach().numpy()
+    satpos = satpos.cpu().detach().numpy()
+    plotranges = plotranges.cpu().detach().numpy()
+    occulter_mask_sat1 = occulter_mask_sat1.cpu().detach().numpy()
+    occulter_mask_sat2 = occulter_mask_sat2.cpu().detach().numpy()
+
+    loss = loss_fn(torch.tensor(prediction), torch.tensor(target[None,:]))  # Assuming loss_fn is defined
+    prediction = np.squeeze(prediction)
+    mask_infered_sat1 = maskFromCloud(prediction, sat=0, satpos=[satpos[0,:]], imsize=IMG_SiZE, plotranges=[plotranges[0,:]])
+    mask_infered_sat2 = maskFromCloud(prediction, sat=0, satpos=[satpos[1,:]], imsize=IMG_SiZE, plotranges=[plotranges[1,:]]) # sat=0 avoid unknown error
+    mask_infered_sat1[occulter_mask_sat1 > 0] = 0  # Setting 0 where the occulter is
+    mask_infered_sat2[occulter_mask_sat2 > 0] = 0  # Setting 0 where the occulter is
+    
+    fig, ax = plt.subplots(1, 2, figsize=(9, 5))
+    # tigh layout
+    fig.tight_layout()
+    fig.suptitle(f'target: {np.around(target, 3)}\nPrediction: {np.around(prediction, 3)}')
+    ax[0].imshow(mask_infered_sat1)
+    ax[0].imshow(img[0,:,:], vmin=0, vmax=1, alpha=0.4, cmap='Reds')
+    ax[1].imshow(mask_infered_sat2)
+    ax[1].imshow(img[1,:,:], vmin=0, vmax=1, alpha=0.4, cmap='Reds')
+
     masks_dir = os.path.join(opath, 'masks')
     os.makedirs(masks_dir, exist_ok=True)
     plt.savefig(os.path.join(masks_dir, namefile))
@@ -144,7 +221,6 @@ def run_training():
             print(f"Model saved at: {status}\n")
 
 if __name__ == '__main__':
-    # train_dataset, test_dataset = random_split(dataset, [int(len(dataset) * 0.90), int(len(dataset) * 0.1)])
     if not TWOVP_MODE:
         dataset = Cme_1VP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE)
     else:
@@ -171,7 +247,6 @@ if __name__ == '__main__':
     print(f'Number of parameters: {num_parameters}\n')
 
     optimizer = torch.optim.Adadelta(model.parameters(), lr=LR[0], weight_decay=0.95)
-    #optimizer = torch.optim.Adam(model.parameters(), lr=LR[0])
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, (len(cme_train_dataloader) / BATCH_SIZE) * EPOCHS, eta_min=LR[1])
     loss_fn = torch.nn.MSELoss()
 
@@ -194,5 +269,5 @@ if __name__ == '__main__':
                 predictions = model.infer(img)
                 sat1_mask = torch.squeeze(sat1_mask)
                 sat2_mask = torch.squeeze(sat2_mask)
-                plot_masks(img[0,:,:], sat1_mask, targets, predictions, occulter_mask_sat1, satpos[0,:], plotranges[0,:], opath=OPATH, namefile=f'targetVinfered_{idx}_sat1.png')
-                plot_masks(img[1,:,:], sat2_mask, targets, predictions, occulter_mask_sat2, satpos[1,:], plotranges[1,:], opath=OPATH, namefile=f'targetVinfered_{idx}_sat2.png')
+                plot_mask_2VP(img, sat1_mask, sat2_mask, targets, predictions, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, opath=OPATH, namefile=f'targetVinfered_{idx}.png')
+            test_specific_image()

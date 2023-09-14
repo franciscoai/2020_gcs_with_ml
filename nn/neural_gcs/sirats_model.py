@@ -74,7 +74,6 @@ class Sirats_net(torch.nn.Module):
         optimizer.zero_grad()
         loss_value.backward()
         optimizer.step()
-        #scheduler.step()
         return loss_value
     
     def test_model(self, img, targets, loss):
