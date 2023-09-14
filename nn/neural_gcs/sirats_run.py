@@ -25,6 +25,7 @@ EPOCHS = 25
 BATCH_LIMIT = None
 BATCH_SIZE = 32
 TRAIN_IDX_SIZE = 9500
+SEED = 42
 IMG_SiZE = [512, 512]
 GPU = 0
 LR = [1e-3, 1e-5]
@@ -148,6 +149,7 @@ if __name__ == '__main__':
         dataset = Cme_1VP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE)
     else:
         dataset = Cme_2VP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE)
+    random.seed(SEED)
     total_samples = len(dataset)
     train_size = TRAIN_IDX_SIZE
     train_indices = random.sample(range(total_samples), train_size)
@@ -190,5 +192,7 @@ if __name__ == '__main__':
                 img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx = img[0], targets[0], sat1_mask[0], sat2_mask[0], occulter_mask_sat1[0], occulter_mask_sat2[0], satpos[0], plotranges[0], idx[0]
                 img = img.to(DEVICE)
                 predictions = model.infer(img)
-                plot_masks(img, sat1_mask, targets, predictions, occulter_mask_sat1, satpos, plotranges, opath=OPATH, namefile=f'targetVinfered_{idx}.png')
-                plot_masks(img, sat2_mask, targets, predictions, occulter_mask_sat2, satpos, plotranges, opath=OPATH, namefile=f'targetVinfered_{idx}.png')
+                sat1_mask = torch.squeeze(sat1_mask)
+                sat2_mask = torch.squeeze(sat2_mask)
+                plot_masks(img[0,:,:], sat1_mask, targets, predictions, occulter_mask_sat1, satpos[0,:], plotranges[0,:], opath=OPATH, namefile=f'targetVinfered_{idx}_sat1.png')
+                plot_masks(img[1,:,:], sat2_mask, targets, predictions, occulter_mask_sat2, satpos[1,:], plotranges[1,:], opath=OPATH, namefile=f'targetVinfered_{idx}_sat2.png')
