@@ -20,7 +20,7 @@ def deg2px(x,y,plotranges,imsize,sat):
     scale_x = (plotranges[sat][1]-plotranges[sat][0])/imsize[0]
     scale_y =(plotranges[sat][3]-plotranges[sat][2])/imsize[1]
     x_px=[]
-    y_px=[]    
+    y_px=[]
     for i in range(len(x_ok)):
         v_x= (np.round((x_ok[i]-plotranges[sat][0])/scale_x)).astype("int") 
         v_y= (np.round((y_ok[i]-plotranges[sat][2])/scale_y)).astype("int")

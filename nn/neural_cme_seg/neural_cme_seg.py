@@ -62,7 +62,7 @@ class neural_cme_segmentation():
             self.labels=['Background','Occ','CME'] # labels for the different classes
             self.num_classes = 3 # background, CME, occulter
             self.trainable_backbone_layers = 4
-            self.mask_threshold = 0.55 # value to consider a pixel belongs to the object
+            self.mask_threshold = 0.60 # value to consider a pixel belongs to the object
             self.scr_threshold = 0.25 # only detections with score larger than this value are considered
         # innitializes the model
         self.model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True, trainable_backbone_layers=self.trainable_backbone_layers) 
@@ -303,7 +303,6 @@ class neural_cme_segmentation():
             else:
                 print('Unrecognized value for ending parameter')
                 return None
-
             for par in range(len(param[0][0])):
                 cparam = np.array([i[par] for j in param for i in j])           
                 
@@ -347,7 +346,6 @@ class neural_cme_segmentation():
 
         # fit the function using least_squares
         used_weights = np.ones(len(x))
-        #breakpoint()
         if len(weights) > 1:
             used_weights = weights
         fit=least_squares(error_func, in_cond , method='lm', kwargs={'x': x-x[0], 'y': y, 'w': used_weights}) # first fit to get a good initial condition
@@ -579,35 +577,40 @@ class neural_cme_segmentation():
                 all_boxes.append([box[i] for i in ok_ind])
                 all_mask_prop.append([mask_prop[i] for i in ok_ind])  
                 all_dates.append(dates[i])
-        # plots parameters
-        if plot_params is not None:
-            self._plot_mask_prop(all_dates, all_mask_prop, self.plot_params , ending='_all')
-        # keeps only one mask per img based on cpa, aw and apex radius evolution consistency
-        if filter:
-            ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop = self._filter_masks(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop)
-            if len(ok_dates) > 0:
-                self._plot_mask_prop(ok_dates, [all_mask_prop], self.plot_params , ending='_filtered')   
+        if len(all_masks)>=2:
+            # plots parameters
+            if plot_params is not None:
+                self._plot_mask_prop(all_dates, all_mask_prop, self.plot_params , ending='_all')
+            # keeps only one mask per img based on cpa, aw and apex radius evolution consistency
+            if filter:
+                ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop = self._filter_masks(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop)
+                if len(ok_dates) > 0:
+                    self._plot_mask_prop(ok_dates, [all_mask_prop], self.plot_params , ending='_filtered')   
 
-            #if any date is left with no mask, it fills its properties with None
-            if len(dates) != len(ok_dates):
-                for i in np.unique(dates):             
-                    if i not in ok_dates:
-                        print('Warning, no consistent mask found for date '+str(i)+', returning None')
-                        ok_dates.append(i)
-                        all_mask_prop.append(np.array([None for i in range(len(self.mask_prop_labels))]))
-                        all_masks.append(None)
-                        all_scores.append(None)
-                        all_lbl.append(None)
-                        all_boxes.append(None)       
-                #resorts all lists based on date, do not convert to numpy array
-                idx = np.argsort(ok_dates)
-                ok_dates = [ok_dates[i] for i in idx]
-                all_mask_prop = [all_mask_prop[i] for i in idx]
-                all_masks = [all_masks[i] for i in idx]
-                all_scores = [all_scores[i] for i in idx]
-                all_lbl = [all_lbl[i] for i in idx]
-                all_boxes = [all_boxes[i] for i in idx]                   
+                #if any date is left with no mask, it fills its properties with None
+                if len(dates) != len(ok_dates):
+                    for i in np.unique(dates):             
+                        if i not in ok_dates:
+                            print('Warning, no consistent mask found for date '+str(i)+', returning None')
+                            ok_dates.append(i)
+                            all_mask_prop.append(np.array([None for i in range(len(self.mask_prop_labels))]))
+                            all_masks.append(None)
+                            all_scores.append(None)
+                            all_lbl.append(None)
+                            all_boxes.append(None)       
+                    #resorts all lists based on date, do not convert to numpy array
+                    idx = np.argsort(ok_dates)
+                    ok_dates = [ok_dates[i] for i in idx]
+                    all_mask_prop = [all_mask_prop[i] for i in idx]
+                    all_masks = [all_masks[i] for i in idx]
+                    all_scores = [all_scores[i] for i in idx]
+                    all_lbl = [all_lbl[i] for i in idx]
+                    all_boxes = [all_boxes[i] for i in idx]                   
+            else:
+                ok_dates = dates.copy()             
+            return all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop
         else:
-            ok_dates = dates.copy()             
-        return all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop
+            ok_dates=[]
+            all_masks=None
+            return all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop
 

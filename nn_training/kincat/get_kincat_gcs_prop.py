@@ -36,6 +36,7 @@ def get_NN(odir,sat):
             csv_path=odir_filter+"/"+ext_folder+"_filtered_stats"
             df=pd.read_csv(csv_path)
             df_list.append(df)
+    
     df_full = pd.concat(df_list, ignore_index=True)
     return df_full
 
@@ -83,23 +84,17 @@ def plot_masks(img,parameters, satpos, plotranges,imsize, opath, namefile):
     
     mask_infered = maskFromCloud(parameters, sat=0, satpos=[satpos], imsize=imsize, plotranges=[plotranges])
     #mask_infered[occulter_mask > 0] = 0  # Setting 0 where the occulter is
+    mask_infered=mask_infered[::-1, :]
+    fig, ax = plt.subplots(1, 3, figsize=(12, 4))
+    img = np.squeeze(img)
+    ax[0].imshow(img, vmin=0, vmax=1, cmap='gray')
+    ax[1].imshow(mask_infered, alpha=0.4)
+    ax[2].imshow(img, vmin=0, vmax=1, cmap='gray')
+    ax[2].imshow(mask_infered, alpha=0.4)
     
-    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
     
-    
-    for i in range(2):
-        img = np.squeeze(img)
-        ax[i].imshow(img, vmin=0, vmax=1, cmap='gray')
-        # if i == 0:
-        #     ax[i].imshow(mask, alpha=0.4)
-        #     ax[i].set_title('Target Mask')
-        # else:
-        ax[i].imshow(mask_infered, alpha=0.4)
-        #ax[i].set_title(f'Prediction Mask: {loss}')
-    
-    masks_dir = os.path.join(opath, 'masks')
-    os.makedirs(masks_dir, exist_ok=True)
-    plt.savefig(os.path.join(masks_dir, namefile))
+    os.makedirs(opath, exist_ok=True)
+    plt.savefig(os.path.join(opath, namefile))
     plt.close() 
 
 
@@ -111,44 +106,42 @@ odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural
 
 sat="cor2_a"#cor2_b
 imageSize=[512,512]
-
+mod_scale=True
 NN=get_NN(odir,sat)
 kincat_orig= get_kincat(kincat_orig_dir,sat)
 df=filter_param(NN,kincat_orig)
 kincat_orig['PRE_DATE_TIME'] = pd.to_datetime(kincat_orig['PRE_DATE_TIME'])
 kincat_orig['END_DATE_TIME'] = pd.to_datetime(kincat_orig['END_DATE_TIME'])
-                                             
+                                            
 for i in range(len(df)):
-    date=pd.to_datetime(df["NN_DATE_TIME"][i])
-    folder= str(date)[:-9].replace("-", "")
-    file_name=folder+"_"+str(date)[11:].replace(":", "")
-    path=(glob.glob(odir+sat+"/"+folder+"/"+file_name+"*"+".fits"))[0]
-    opath=odir+sat+"/"+folder+"/"+file_name+"/"+"gcs_masks"
-   
-    if not os.path.exists(opath):
-        os.makedirs(opath)
-    img, header = read_fits(path, header=True,imageSize=imageSize)
-    if header['NAXIS1'] != imageSize[0]:
-        plt_scl = header['CDELT1'] * header['NAXIS1']/imageSize[0] 
-    else:
+    try:
+        date=pd.to_datetime(df["NN_DATE_TIME"][i])
+        folder= str(date)[:-9].replace("-", "")
+        file_name=folder+"_"+str(date)[11:].replace(":", "")
+        path=(glob.glob(odir+sat+"/"+folder+"/"+file_name+"*"+".fits"))[0]
+        opath=odir+sat+"/"+folder+"/"+"gcs_masks"
+        print("Working on file "+str(file_name)+", "+str(i)+" of " +str(len(df)))
+
+        if not os.path.exists(opath):
+            os.makedirs(opath)
+        img, header = read_fits(path, header=True,imageSize=imageSize)
         plt_scl = header['CDELT1']
-    
-    result = kincat_orig.loc[(kincat_orig['PRE_DATE_TIME'] <= date) & (kincat_orig['END_DATE_TIME'] >= date)]
-   
-    #CME parameters
-    parameters=[]
+        satpos, plotranges = pyGCS.processHeaders([header])
 
-    apex_dist=NN.loc[NN["DATE_TIME"]==df["NN_DATE_TIME"][i], "APEX_DIST"]
-    long = result['CARLON']
-    lat = result['LAT']
-    tilt = result['TILT']
-    heith = apex_dist* plt_scl / header['RSUN']
-    asp_ratio = result['ASP_RATIO']
-    half_ang = result['H_ANGLE']
-    parameters.append([long,lat,tilt,heith,asp_ratio,half_ang])
-    satpos, plotranges = pyGCS.processHeaders([header])
+        #CME parameters
+        result = kincat_orig.loc[((kincat_orig['PRE_DATE_TIME'] - timedelta(hours=1)) <= date) & (kincat_orig['END_DATE_TIME'] >= date)]
+        parameters=[]
+        apex_dist=NN.loc[NN["DATE_TIME"]==df["NN_DATE_TIME"][i], "APEX_DIST"]
+        long = float(result['CARLON'].values[0].replace( ',', '.'))
+        lat = float(result['LAT'].values[0].replace( ',', '.'))
+        tilt = float(result['TILT'].values[0].replace( ',', '.'))
+        heith = float(apex_dist* plt_scl / (header['RSUN']))
+        asp_ratio = float(result['ASP_RATIO'].values[0].replace( ',', '.'))
+        half_ang = float(result['H_ANGLE'].values[0].replace( ',', '.'))
+        parameters.append([long,lat,tilt,heith,asp_ratio,half_ang])
+        
+        
+        plot_masks(img,parameters[0],satpos[0], plotranges[0],imsize=imageSize, opath=opath, namefile=f'GCS_mask_{file_name}.png')
+    except:
+        print("file not found")
 
-    
-    plot_masks(img,parameters,satpos[0], plotranges[0],imsize=imageSize, opath=opath, namefile=f'GCS_mask_{file_name}.png')
-
- #cmelong(carlon)+, cmelat+, cme tilt+, height+, k(asp ratio)+, half ang+

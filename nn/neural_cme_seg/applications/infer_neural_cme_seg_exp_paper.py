@@ -214,7 +214,7 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
     in a single image saved to ofile
     save_masks: set to a list of fits headers to save the masks as fits files
     """    
-    mask_threshold = 0.5 # value to consider a pixel belongs to the object
+    mask_threshold = 0.6 # value to consider a pixel belongs to the object
     scr_threshold = 0.25 # only detections with score larger than this value are considered
     color=['b','r','g','k','y','m','c','w','b','r','g','k','y','m','c','w']
     obj_labels = ['Back', 'Occ','CME','N/A']

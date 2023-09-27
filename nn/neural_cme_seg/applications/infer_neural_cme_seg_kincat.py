@@ -37,16 +37,15 @@ def read_fits(file_path,smooth_kernel=[0,0]):
             img = rebin(img, imageSize,operation='mean')
         return img  
     except:
-        print(f'WARNING. I could not find file {file_path}')
+        print(f'WARNING. could not find file {file_path}')
         return None
 
-def plot_to_png(ofile,orig_img, masks, title=None, labels=None, boxes=None, scores=None):
+def plot_to_png(ofile,orig_img, masks,mask_threshold,scr_threshold, title=None, labels=None, boxes=None, scores=None):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
     """    
-    mask_threshold = 0.5 # value to consider a pixel belongs to the object
-    scr_threshold = 0.3 # only detections with score larger than this value are considered
+    
     color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
     obj_labels = ['Back', 'Occ','CME','N/A']
     #
@@ -110,6 +109,8 @@ opath= model_path + "/infer_neural_cme_seg_kincat_"+level+"/cor2_a"
 ipath=  "/gehme/projects/2020_gcs_with_ml/data/corona_back_database/cor2/cor2_a"
 file_ext=".fits"
 trained_model = '6000.torch'
+mask_threshold = 0.6 # value to consider a pixel belongs to the object
+scr_threshold = 0.25 # only detections with score larger than this value are considered
 
 #main
 gpu=0 # GPU to use
@@ -154,8 +155,9 @@ for i in range(len(catalogue.index)):
         all_occ_size=[]
         all_plate_scl=[]
         file_names=[]
+        all_headers=[]
+        
         for j in range(len(files)-1):
-
             print(f'Processing {j} of {len(files)-1}')
             #read fits
             image1=read_fits(files[j],smooth_kernel=smooth_kernel)
@@ -173,40 +175,66 @@ for i in range(len(catalogue.index)):
                 os.makedirs(os.path.join(opath, str(folder_name)),exist_ok=True)
                 ofile = os.path.join(opath, str(folder_name), filename )
                 
-                hdu = fits.PrimaryHDU(img, header=header)
-                hdu.writeto(ofile+".fits", overwrite=True)
                 if header['NAXIS1'] != imsize_nn[0]:
                     plt_scl = header['CDELT1'] * header['NAXIS1']/imsize_nn[0] 
+
                 else:
                     plt_scl = header['CDELT1']
+
                 all_plate_scl.append(plt_scl)
                 all_images.append(img)
                 all_dates.append(date)
                 all_occ_size.append(occ_size)
                 file_names.append(filename)
-             
-        all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop =  nn_seg.infer_event(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=final_path+'mask_props')
+                all_headers.append(header)
         
-        if len(all_masks)>0:
-            for i in range(len(all_images)):
+        if len(all_images)>=2:
+            all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop =  nn_seg.infer_event(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=final_path+'mask_props')
+            
+            if all_masks is not None:
+                zeros = np.zeros(np.shape(all_orig_img[0]))
+                for i in range(len(all_orig_img)):
+                    scr = 0
+                    if all_scores is not None:
+                        if all_scores[i] is not None:
+                            scr = all_scores[i]
+                    if scr > scr_threshold:             
+                        masked = zeros.copy()
+                        masked[:, :][all_masks[i] > mask_threshold] = 1
+                        # safe fits
+                        ofile_fits = os.path.join(os.path.dirname(ofile), file_names[i]+'.fits')
+                        h0 = all_headers[i]
 
-                plot_to_png(opath+"/"+folder_name+"/"+file_names[i]+".png", [all_orig_img[i]], [all_masks[i]], title=[file_names[i]], labels=[all_lbl[i]], boxes=[all_boxes[i]], scores=[all_scores[i]])
-        
+                        # adapts hdr because we use smaller im size
+                        sz_ratio = np.array(masked.shape)/np.array([h0['NAXIS1'], h0['NAXIS2']])
+                        h0['NAXIS1'] = masked.shape[0]
+                        h0['NAXIS2'] = masked.shape[1]
+                        h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
+                        h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
+                        h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
+                        h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
+                        fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
+
+                if len(all_masks)>0:
+                    for i in range(len(all_images)):
+                        plot_to_png(opath+"/"+folder_name+"/"+file_names[i]+".png", [all_orig_img[i]], [all_masks[i]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[i]], labels=[all_lbl[i]], boxes=[all_boxes[i]], scores=[all_scores[i]])
+                else:
+                    print("No CME detected :-/")        
+
+                data_kincat=[]
+                for i in range(len(all_mask_prop)):
+                    if all(elemento is not None for elemento in all_mask_prop[i]):
+                        prop_list = all_mask_prop[i].tolist()
+                        prop_list.insert(0,ok_dates[i])
+                        data_kincat.append(prop_list)
+
+                df = pd.DataFrame(data_kincat, columns=kincat_col_names)
+                df.to_csv(final_path+folder_name+'_filtered_stats', index=False)
+
         else:
-            print("No CME detected :-/")        
+            print("WARNING: COULD NOT PROCESS EVENT "+ files[0][49:-13] )
 
-        data_kincat=[]
-        for i in range(len(all_mask_prop)):
-            if all(elemento is not None for elemento in all_mask_prop[i]):
-                prop_list = all_mask_prop[i].tolist()
-                prop_list.insert(0,ok_dates[i])
-                data_kincat.append(prop_list)
-
-        df = pd.DataFrame(data_kincat, columns=kincat_col_names)
-        
-        df.to_csv(final_path+folder_name+'_filtered_stats', index=False)
-
-                       
+                        
 
 
 
