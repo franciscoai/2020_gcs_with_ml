@@ -22,6 +22,23 @@ def get_NN(iodir,sat):
 
     return df_full
 
+def get_GCS(iodir,sat):
+    
+    df_list=[]
+    odir=iodir+'/'+sat+"/"
+    ext_folders = os.listdir(odir)
+    for ext_folder in ext_folders:
+        odir_filter=odir+ext_folder+"/gcs_masks"
+        if os.path.exists(odir_filter):
+            csv_path=odir_filter+"/GCS_mask_stats"
+            try:
+                df=pd.read_csv(csv_path)
+                df_list.append(df)
+            except:
+                continue
+    df_full = pd.concat(df_list, ignore_index=True)
+    return df_full
+
 
 def get_seeds(folder,sat):
     '''
@@ -87,7 +104,6 @@ def get_vourlidas(folder,sat):
                 df = df[df["S/C"] == "B"]
             else:
                 print("satellite not recognized")
-                breakpoint()
             df_list.append(df)
         df_full = pd.concat(df_list, ignore_index=True)
         for i in cols:
@@ -108,8 +124,8 @@ def get_vourlidas(folder,sat):
     return df_full
 
 
-def comparator(NN,seeds,vourlidas):
-    columns=["NN_DATE_TIME","SEEDS_DATE_TIME","VOURLIDAS_DATE_TIME","NN_CPA_ANG_MEDIAN","NN_CPA_ANG_STD","SEEDS_CPA_ANG","VOURLIDAS_CPA_ANG","NN_WIDE_ANG_MEDIAN","NN_WIDE_ANG_STD","SEEDS_WIDE_ANG","VOURLIDAS_WIDE_ANG"]
+def comparator(NN,seeds,vourlidas,gcs):
+    columns=["NN_DATE_TIME","SEEDS_DATE_TIME","VOURLIDAS_DATE_TIME","NN_CPA_ANG_MEDIAN","NN_CPA_ANG_STD","SEEDS_CPA_ANG","VOURLIDAS_CPA_ANG","NN_WIDE_ANG_MEDIAN","NN_WIDE_ANG_STD","SEEDS_WIDE_ANG","VOURLIDAS_WIDE_ANG","GCS_CPA_ANG","GCS_WIDE_ANG"]
     NN_ang_col=['CPA_ANG', 'WIDE_ANG']
        
     compare=[]
@@ -123,6 +139,8 @@ def comparator(NN,seeds,vourlidas):
     seeds.sort_values(by='DATE_TIME', inplace=True)
     NN['DATE'] = NN['DATE_TIME'].dt.date
     NN['TIME'] = pd.to_datetime(NN['DATE_TIME']).dt.time
+    gcs['DATE_TIME'] = pd.to_datetime(gcs['DATE_TIME'])
+    gcs = gcs.sort_values(by='DATE_TIME')
     
     #adjust the 0 degree to the nort
     for i in NN_ang_col:
@@ -144,7 +162,7 @@ def comparator(NN,seeds,vourlidas):
     NN_min= NN.groupby('DATE')['TIME'].min().reset_index()
     NN_max= NN.groupby('DATE')['TIME'].max().reset_index()
     #creates the list to compare the events in NN and seeds
-    for i in range(len(NN_min)):
+    for i in range(len(NN_min)-1):
         NN_min['DATE_TIME'] = NN_min.apply(lambda row: datetime.combine(row['DATE'], row['TIME']), axis=1)
         NN_max['DATE_TIME'] = NN_max.apply(lambda row: datetime.combine(row['DATE'], row['TIME']), axis=1)
         NN_date=NN_min["DATE_TIME"][i]
@@ -152,27 +170,30 @@ def comparator(NN,seeds,vourlidas):
         #path=NN.loc[NN["DATE_TIME"]==NN_date, "PATH"].values[0]
         seeds['TIME_DIFF'] = seeds['DATE_TIME'] - pd.to_datetime(NN_date)
         time_diff_seeds = seeds[seeds['TIME_DIFF'] >= pd.Timedelta(0)]
+        vourlidas['Time_Diff'] = vourlidas['Date_Time'] - pd.to_datetime(NN_date)
+        time_diff_vourlidas = vourlidas[vourlidas['Time_Diff'] >= pd.Timedelta(0)]
         idx_seeds = time_diff_seeds['TIME_DIFF'].idxmin()
         seeds_data = seeds.loc[idx_seeds]
         cpa_ang_seeds=seeds_data["CPA_ANG"]
         wide_ang_seeds=seeds_data["WIDE_ANG"]
-
-        vourlidas['Time_Diff'] = vourlidas['Date_Time'] - pd.to_datetime(NN_date)
-        
-        time_diff_vourlidas = vourlidas[vourlidas['Time_Diff'] >= pd.Timedelta(0)]
         idx_vourlidas = time_diff_vourlidas['Time_Diff'].idxmin()
         vourlidas_data = vourlidas.loc[idx_vourlidas]
         cpa_ang_vourlidas=vourlidas_data["CPA"]
         wide_ang_vourlidas=vourlidas_data["Width"]
         NN_prev=NN_min["DATE_TIME"][i]-pd.Timedelta(hours=4)
         NN_post=NN_max["DATE_TIME"][i]+pd.Timedelta(hours=4)
+        gcs_data=gcs.loc[gcs["DATE_TIME"]==NN_date]
+        
+        cpa_ang_gcs = gcs_data["CPA_ANG"].values
+        wide_ang_gcs = gcs_data["WIDE_ANG"].values
+        
         if (NN_prev<=vourlidas_data["Date_Time"]<=NN_post)and(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
-            compare.append([NN_date,seeds_data["DATE_TIME"],vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,wide_ang_vourlidas])
+            compare.append([NN_date,seeds_data["DATE_TIME"],vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,wide_ang_vourlidas,cpa_ang_gcs,wide_ang_gcs])
         elif (NN_prev<=vourlidas_data["Date_Time"]<=NN_post) and not(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
-            compare.append([NN_date,np.nan,vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],np.nan,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],np.nan,wide_ang_vourlidas])
+            compare.append([NN_date,np.nan,vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],np.nan,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],np.nan,wide_ang_vourlidas,cpa_ang_gcs,wide_ang_gcs])
         elif not(NN_prev<=vourlidas_data["Date_Time"]<=NN_post)and(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
             
-            compare.append([NN_date,seeds_data["DATE_TIME"],np.nan,df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,np.nan,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,np.nan])
+            compare.append([NN_date,seeds_data["DATE_TIME"],np.nan,df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,np.nan,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,np.nan,cpa_ang_gcs,wide_ang_gcs])
     compare = pd.DataFrame(compare, columns=columns)
     
     #vourlidas.loc[vourlidas["Date_Time"]=="2008-05-17 10:37:30"]
@@ -221,29 +242,42 @@ os.makedirs(plot_dir, exist_ok=True)
 NN=get_NN(odir,sat)
 seeds=get_seeds(folder,sat)
 vourlidas= get_vourlidas(folder,sat)
-df=comparator(NN,seeds,vourlidas)
+gcs=get_GCS(odir,sat)
+
+df=comparator(NN,seeds,vourlidas,gcs)
 
 date_to_tag_vourlidas = pd.to_datetime([datetime(2008, 5, 17)])
 date_to_tag_seeds = pd.to_datetime([datetime(2008, 5, 17)])
+date_to_tag_nn = pd.to_datetime([datetime(2008, 5, 17)])
 
 fig, ax = plt.subplots(figsize=(6, 6))
 label = 'VOURLIDAS ; '+get_r(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"])
-ax.errorbar(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"], xerr=df["NN_CPA_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label=label)
+#ax.errorbar(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"], xerr=df["NN_CPA_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label=label)
 # add a tag to the plot
-
+ax.plot(df["GCS_CPA_ANG"],df["VOURLIDAS_CPA_ANG"], color='green')
 for date in date_to_tag_vourlidas:
-    x = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["NN_CPA_ANG_MEDIAN"]
+    x = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["GCS_CPA_ANG"]
     y = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["VOURLIDAS_CPA_ANG"]
     if len(x) > 0:
         ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
 label = 'SEEDS ; '+get_r(df["NN_CPA_ANG_MEDIAN"], df["SEEDS_CPA_ANG"])
-ax.errorbar(df["NN_CPA_ANG_MEDIAN"], df["SEEDS_CPA_ANG"], xerr=df["NN_CPA_ANG_STD"], fmt='o', color='blue', ecolor='gray', capsize=5, label=label)
+#ax.errorbar(df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"], xerr=df["GCS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label=label)
+ax.plot(df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"], color='blue')
 # add a tag to the plot
 for date in date_to_tag_seeds:
-    x = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["NN_CPA_ANG_MEDIAN"]
+    x = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["GCS_CPA_ANG"]
     y = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["SEEDS_CPA_ANG"]
     if len(x) > 0:
+        ax.plot(x,y)
         ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+ax.plot(df["GCS_CPA_ANG"], df["NN_CPA_ANG"], color='red')
+for date in date_to_tag_nn:
+    x = df.loc[df["NN_DATE_TIME"].dt.date==date]["GCS_CPA_ANG"]
+    y = df.loc[df["NN_DATE_TIME"].dt.date==date]["NN_CPA_ANG"]
+    if len(x) > 0:
+        ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+
+
 ax.plot([0, 450], [0, 450], color='black', linestyle='-',linewidth=0.5)
 ax.set_xlim(0, ax.get_xlim()[1])
 ax.set_xlabel('NN')

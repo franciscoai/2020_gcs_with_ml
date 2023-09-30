@@ -227,7 +227,7 @@ for i in range(len(catalogue.index)):
                         prop_list = all_mask_prop[i].tolist()
                         prop_list.insert(0,ok_dates[i])
                         data_kincat.append(prop_list)
-
+            
                 df = pd.DataFrame(data_kincat, columns=kincat_col_names)
                 df.to_csv(final_path+folder_name+'_filtered_stats', index=False)
 
