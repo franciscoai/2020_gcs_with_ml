@@ -24,19 +24,19 @@ TWOVP_MODE = True
 INFERENCE_MODE = False
 SAVE_MODEL = True
 LOAD_MODEL = True
-EPOCHS = 50
+EPOCHS = 30
 BATCH_LIMIT = None
 BATCH_SIZE = 32
 TRAIN_IDX_SIZE = 9500
 SEED = 42
 IMG_SiZE = [512, 512]
 GPU = 0
-LR = [1e-3, 1e-4]
+LR = [1e-2, 1e-3]
 # CMElon,CMElat,CMEtilt,height,k,ang
 GCS_PAR_RNG = torch.tensor([[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60]]) 
 LOSS_WEIGHTS = torch.tensor([100,100,100,10,1,10])
-TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_2VP_100k'
-OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_2VP_100k_50E"
+TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_2VP_10k'
+OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_2VP_10k_30E"
 os.makedirs(OPATH, exist_ok=True)
 
 
@@ -246,7 +246,8 @@ if __name__ == '__main__':
     num_parameters = sum(p.numel() for p in model.parameters())
     print(f'Number of parameters: {num_parameters}\n')
 
-    optimizer = torch.optim.Adadelta(model.parameters(), lr=LR[0], weight_decay=0.95)
+    #optimizer = torch.optim.Adadelta(model.parameters())
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR[0])
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, (len(cme_train_dataloader) / BATCH_SIZE) * EPOCHS, eta_min=LR[1])
     loss_fn = torch.nn.MSELoss()
 
