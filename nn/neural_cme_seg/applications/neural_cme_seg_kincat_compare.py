@@ -203,7 +203,6 @@ def comparator(NN,seeds,vourlidas,gcs):
             
             compare.append([NN_date,seeds_data["DATE_TIME"],np.nan,df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,np.nan,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,np.nan,cpa_ang_gcs,wide_ang_gcs])
     compare = pd.DataFrame(compare, columns=columns)
-    
     #vourlidas.loc[vourlidas["Date_Time"]=="2008-05-17 10:37:30"]
     return compare
 
@@ -252,7 +251,7 @@ seeds=get_seeds(folder,sat)
 vourlidas= get_vourlidas(folder,sat)
 gcs=get_GCS(odir,sat)
 df=comparator(NN,seeds,vourlidas,gcs)
-
+breakpoint()
 date_to_tag_vourlidas = pd.to_datetime([datetime(2008, 5, 17)])
 date_to_tag_seeds = pd.to_datetime([datetime(2008, 5, 17)])
 date_to_tag_nn = pd.to_datetime([datetime(2008, 5, 17)])
@@ -297,7 +296,7 @@ fig.savefig(plot_dir + '/CPA_ANG_all.png', dpi=300, bbox_inches='tight')
 
 fig2, ax2 = plt.subplots(figsize=(6, 6))
 label = 'VOURLIDAS ; '+get_r(df["GCS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"])
-ax2.scatter(df["GCS_CPA_ANG"],df["VOURLIDAS_CPA_ANG"], color='green', label=label)
+ax2.scatter(df["GCS_WIDE_ANG"],df["VOURLIDAS_WIDE_ANG"], color='green', label=label)
 #ax2.errorbar(df["GCS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"], xerr=df["NN_WIDE_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label=label)
 # add a tag to the plot
 for date in date_to_tag_vourlidas:
@@ -305,8 +304,8 @@ for date in date_to_tag_vourlidas:
     y = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["VOURLIDAS_WIDE_ANG"]
     if len(x) > 0:
         ax2.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
-label = 'SEEDS ; '+get_r(df["NN_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"])
-ax2.scatter(df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"], color='blue', label=label)
+label = 'SEEDS ; '+get_r(df["GCS_WIDE_ANG"], df["SEEDS_WIDE_ANG"])
+ax2.scatter(df["GCS_WIDE_ANG"], df["SEEDS_WIDE_ANG"], color='blue', label=label)
 #ax2.errorbar(df["NN_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"], xerr=df["NN_WIDE_ANG_STD"], fmt='o', color='blue', ecolor='gray', capsize=5, label=label)
 # add a tag to the plot
 for date in date_to_tag_seeds:
@@ -323,7 +322,7 @@ for date in date_to_tag_nn:
     if len(x) > 0:
         ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
 
-ax2.plot([0, 300], [0, 300], color='black', linestyle='-',linewidth=0.5)
+ax2.plot([0, 250], [0, 250], color='black', linestyle='-',linewidth=0.5)
 ax2.set_xlim(0, ax2.get_xlim()[1])
 ax2.set_xlabel('GCS')
 ax2.set_title('AW [deg]')
