@@ -35,10 +35,12 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None):
     
     
     cor2_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2"
-    lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_back_database/lasco"
+    #lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_back_database/lasco"
+    lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2" #temp to clone first image
     h_cor2b="/gehme/data/stereo/secchi/L1/b/img/cor2/20130209/20130209_062400_14c2B.fts"
     h_cor2a="/gehme/data/stereo/secchi/L1/a/img/cor2/20130209/20130209_062400_14c2A.fts" 
-    h_lasco="path/to/lasco/header"
+    #h_lasco="path/to/lasco/header"
+    h_lasco="/gehme/data/stereo/secchi/L1/b/img/cor2/20130209/20130209_062400_14c2B.fts" #temp to clone first image
     size_occ=[2.6, 3.7, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun]
     # size_occ=[1.4, 1.4, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun] 
     max_time_diff= datetime.timedelta(hours=2)
@@ -52,7 +54,8 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None):
         path=cor2_path+"/cor2_a"
     # LASCO    
     elif sat==2:
-        path=lasco_path+"/c2"
+        #path=lasco_path+"/c2"
+        path=lasco_path+"/cor2_b"
     else:
         os.error('Input instrument not recognized, check value of sat')
 

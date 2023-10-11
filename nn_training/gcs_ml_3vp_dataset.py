@@ -51,8 +51,8 @@ def save_png(array, ofile=None, range=None):
 # CONSTANTS
 #files
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_2VP_100k' #'/gehme/projects/2020_gcs_with_ml/data/cme_seg_training' 
-n_sat = 2 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_100k' #'/gehme/projects/2020_gcs_with_ml/data/cme_seg_training' 
+n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 
 # GCS parameters [first 6]
 # The other parameters are:
