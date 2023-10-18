@@ -240,7 +240,7 @@ def get_r(xdf,ydf):
 ################################################################################### MAIN ######################################################################################
 odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1"
 folder="/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications"
-sat="cor2_a"#cor2_b
+sat="cor2_b"#cor2_a
 
 #-----------------
 plot_dir=odir+'/'+sat+'_comparison'

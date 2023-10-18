@@ -107,14 +107,22 @@ class neural_cme_segmentation():
         '''
         return cv2.resize(img, self.imsize, cv2.INTER_LINEAR)
     
-    def mask_occulter(self, img, occulter_size, repleace_value=None):
+    def mask_occulter(self, img, occulter_size,centerpix,repleace_value=None):
         '''
         Replace a circular area of radius occulter_size in input image[h,w,3] with a constant value
         repleace_value: if None, the area is replaced with the image mean. If set to scalar float that value is used
         '''
-        h,w = img.shape[:2]
-        mask = np.zeros((h,w), dtype=np.uint8)
-        cv2.circle(mask, (int(w/2), int(h/2)), occulter_size, 1, -1)
+        if centerpix is not None:
+            w=int(round(centerpix[0]))
+            h=int(round(centerpix[1]))
+        else:
+            h,w = img.shape[:2]
+            h=int(h/2)
+            w=int(w/2)
+       
+        mask = np.zeros((img.shape[0],img.shape[0]), dtype=np.uint8)
+        cv2.circle(mask, (w,h), occulter_size, 1, -1)
+        
         if repleace_value is None:
             img[mask==1] = np.mean(img)
         else:
@@ -122,7 +130,7 @@ class neural_cme_segmentation():
         return img
 
     
-    def infer(self, img, model_param=None, resize=True, occulter_size=0):
+    def infer(self, img, model_param=None, resize=True, occulter_size=0,centerpix=None):
         '''        
         Infers a cme segmentation mask in the input coronograph image (img) using the trained R-CNN
         model_param: model parameters to use for inference. If None, the model parameters given at initialization are used
@@ -144,7 +152,7 @@ class neural_cme_segmentation():
         if resize and (images.shape[0] != self.imsize[0] or images.shape[1] != self.imsize[1]):
             images = self.resize(images)   
         if occulter_size > 0:
-            images = self.mask_occulter(images, occulter_size)    
+            images = self.mask_occulter(images, occulter_size,centerpix)    
         images = self.normalize(images) # normalize to 0,1
         oimages = images.copy()                                   
         images = torch.as_tensor(images, dtype=torch.float32).unsqueeze(0)
@@ -170,7 +178,7 @@ class neural_cme_segmentation():
                 msk=pred[0]['masks'][i,0].detach().cpu().numpy()
                 # eliminates px within the occulter for non -OCC masks
                 if occulter_size > 0 and lbl == self.labels.index('Occ'):
-                    msk = self.mask_occulter(msk, occulter_size, repleace_value=0)
+                    msk = self.mask_occulter(msk, occulter_size,centerpix, repleace_value=0)
                 all_masks.append(msk)                
                 box = pred[0]['boxes'][i].detach().cpu().numpy()
                 all_boxes.append(box)              
@@ -230,7 +238,7 @@ class neural_cme_segmentation():
                     pol_mask.append([distance,angle])
         return pol_mask
 
-    def _compute_mask_prop(self, masks, scores, labels, boxes, plate_scl=1, filter_halos=True, occulter_size=0):    
+    def _compute_mask_prop(self, masks, scores, labels, boxes, plate_scl=1, filter_halos=True, occulter_size=0,centerpix=None):    
         '''
         Computes the CPA, AW and apex radius for the given 'CME' masks.
         If the mask label is not "CME" and if is not a Halo and filter_halos=True, it returns None
@@ -244,7 +252,10 @@ class neural_cme_segmentation():
         for i in range(len(masks)):
             if filter_halos:
                 box_center = np.array([boxes[i][0]+(boxes[i][2]-boxes[i][0])/2, boxes[i][1]+(boxes[i][3]-boxes[i][1])/2])
-                distance_to_box_center = np.sqrt((self.imsize[0]/2-box_center[0])**2 + (self.imsize[1]/2-box_center[1])**2)
+                if centerpix is not None:
+                    distance_to_box_center = np.sqrt((centerpix[0]/2-box_center[0])**2 + (centerpix[1]/2-box_center[1])**2)
+                else:
+                    distance_to_box_center = np.sqrt((self.imsize[0]/2-box_center[0])**2 + (self.imsize[1]/2-box_center[1])**2)
                 if distance_to_box_center < 0.8 * occulter_size:
                     halo_flag = False
                 else:
@@ -505,7 +516,7 @@ class neural_cme_segmentation():
                    
         return all_dates,all_masks, all_scores, all_lbl, all_boxes,all_mask_prop
         
-    def infer_event(self, imgs, dates, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None, mask_threshold=None, 
+    def infer_event(self, imgs, dates, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None,centerpix=None, mask_threshold=None, 
                     scr_threshold=None, plot_params=None, filter_halos=True):
         '''
         Infers masks for a temporal series of images belonging to the same event. It filters the masks found in the
@@ -563,11 +574,11 @@ class neural_cme_segmentation():
         all_dates = []
         for i in range(len(in_imgs)):
             #infer masks
-            orig_img, mask, score, lbl, box = self.infer(in_imgs[i], model_param=model_param, resize=resize, occulter_size=in_occulter_size[i])
+            orig_img, mask, score, lbl, box = self.infer(in_imgs[i], model_param=model_param, resize=resize, occulter_size=in_occulter_size[i],centerpix=centerpix[i])
             all_orig_img.append(orig_img)
             # compute cpa, aw and apex. Already filters by score and other aspects
             self.debug_flag = i
-            mask_prop = self._compute_mask_prop(mask, score, lbl, box, plate_scl=in_plate_scl[i]/in_plate_scl[0], filter_halos=filter_halos, occulter_size=in_occulter_size[i])
+            mask_prop = self._compute_mask_prop(mask, score, lbl, box, plate_scl=in_plate_scl[i]/in_plate_scl[0], filter_halos=filter_halos, occulter_size=in_occulter_size[i],centerpix=centerpix[i])
             # appends results only if mask_prop[1] is not NaN, i.e., if it fulfills the filters in compute_mask_prop
             ok_ind = np.where(~np.isnan(np.array(mask_prop)[:,1]))[0]
             if len(ok_ind) >0:

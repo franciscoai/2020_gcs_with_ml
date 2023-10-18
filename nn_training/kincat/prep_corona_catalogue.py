@@ -7,20 +7,29 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath
 from ext_libs.rebin import rebin
 import glob
 
+imsize=[512,512]
+sat="cor2_b"#"cor2_a"
 units= ["-","-","yyyymmdd","hhmm","yyyymmdd","hhmm","deg","lon","old","deg","deg","deg", "yyyymmdd","hhmm","km/s","g","km/s","LON","LAT","km/s","LON","LAT","km/s","LON","LAT"]
 col_names=["HEL","CME","PRE_DATE","PRE_TIME","LAST_DATE","LAST_TIME","CARLON","STONEY","LAT","TILT", "ASP_RATIO","H_ANGLE","DATE","TIME","APEX_SPEED","CME_MASS","SPEED_FPF","FPF_LON","FPF_LAT","SPEED_SSEF","SSEF_LON","SSEF_LAT","SPEED_HMF","HMF_LON","HMF_LAT"]
 repo_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 helcat_db=repo_dir + "/nn_training/kincat/helcatslist_20160601.txt" # kincat database
-opath= "/gehme/projects/2020_gcs_with_ml/data/corona_background_kincat/cor2/cor2_b"
-imsize=[512,512]
+opath= "/gehme/projects/2020_gcs_with_ml/data/corona_background_kincat/cor2/"+sat
+
+
+if sat=="cor2_b":
+    csv_path='/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/kincat/helcatslist_20160601_stb_downloaded.csv'
+elif sat=="cor2_a":
+    csv_path='/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/kincat/helcatslist_20160601_sta_downloaded.csv'
+
+#checks if the folder exist, if not creates it
+if not os.path.exists(opath):
+    os.makedirs(opath)
 
 # read csv with paths and dates of the downloaded files
-downloaded=pd.read_csv('/gehme/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn_training/kincat/helcatslist_20160601_stb_downloaded.csv')
+downloaded=pd.read_csv(csv_path)
 downloaded['DATE_TIME'] = pd.to_datetime(downloaded['DATE_TIME'])
 downloaded= downloaded.sort_values('DATE_TIME')
 downloaded = downloaded.reset_index(drop=True)
-
-
 
 # read helcat database and changes the column names
 catalogue = pd.read_csv(helcat_db, sep = "\t")
