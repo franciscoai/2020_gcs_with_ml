@@ -74,24 +74,7 @@ def plot_to_png(ofile,orig_img, masks,all_center,mask_threshold,scr_threshold, t
                     axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
                     box =  mpl.patches.Rectangle(boxes[i][0:2],boxes[i][2]-boxes[i][0],boxes[i][3]-boxes[i][1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
                     axs[i+1].add_patch(box)
-                    axs[i+1].scatter(round(all_center[0][0]), round(all_center[0][1]), color='red', marker='x', s=100)
-                    center_x = 260
-                    center_y = 247
-
-                    # Establecer los límites de los ejes existentes (opcional)
-                    axs[i].set_xlim(0, 510)
-                    axs[i].set_ylim(0, 510)
-
-                    # Agregar ejes X e Y adicionales que pasan por el punto central
-                    axs[i].annotate('', xy=(center_x+52, 510), xytext=(center_x+52, 0),
-                                arrowprops=dict(arrowstyle='->', lw=1.5))
-                    axs[i].annotate('', xy=(510, center_y+52), xytext=(0, center_y+52),
-                    arrowprops=dict(arrowstyle='->', lw=1.5))
-                    
-                    axs[i].annotate('', xy=(center_x-52, 510), xytext=(center_x-52, 0),
-                                arrowprops=dict(arrowstyle='->', lw=1.5))
-                    axs[i].annotate('', xy=(510, center_y-52), xytext=(0, center_y-52),
-                    arrowprops=dict(arrowstyle='->', lw=1.5))                   
+                    axs[i+1].scatter(round(all_center[0][0]), round(all_center[0][1]), color='red', marker='x', s=100)                
 
                     if labels[i] is not None: 
                         

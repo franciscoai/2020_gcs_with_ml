@@ -50,16 +50,19 @@ def get_seeds(folder,sat):
     if os.path.exists(folder) and os.path.isdir(folder):
         files=os.listdir(folder)
         df_list=[]
-        for i in files:    
+        for i in files:
+            path=folder+"/"+i
+               
             if sat=="cor2_a":
                 if i.endswith("A_monthly.txt"):
-                    path=folder+"/"+i
+                    
                     df=pd.read_csv(path, header=None, delim_whitespace=True)
                     df.columns=col_names
                     df_list.append(df)
             elif sat=="cor2_b":
                  if i.endswith("B_monthly.txt"):
-                    df=pd.read_csv(path, header=None, names=col_names, delimiter="/t")
+                    df=pd.read_csv(path,header=None, delim_whitespace=True)
+                    df.columns= col_names
                     df_list.append(df)
         df_full = pd.concat(df_list, ignore_index=True)
         df_full['DATE_TIME'] = pd.to_datetime(df_full['DATE'] + ' ' + df_full['TIME'])
@@ -77,7 +80,6 @@ def get_seeds(folder,sat):
                 if file_response.status_code == 200:
                     with open(folder+'/'+file_name, 'wb') as archivo:
                         archivo.write(file_response.content)
-
     return df_full
 
 def get_vourlidas(folder,sat):
@@ -121,6 +123,7 @@ def get_vourlidas(folder,sat):
                 if file_response.status_code == 200:
                     with open(folder+'/'+file_name, 'wb') as archivo:
                         archivo.write(file_response.content)
+    
     return df_full
 
 
@@ -171,39 +174,39 @@ def comparator(NN,seeds,vourlidas,gcs):
         NN_min['DATE_TIME'] = NN_min.apply(lambda row: datetime.combine(row['DATE'], row['TIME']), axis=1)
         NN_max['DATE_TIME'] = NN_max.apply(lambda row: datetime.combine(row['DATE'], row['TIME']), axis=1)
         NN_date=NN_min["DATE_TIME"][i]
-        
         #path=NN.loc[NN["DATE_TIME"]==NN_date, "PATH"].values[0]
         seeds['TIME_DIFF'] = seeds['DATE_TIME'] - pd.to_datetime(NN_date)
         time_diff_seeds = seeds[seeds['TIME_DIFF'] >= pd.Timedelta(0)]
         vourlidas['Time_Diff'] = vourlidas['Date_Time'] - pd.to_datetime(NN_date)
         time_diff_vourlidas = vourlidas[vourlidas['Time_Diff'] >= pd.Timedelta(0)]
-        idx_seeds = time_diff_seeds['TIME_DIFF'].idxmin()
-        seeds_data = seeds.loc[idx_seeds]
-        cpa_ang_seeds=seeds_data["CPA_ANG"]
-        wide_ang_seeds=seeds_data["WIDE_ANG"]
-        idx_vourlidas = time_diff_vourlidas['Time_Diff'].idxmin()
-        vourlidas_data = vourlidas.loc[idx_vourlidas]
-        cpa_ang_vourlidas=vourlidas_data["CPA"]
-        wide_ang_vourlidas=vourlidas_data["Width"]
-        NN_prev=NN_min["DATE_TIME"][i]-pd.Timedelta(hours=4)
-        NN_post=NN_max["DATE_TIME"][i]+pd.Timedelta(hours=4)
-        gcs_data=gcs.loc[gcs["DATE_TIME"]==NN_date]
-        if len(gcs_data)>0:
-            cpa_ang_gcs = (gcs_data["CPA_ANG"].values)[0]
-            wide_ang_gcs = (gcs_data["WIDE_ANG"].values)[0]
-        else:
-            cpa_ang_gcs = np.nan
-            wide_ang_gcs = np.nan
-        
-        if (NN_prev<=vourlidas_data["Date_Time"]<=NN_post)and(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
-            compare.append([NN_date,seeds_data["DATE_TIME"],vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,wide_ang_vourlidas,cpa_ang_gcs,wide_ang_gcs])
-        elif (NN_prev<=vourlidas_data["Date_Time"]<=NN_post) and not(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
-            compare.append([NN_date,np.nan,vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],np.nan,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],np.nan,wide_ang_vourlidas,cpa_ang_gcs,wide_ang_gcs])
-        elif not(NN_prev<=vourlidas_data["Date_Time"]<=NN_post)and(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
+        if not time_diff_seeds.empty and not time_diff_vourlidas.empty:
             
-            compare.append([NN_date,seeds_data["DATE_TIME"],np.nan,df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,np.nan,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,np.nan,cpa_ang_gcs,wide_ang_gcs])
+            idx_seeds = time_diff_seeds['TIME_DIFF'].idxmin()
+            seeds_data = seeds.loc[idx_seeds]
+            cpa_ang_seeds=seeds_data["CPA_ANG"]
+            wide_ang_seeds=seeds_data["WIDE_ANG"]
+            idx_vourlidas = time_diff_vourlidas['Time_Diff'].idxmin()
+            vourlidas_data = vourlidas.loc[idx_vourlidas]
+            cpa_ang_vourlidas=vourlidas_data["CPA"]
+            wide_ang_vourlidas=vourlidas_data["Width"]
+            NN_prev=NN_min["DATE_TIME"][i]-pd.Timedelta(hours=4)
+            NN_post=NN_max["DATE_TIME"][i]+pd.Timedelta(hours=4)
+            gcs_data=gcs.loc[gcs["DATE_TIME"]==NN_date]
+            if len(gcs_data)>0:
+                cpa_ang_gcs = (gcs_data["CPA_ANG"].values)[0]
+                wide_ang_gcs = (gcs_data["WIDE_ANG"].values)[0]
+            else:
+                cpa_ang_gcs = np.nan
+                wide_ang_gcs = np.nan
+            
+            if (NN_prev<=vourlidas_data["Date_Time"]<=NN_post)and(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
+                compare.append([NN_date,seeds_data["DATE_TIME"],vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,wide_ang_vourlidas,cpa_ang_gcs,wide_ang_gcs])
+            elif (NN_prev<=vourlidas_data["Date_Time"]<=NN_post) and not(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
+                compare.append([NN_date,np.nan,vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],np.nan,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],np.nan,wide_ang_vourlidas,cpa_ang_gcs,wide_ang_gcs])
+            elif not(NN_prev<=vourlidas_data["Date_Time"]<=NN_post)and(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
+                
+                compare.append([NN_date,seeds_data["DATE_TIME"],np.nan,df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,np.nan,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,np.nan,cpa_ang_gcs,wide_ang_gcs])
     compare = pd.DataFrame(compare, columns=columns)
-    #vourlidas.loc[vourlidas["Date_Time"]=="2008-05-17 10:37:30"]
     return compare
 
 def linear(t,a,b):
@@ -251,7 +254,6 @@ seeds=get_seeds(folder,sat)
 vourlidas= get_vourlidas(folder,sat)
 gcs=get_GCS(odir,sat)
 df=comparator(NN,seeds,vourlidas,gcs)
-breakpoint()
 date_to_tag_vourlidas = pd.to_datetime([datetime(2008, 5, 17)])
 date_to_tag_seeds = pd.to_datetime([datetime(2008, 5, 17)])
 date_to_tag_nn = pd.to_datetime([datetime(2008, 5, 17)])
