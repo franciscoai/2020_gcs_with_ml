@@ -9,8 +9,8 @@ import warnings
 from torchvision.io import read_image
 from torch.utils.data import Dataset
 
-class Cme_2VP_Dataset(Dataset):
-    def __init__(self, root_dir:str, file_ext:str='.png', img_size:list=[512, 512]):
+class Cme_MVP_Dataset(Dataset):
+    def __init__(self, root_dir:str, file_ext:str='.png', img_size:list=[3, 512, 512]):
         self.root_dir = root_dir
         self.imgs = self.__get_dirs(self.root_dir)
         self.file_ext = file_ext
@@ -40,9 +40,12 @@ class Cme_2VP_Dataset(Dataset):
             
             sat1_mask = read_image(os.path.join(mask_dir, 'sat1.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
             sat2_mask = read_image(os.path.join(mask_dir, 'sat2.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
-            img = torch.zeros((2, sat1_mask.shape[1], sat1_mask.shape[2]))
+            sat3_mask = read_image(os.path.join(mask_dir, 'sat3.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
+            img = torch.zeros((3, sat1_mask.shape[1], sat1_mask.shape[2]))
             img[0, :, :] = sat1_mask
             img[1, :, :] = sat2_mask
+            img[2, :, :] = sat3_mask
+
 
             img = img.float()
             img = self.__normalize(img)
@@ -50,19 +53,20 @@ class Cme_2VP_Dataset(Dataset):
 
             occulter_mask_sat1 = read_image(os.path.join(mask_dir, 'sat1_occ.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
             occulter_mask_sat2 = read_image(os.path.join(mask_dir, 'sat2_occ.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
+            occulter_mask_sat3 = read_image(os.path.join(mask_dir, 'sat3_occ.png'), mode=torchvision.io.image.ImageReadMode.GRAY)
+            occulter_masks = torch.zeros((3, occulter_mask_sat1.shape[1], occulter_mask_sat1.shape[2]))
+            occulter_masks[0, :, :] = occulter_mask_sat1
+            occulter_masks[1, :, :] = occulter_mask_sat2
+            occulter_masks[2, :, :] = occulter_mask_sat3
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                sat1_mask = sat1_mask.new_tensor(sat1_mask > 0, dtype=torch.uint8)
-                sat2_mask = sat2_mask.new_tensor(sat2_mask > 0, dtype=torch.uint8)
-                occulter_mask_sat1 = occulter_mask_sat1.new_tensor(occulter_mask_sat1 > 0, dtype=torch.uint8)
-                occulter_mask_sat2 = occulter_mask_sat2.new_tensor(occulter_mask_sat2 > 0, dtype=torch.uint8)
+                sat_masks = img.new_tensor(img > 0, dtype=torch.uint8)
+                occulter_masks = occulter_masks.new_tensor(occulter_masks > 0, dtype=torch.uint8)
 
             resize = torchvision.transforms.Resize(self.image_size, torchvision.transforms.InterpolationMode.BILINEAR)
-            sat1_mask = resize(sat1_mask)
-            sat2_mask = resize(sat2_mask)
-            occulter_mask_sat1 = resize(occulter_mask_sat1)
-            occulter_mask_sat2 = resize(occulter_mask_sat2)
+            sat_masks = resize(sat_masks)
+            occulter_masks = resize(occulter_masks)
 
             # CMElon,CMElat,CMEtilt,height,k,ang
             labels = ["CMElon", "CMElat", "CMEtilt", "height", "k", "ang"]
@@ -78,16 +82,17 @@ class Cme_2VP_Dataset(Dataset):
             #img = torch.squeeze(img)
             #targets = torch.squeeze(targets)
             #mask = torch.squeeze(mask)
-            occulter_mask_sat1 = torch.squeeze(occulter_mask_sat1)
-            occulter_mask_sat2 = torch.squeeze(occulter_mask_sat2)
+            occulter_masks = torch.squeeze(occulter_masks)
+            
             satpos = torch.squeeze(satpos)
             plotranges = torch.squeeze(plotranges)
 
-            return img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx
+            return img, targets, sat_masks, occulter_masks, satpos, plotranges, idx
+        
         except :
             print(f"Error in {self.imgs[idx]}")
-            img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx = self.__getitem__(idx+1)
-            return img, targets, sat1_mask, sat2_mask, occulter_mask_sat1, occulter_mask_sat2, satpos, plotranges, idx
+            img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = self.__getitem__(idx+1)
+            return img, targets, sat_masks, occulter_masks, satpos, plotranges, idx
 
 
 
