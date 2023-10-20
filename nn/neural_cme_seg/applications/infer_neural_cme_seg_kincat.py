@@ -40,7 +40,7 @@ def read_fits(file_path,smooth_kernel=[0,0]):
         print(f'WARNING. could not find file {file_path}')
         return None
 
-def plot_to_png(ofile,orig_img, masks,all_centers,all_centerpix,mask_threshold,scr_threshold, title=None, labels=None, boxes=None, scores=None):
+def plot_to_png(ofile,orig_img, masks,all_center,mask_threshold,scr_threshold, title=None, labels=None, boxes=None, scores=None):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
@@ -59,7 +59,8 @@ def plot_to_png(ofile,orig_img, masks,all_centers,all_centerpix,mask_threshold,s
         axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
         axs[i].axis('off')
         axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
-        axs[i+1].axis('off')        
+        axs[i+1].axis('off') 
+     
         if boxes[i] is not None:
             nb = 2
             for b in boxes[i]:
@@ -73,10 +74,24 @@ def plot_to_png(ofile,orig_img, masks,all_centers,all_centerpix,mask_threshold,s
                     axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
                     box =  mpl.patches.Rectangle(boxes[i][0:2],boxes[i][2]-boxes[i][0],boxes[i][3]-boxes[i][1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
                     axs[i+1].add_patch(box)
-                    axs[i+1].scatter(256, 256, color='red', marker='x', s=100)
+                    axs[i+1].scatter(round(all_center[0][0]), round(all_center[0][1]), color='red', marker='x', s=100)
+                    center_x = 260
+                    center_y = 247
+
+                    # Establecer los límites de los ejes existentes (opcional)
+                    axs[i].set_xlim(0, 510)
+                    axs[i].set_ylim(0, 510)
+
+                    # Agregar ejes X e Y adicionales que pasan por el punto central
+                    axs[i].annotate('', xy=(center_x+52, 510), xytext=(center_x+52, 0),
+                                arrowprops=dict(arrowstyle='->', lw=1.5))
+                    axs[i].annotate('', xy=(510, center_y+52), xytext=(0, center_y+52),
+                    arrowprops=dict(arrowstyle='->', lw=1.5))
                     
-                    axs[i+1].scatter(round(all_centers[0][0]), round(all_centers[0][1]), color='blue', marker='x', s=100)
-                    axs[i+1].scatter(round(all_centerpix[0][0]), round(all_centerpix[0][1]), color='green', marker='x', s=100)
+                    axs[i].annotate('', xy=(center_x-52, 510), xytext=(center_x-52, 0),
+                                arrowprops=dict(arrowstyle='->', lw=1.5))
+                    axs[i].annotate('', xy=(510, center_y-52), xytext=(0, center_y-52),
+                    arrowprops=dict(arrowstyle='->', lw=1.5))                   
 
                     if labels[i] is not None: 
                         
@@ -105,14 +120,18 @@ kincat_col_names=["DATE_TIME","MASK","SCORE","CPA_ANG","WIDE_ANG","APEX_DIST"]
 imsize=[0,0]# if 0,0 no rebin its applied 
 imsize_nn=[512,512] #for rebin befor the nn
 smooth_kernel=[2,2] #changes the gaussian filter size
-occ_size = 50 # occulter radius in pixels. An artifitial occulter with constant value equal to the mean of the image is added before inference. Use 0 to avoid
+occ_size = [50,52] # occulter radius in pixels. An artifitial occulter with constant value equal to the mean of the image is added before inference. Use 0 to avoid
+occ_center=[[256,256],[260,247]]
 sat="cor2_b"#"cor2_a"
 
 if sat=="cor2_a":
     downloaded_files_list = repo_dir + '/nn_training/kincat/helcatslist_20160601_sta_downloaded.csv' # list of downloaded files
+    occ_center=occ_center[0]
+    occ_size= occ_size[0]
 elif sat=="cor2_b":
     downloaded_files_list = repo_dir + '/nn_training/kincat/helcatslist_20160601_stb_downloaded.csv' # list of downloaded files
-
+    occ_center=occ_center[1]
+    occ_size= occ_size[1]
 
 #nn model parameters
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
@@ -168,8 +187,7 @@ for i in range(len(catalogue.index)):
         all_plate_scl=[]
         file_names=[]
         all_headers=[]
-        all_centers=[]
-        all_centerpix=[]
+        all_center=[]
 
         folder=files[0][40:-26]
         print("WORKING ON FOLDER "+folder)
@@ -193,31 +211,29 @@ for i in range(len(catalogue.index)):
                     ofile = os.path.join(opath, str(folder_name), filename )
                     
                     if header['NAXIS1'] != imsize_nn[0]:
-                        plt_scl = header['CDELT1'] * header['NAXIS1']/imsize_nn[0] 
-                        crpix1 = imsize_nn[0]-(header['CRPIX1'] / (header['NAXIS1']/imsize_nn[0]))
-                        crpix2 = imsize_nn[1]-(header['CRPIX2'] / (header['NAXIS1']/imsize_nn[0]))
-                        crpix=[crpix1,crpix2]
+                        scale=(header['NAXIS1']/imsize_nn[0])
+                        plt_scl = header['CDELT1'] * scale
+                        # crpix1 = imsize_nn[0]/2+(header['NAXIS1']/2-header['CRPIX1']-(header['CRVAL1']/header['CDELT1']))/scale
+                        # crpix2 = imsize_nn[0]/2+(header['NAXIS2']/2-header['CRPIX2']-(header['CRVAL2']/header['CDELT2']))/scale
+                        # crpix=[crpix2,crpix1]
 
                     else:
                         plt_scl = header['CDELT1']
-                        crpix1 = imsize_nn[0]-header['CRPIX1']
-                        crpix2 = imsize_nn[1]-header['CRPIX2']
-                        crpix=[crpix1,crpix2]
+                        # crpix1 = imsize_nn[0]-header['CRPIX1']
+                        # crpix2 = imsize_nn[1]-header['CRPIX2']
+                        # crpix=[crpix1,crpix2]
 
-                    x_cen=(imsize_nn[0]/2)+(header['XCEN']/plt_scl)
-                    y_cen=(imsize_nn[1]/2)+(header['YCEN']/plt_scl)
-                    center=[x_cen,y_cen]
-                    all_centerpix.append(crpix)
-                    all_plate_scl.append(plt_scl)
-                    all_centers.append(center)
+                    
+                    all_center.append(occ_center)
+                    all_plate_scl.append(plt_scl)                    
                     all_images.append(img)
                     all_dates.append(date)
-                    all_occ_size.append(0)
+                    all_occ_size.append(occ_size)
                     file_names.append(filename)
                     all_headers.append(header)
-            
+                    
             if len(all_images)>=2:
-                all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop =  nn_seg.infer_event(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_centers,  plot_params=final_path+'mask_props')
+                all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop =  nn_seg.infer_event(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=final_path+'mask_props')
                 
                 if all_masks is not None:
                     zeros = np.zeros(np.shape(all_orig_img[0]))
@@ -245,7 +261,7 @@ for i in range(len(catalogue.index)):
 
                     if len(all_masks)>0:
                         for i in range(len(all_images)):
-                            plot_to_png(opath+"/"+folder_name+"/"+file_names[i]+".png", [all_orig_img[i]], [all_masks[i]],[all_centers[i]],[all_centerpix[i]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[i]], labels=[all_lbl[i]], boxes=[all_boxes[i]], scores=[all_scores[i]])
+                            plot_to_png(opath+"/"+folder_name+"/"+file_names[i]+".png", [all_orig_img[i]], [all_masks[i]],[all_center[i]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[i]], labels=[all_lbl[i]], boxes=[all_boxes[i]], scores=[all_scores[i]])
                     else:
                         print("No CME detected :-/")        
 
