@@ -51,7 +51,7 @@ def save_png(array, ofile=None, range=None):
 # CONSTANTS
 #files
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_10_test' #'/gehme/projects/2020_gcs_with_ml/data/cme_seg_training' 
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_100' #'/gehme/projects/2020_gcs_with_ml/data/cme_seg_training' 
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 
 # GCS parameters [first 6]
@@ -60,7 +60,7 @@ n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names
-par_num = 10  # total number of samples that will be generated for each param (there are nsat images per param combination)
+par_num = 100  # total number of samples that will be generated for each param (there are nsat images per param combination)
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 same_corona=False # Set to True use a single corona back for all par_num cases
 
@@ -70,7 +70,7 @@ imsize=np.array([512, 512], dtype='int32') # output image size
 level_occ=0. #mean level of the occulter relative to the background level
 cme_noise= [0,2.] #gaussian noise level of cme image. [mean, sd], both expressed in fractions of the cme-only image mean level. Set mean to None to avoid
 occ_noise = [0,30.] # occulter gaussian noise. [mean, sd] both expressed in fractions of the abs mean background level. Set mean to None to avoid
-mesh=False # set to also save a png with the GCSmesh (only for otype='png')
+mesh=True # set to also save a png with the GCSmesh (only for otype='png')
 otype="png" # set the ouput file type: 'png' or 'fits'
 im_range=2. # range of the color scale of the output final syntethyc image in std dev around the mean
 back_rnd_rot=False # set to randomly rotate the background image around its center
