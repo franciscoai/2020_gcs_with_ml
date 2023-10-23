@@ -35,12 +35,10 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None):
     
     
     cor2_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2"
-    #lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_back_database/lasco"
-    lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2" #temp to clone first image
+    lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/lasco"
     h_cor2b="/gehme/data/stereo/secchi/L1/b/img/cor2/20130209/20130209_062400_14c2B.fts"
     h_cor2a="/gehme/data/stereo/secchi/L1/a/img/cor2/20130209/20130209_062400_14c2A.fts" 
-    #h_lasco="path/to/lasco/header"
-    h_lasco="/gehme/data/stereo/secchi/L1/b/img/cor2/20130209/20130209_062400_14c2B.fts" #temp to clone first image
+    h_lasco="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/lasco/c2/20130224_055918.fts"
     size_occ=[2.6, 3.7, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun]
     # size_occ=[1.4, 1.4, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun] 
     max_time_diff= datetime.timedelta(hours=2)
@@ -54,12 +52,22 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None):
         path=cor2_path+"/cor2_a"
     # LASCO    
     elif sat==2:
-        #path=lasco_path+"/c2"
-        path=lasco_path+"/cor2_b"
+        path=lasco_path+"/c2"
+        # p0 = '/gehme/data/soho/lasco/level_1/c2/20130424/25456651.fts'
+        # p1 = '/gehme/data/soho/lasco/level_1/c2/20130424/25456652.fts'
+        # p0img = fits.open(p0)[0].data
+        # p1img = fits.open(p1)[0].data
+        # h0 = fits.getheader(p0)
+        # oimg = p1img - p0img
+        # namefile = '20130424_055918.fts'
+        # # Save oimage in namefile
+        # pp = fits.PrimaryHDU(oimg, header=h0[0:-3])
+        # pp.writeto(path+'/'+namefile, output_verify='ignore', overwrite=True)
+
     else:
         os.error('Input instrument not recognized, check value of sat')
 
-    files=[f for f in os.listdir(path) if f.endswith('.fits')]
+    files=[f for f in os.listdir(path) if f.endswith('.fits') or f.endswith('.fts')]
     
     if obs_datetime is not None:
         # get the closest file to the input datetime
