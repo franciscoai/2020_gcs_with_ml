@@ -15,7 +15,7 @@ from astropy.io import fits
 import datetime
 
 
-def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None):
+def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None, custom_headers=False):
     '''
     Returns a measured "quiet" (with no CME) solar corona observed by satelitte sat, the implemented instruments are
 
@@ -86,12 +86,15 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None):
     p0=path+"/"+p0
     
     oimg= fits.open(p0)[0].data
-    if sat == 0:
-        h0= fits.getheader(h_cor2b)
-    elif sat == 1:
-        h0= fits.getheader(h_cor2a)
+    if custom_headers:
+        if sat == 0:
+            h0= fits.getheader(h_cor2b)
+        elif sat == 1:
+            h0= fits.getheader(h_cor2a)
+        else:
+            h0= fits.getheader(h_lasco)
     else:
-        h0= fits.getheader(h_lasco)
+        h0= fits.getheader(p0)
 
     if rnd_rot:
         oimg = scipy.ndimage.rotate(oimg, np.random.randint(low=0, high=360), reshape=False)

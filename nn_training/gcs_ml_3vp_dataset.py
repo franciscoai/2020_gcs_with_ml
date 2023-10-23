@@ -62,7 +62,8 @@ par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names
 par_num = 100  # total number of samples that will be generated for each param (there are nsat images per param combination)
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
-same_corona=False # Set to True use a single corona back for all par_num cases
+same_corona=True # Set to True use a single corona back for all par_num cases
+same_position=True # Set to True to use the same set of satteite positions(not necesarly the same background image)
 
 # Syntethic image options
 synth_int_image=False
@@ -118,9 +119,9 @@ for row in df.index:
         size_occ=[]
         for sat in range(n_sat):
             if sat == 0:
-                a,b,c,obs_datetime=get_corona(sat,imsize=imsize)
+                a,b,c,obs_datetime=get_corona(sat,imsize=imsize, custom_headers=same_position)
             else:
-                a,b,c,_=get_corona(sat,imsize=imsize, obs_datetime=obs_datetime)
+                a,b,c,_=get_corona(sat,imsize=imsize, obs_datetime=obs_datetime, custom_headers=same_position)
             back_corona.append(a)
             headers.append(b)
             size_occ.append(c)
