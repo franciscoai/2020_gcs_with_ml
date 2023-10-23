@@ -10,11 +10,12 @@ from torchvision.io import read_image
 from torch.utils.data import Dataset
 
 class Cme_MVP_Dataset(Dataset):
-    def __init__(self, root_dir:str, file_ext:str='.png', img_size:list=[3, 512, 512]):
+    def __init__(self, root_dir:str, file_ext:str='.png', img_size:list=[3, 512, 512], binary_mask:bool=False):
         self.root_dir = root_dir
         self.imgs = self.__get_dirs(self.root_dir)
         self.file_ext = file_ext
         self.image_size = img_size
+        self.binary_mask = binary_mask
         self.transform = self.__define_transforms()
         csv_path = [f for f in os.listdir(self.root_dir) if f.endswith('.csv')][0]
         self.csv_df = pd.read_csv(os.path.join(self.root_dir, csv_path))
@@ -97,12 +98,14 @@ class Cme_MVP_Dataset(Dataset):
 
 
     def __normalize(self, img):
-        sd_range = 1
-        m = torch.mean(img)
-        sd = torch.std(img)
-        img = (img - m + sd_range * sd) / (2 * sd_range * sd)
-        img[img > 1] = 1
-        img[img < 0] = 0
+        if not self.binary_mask:
+            sd_range = 1
+            m = torch.mean(img)
+            sd = torch.std(img)
+            img = (img - m + sd_range * sd) / (2 * sd_range * sd) # breaks binary mask
+        else:
+            img[img > 1] = 1
+            img[img < 0] = 0
         return img
 
     def __define_transforms(self):

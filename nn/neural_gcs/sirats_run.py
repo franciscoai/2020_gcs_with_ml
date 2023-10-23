@@ -16,32 +16,34 @@ from nn.neural_gcs.cme_mvp_dataset import Cme_MVP_Dataset
 from nn.neural_gcs.sirats_model import Sirats_net
 from nn.utils.gcs_mask_generator import maskFromCloud
 
+# Dataset Parameters
+TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_100k'
+OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_3VP_100k_test"
+BINARY_MASK = True
+BATCH_SIZE = 8
+BATCH_LIMIT = None
+SEED = 42
+IMG_SiZE = [3, 512, 512]
 
 # Train Parameters
 DEVICE = 0
-INFERENCE_MODE = False
+INFERENCE_MODE = True
 SAVE_MODEL = True
 LOAD_MODEL = True
-EPOCHS = 5
-BATCH_LIMIT = None
-BATCH_SIZE = 8
+EPOCHS = 1
 TRAIN_IDX_SIZE = 9500
-SEED = 42
-IMG_SiZE = [3, 512, 512]
 GPU = 0
 LR = [1e-2, 1e-3]
 # CMElon,CMElat,CMEtilt,height,k,ang
 GCS_PAR_RNG = torch.tensor([[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60]]) 
 LOSS_WEIGHTS = torch.tensor([100,100,100,10,1,10])
-TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_100k'
-OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_3VP_100k_test"
 os.makedirs(OPATH, exist_ok=True)
 
 
 def test_specific_image():
     sat1_path = "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20110317_filter_True/FMwLASCO201103173_0.fits"
     sat2_path = "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20110317_filter_True/FMwLASCO201103173_1.fits"
-    resize = torchvision.transforms.Resize(IMG_SiZE, torchvision.transforms.InterpolationMode.BILINEAR)
+    resize = torchvision.transforms.Resize(IMG_SiZE[1:3], torchvision.transforms.InterpolationMode.BILINEAR)
     #read fits
     sat1 = fits.open(sat1_path)[0].data
     sat2 = fits.open(sat2_path)[0].data
@@ -51,62 +53,97 @@ def test_specific_image():
     satpos, plotranges = pyGCS.processHeaders(headers)
     satpos = np.array(satpos)
     plotranges = np.array(plotranges)
-    img = torch.tensor([sat1, sat2])
+    img = torch.tensor([sat1, sat2, sat1]) # it repeats because Lasco is not implemented yet
     img = img.float()
-    sd_range = 1
-    m = torch.mean(img)
-    sd = torch.std(img)
-    img = (img - m + sd_range * sd) / (2 * sd_range * sd)
-    img[img > 1] = 1
-    img[img < 0] = 0
+    if not BINARY_MASK:
+        sd_range = 1
+        m = torch.mean(img)
+        sd = torch.std(img)
+        img = (img - m + sd_range * sd) / (2 * sd_range * sd)
+    else:
+        img[img > 1] = 1
+        img[img < 0] = 0
     img = resize(img)
     img = img.to(DEVICE)
     predictions = model.infer(img)
     predictions = predictions.cpu().detach().numpy()
     img = img.cpu().detach().numpy()
     predictions = np.squeeze(predictions)
-    mask_infered_sat1 = maskFromCloud(predictions, sat=0, satpos=[satpos[0,:]], imsize=IMG_SiZE, plotranges=[plotranges[0,:]])
-    mask_infered_sat2 = maskFromCloud(predictions, sat=0, satpos=[satpos[1,:]], imsize=IMG_SiZE, plotranges=[plotranges[1,:]])
+    mask_infered_sat1 = maskFromCloud(predictions, sat=0, satpos=[satpos[0,:]], imsize=IMG_SiZE[1:3], plotranges=[plotranges[0,:]])
+    mask_infered_sat2 = maskFromCloud(predictions, sat=0, satpos=[satpos[1,:]], imsize=IMG_SiZE[1:3], plotranges=[plotranges[1,:]])
     
     fig, ax = plt.subplots(1, 2, figsize=(9, 5))
-    # tigh layout
-    fig.tight_layout()
-    fig.suptitle("Lasco specific image")
-    ax[0].imshow(mask_infered_sat1)
-    ax[0].imshow(img[0,:,:], vmin=0, vmax=1, alpha=0.4, cmap='Reds')
-    ax[1].imshow(mask_infered_sat2)
-    ax[1].imshow(img[1,:,:], vmin=0, vmax=1, alpha=0.4, cmap='Reds')
 
+    # Define colors and colormap
+    color = ['purple', 'r']
+    cmap = mpl.colors.ListedColormap(color)
+
+    # Tight layout
+    fig.tight_layout()
+
+    # Set the main title
+    fig.suptitle("Lasco specific image")
+
+    # Update masks for saturation
+    mask_infered_sat1[mask_infered_sat1 > 0] = 1
+    mask_infered_sat2[mask_infered_sat2 > 0] = 1
+    mask_infered_sat1[mask_infered_sat1 <= 0] = np.nan
+    mask_infered_sat2[mask_infered_sat2 <= 0] = np.nan
+
+    # Set image values
+    img[img <= 0] = np.nan
+    img[img > 0] = 0
+
+    # Plot the masks and images
+    ax[0].imshow(mask_infered_sat1, cmap=cmap)
+    ax[0].imshow(img[0, :, :], vmin=0, vmax=1, alpha=0.4, cmap=cmap)
+
+    ax[1].imshow(mask_infered_sat2, cmap=cmap)
+    ax[1].imshow(img[1, :, :], vmin=0, vmax=1, alpha=0.4, cmap=cmap)
+
+    # Save the figure
     masks_dir = os.path.join(OPATH, 'masks')
     os.makedirs(masks_dir, exist_ok=True)
     plt.savefig(os.path.join(masks_dir, 'test_image.png'))
     plt.close()
 
 
+
 def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, plotranges, opath, namefile):
+    # Convert tensors to numpy arrays
     img = img.cpu().detach().numpy()
     target = target.cpu().detach().numpy()
-    prediction = prediction.cpu().detach().numpy()
+    prediction = np.squeeze(prediction.cpu().detach().numpy())
     satpos = satpos.cpu().detach().numpy()
     plotranges = plotranges.cpu().detach().numpy()
     occulter_masks = occulter_masks.cpu().detach().numpy()
 
-    prediction = np.squeeze(prediction)
-    masks_infered = torch.zeros((IMG_SiZE[0], IMG_SiZE[1], IMG_SiZE[2]))
-    for i in range(IMG_SiZE[0]):
-        mask_infered_sat = maskFromCloud(prediction, sat=0, satpos=[satpos[i,:]], imsize=IMG_SiZE, plotranges=[plotranges[i,:]])# sat=0 avoid unknown error
-        masks_infered[i,:,:] = mask_infered_sat
-    # Setting 0 where the occulter is
-    masks_infered[occulter_masks > 0] = 0
-    
-    fig, ax = plt.subplots(1, 2, figsize=(9, 5))
-    # tigh layout
+    IMG_SIZE = (img.shape[0], img.shape[1], img.shape[2])  # Assuming you have IMG_SIZE defined
+
+    fig, ax = plt.subplots(1, IMG_SIZE[0], figsize=(9, 5))
     fig.tight_layout()
     fig.suptitle(f'target: {np.around(target, 3)}\nPrediction: {np.around(prediction, 3)}')
-    ax[0].imshow(masks_infered[0,:,:])
-    ax[0].imshow(img[0,:,:], vmin=0, vmax=1, alpha=0.4, cmap='Reds')
-    ax[1].imshow(masks_infered[1,:,:])
-    ax[1].imshow(img[1,:,:], vmin=0, vmax=1, alpha=0.4, cmap='Reds')
+
+    color = ['purple', 'k', 'r', 'b']
+    cmap = mpl.colors.ListedColormap(color)
+
+    for i in range(IMG_SIZE[0]):
+        mask_infered_sat = maskFromCloud(prediction, sat=0, satpos=[satpos[i, :]], imsize=IMG_SIZE[1:3], plotranges=[plotranges[i, :]])
+        masks_infered = np.zeros(IMG_SIZE)
+        masks_infered[i, :, :] = mask_infered_sat
+
+        nan_mask = np.full(IMG_SIZE[1:3], np.nan)
+        nan_occulter = np.full(IMG_SIZE[1:3], np.nan)
+
+        img[i, :, :][img[i, :, :] <= 0] = np.nan
+        img[i, :, :][img[i, :, :] > 0] = 0
+
+        nan_occulter[occulter_masks[i, :, :] > 0] = 1
+        nan_mask[:, :][masks_infered[i, :, :] > 0] = 2
+
+        ax[i].imshow(img[i, :, :], vmin=0, vmax=len(color) - 1, cmap=cmap)
+        ax[i].imshow(nan_mask, cmap=cmap, alpha=0.6, vmin=0, vmax=len(color) - 1)
+        ax[i].imshow(nan_occulter, cmap=cmap, alpha=0.25, vmin=0, vmax=len(color) - 1)
 
     masks_dir = os.path.join(opath, 'masks')
     os.makedirs(masks_dir, exist_ok=True)
@@ -166,7 +203,7 @@ def run_training():
             print(f"Model saved at: {status}\n")
 
 if __name__ == '__main__':
-    dataset = Cme_MVP_Dataset(root_dir=TRAINDIR, img_size=[IMG_SiZE[1], IMG_SiZE[2]]) # Dataset doen't need the number of "channels" 
+    dataset = Cme_MVP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE[1:3], binary_mask=True)
     random.seed(SEED)
     total_samples = len(dataset)
     train_size = TRAIN_IDX_SIZE
@@ -198,9 +235,8 @@ if __name__ == '__main__':
         data_iter = iter(cme_test_dataloader)
         for i in range(10):
             img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = next(data_iter)
-            img, targets, sat_masks, oocculter_masks, satpos, plotranges, idx = img[0], targets[0], sat_masks[0], oocculter_masks[0], satpos[0], plotranges[0], idx[0]
+            img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = img[0], targets[0], sat_masks[0], occulter_masks[0], satpos[0], plotranges[0], idx[0]
             img = img.to(DEVICE)
             predictions = model.infer(img)
-            sat_masks = torch.squeeze(sat_masks)
             plot_mask_MVP(img, sat_masks, targets, predictions, occulter_masks, satpos, plotranges, opath=OPATH, namefile=f'targetVinfered_{idx}.png')
-        test_specific_image()
+        #test_specific_image()
