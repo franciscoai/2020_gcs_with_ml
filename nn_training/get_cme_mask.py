@@ -1,7 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+import alphashape
 import scipy
+
 
 def pnt2arr(points,imsize):
     '''
@@ -69,40 +71,31 @@ def get_mask_cloud(p_x,p_y,imsize, occ_size=None):
 
     points=[]
     for i in range(len(p_x)):
-        points.append([p_x[i],p_y[i]])
-    arr_cloud=pnt2arr(points,imsize)
+        points.append((p_x[i],p_y[i]))
 
-    #creates a bounding box arround the cme cloud
-    square = np.zeros_like(arr_cloud)
-    square[np.min(p_x):np.max(p_x),np.min(p_y)] = 1 # Right edge
-    square[np.min(p_x):np.max(p_x),np.max(p_y)] = 1 # Left edge
-    square[np.min(p_x),np.min(p_y):np.max(p_y)] = 1 # Right edge
-    square[np.max(p_x),np.min(p_y):np.max(p_y)] = 1 # Left edge
-    result = arr_cloud+square
+    alpha_shape = alphashape.alphashape(points, 0.1)
+    points = alpha_shape.exterior.coords.xy
 
-    #interpolation of the cme cloud points
+    # #interpolation of the cme cloud points
     box=[[np.min(p_x),np.max(p_x)],[np.min(p_y),np.max(p_y)]]
     x_len=box[0][1]-box[0][0]
     y_len=box[1][1]-box[1][0]
     grid = np.indices((x_len,y_len))
-    values = np.ones(len(p_x))
+    values = np.transpose(np.array([points[0],points[1]]))
     xi = np.transpose(np.array([grid[0].flatten()+box[0][0], grid[1].flatten()+box[1][0]]))
     mask = scipy.interpolate.griddata(points, values, xi, method='linear',fill_value=0)
     arr_mask=np.zeros(imsize)
 
     if occ_size is None:
         for i in range(len(xi)):
-            arr_mask[int(xi[i][0]), int(xi[i][1])] = mask[i]
+            px_dist_to_center = np.sqrt((xi[i][0]-imsize[0]/2)**2 + (xi[i][1]-imsize[1]/2)**2)
+            if px_dist_to_center < imsize[0]/2:
+                arr_mask[int(xi[i][0]), int(xi[i][1])] = mask[i]
     else:        
         for i in range(len(xi)):
             px_dist_to_center = np.sqrt((xi[i][0]-imsize[0]/2)**2 + (xi[i][1]-imsize[1]/2)**2)
-            if px_dist_to_center >= occ_size:
-                arr_mask[int(xi[i][0]), int(xi[i][1])] = mask[i]
-    
-    arr_mask[arr_mask>0]=1
-    
     if np.sum(arr_mask) == 0:
         arr_mask = np.zeros(imsize)
-
+        
     return arr_mask
   
