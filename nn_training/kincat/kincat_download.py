@@ -2,7 +2,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-from data_download.descargar_imagenes_clases import cor2_downloader
+from data_download.descargar_imagenes_clases import cor2_downloader, lascoc2_downloader
 import pandas as pd
 from datetime import datetime, timedelta
 
@@ -13,7 +13,8 @@ col_names=["HEL","CME","PRE_DATE","PRE_TIME","LAST_DATE","LAST_TIME","CARLON","S
 suffix = "/gehme/data/stereo/"
 helcat_db =  repo_dir + "/nn_training/kincat/helcatslist_20160601.txt" # kincat database
 downloaded_files_list = repo_dir + '/nn_training/kincat/helcatslist_20160601_stb_downloaded.csv' # list of downloaded files
-sat="STEREO_B"
+sat="C2"#STEREO_A OR STEREO_B FOR COR2 / C2 FOR LASCO
+instrument="LASCO"#COR2 OR LASCO
 
 # read helcats database
 df = pd.read_csv(helcat_db, sep = "\t")
@@ -36,16 +37,27 @@ for i in range(len(df.index)):
         last_datetime=datetime.strptime((last_date+" "+last_time),'%Y-%m-%d %H:%M')
         last_diff = last_datetime - timedelta(hours=1)
         end=last_diff.strftime('%Y/%m/%d %H:%M:%S')
-        # download COR2 images
-        asd = cor2_downloader(start_time=pre_diff,end_time=last_diff,nave=sat,nivel='double',image_type='img',size=2)
-        asd.search()
-        #breakpoint()
-        if len(asd.search_cor2) >= 1:   
-            asd.download()
-            for p in range(len(asd.search_cor2)):
-                path=asd.search_cor2[p][9]
-                date_time = datetime.strptime(path[30:-10], '%Y%m%d_%H%M%S')
-                data.append([suffix+path,date_time])
-    #breakpoint()
+        
+        if instrument=="COR2":
+            # download COR2 images
+            asd = cor2_downloader(start_time=pre_diff,end_time=last_diff,nave=sat,nivel='double',image_type='img',size=2)
+            asd.search()
+            if len(asd.search_cor2) >= 1:   
+                asd.download()
+                for p in range(len(asd.search_cor2)):
+                    path=asd.search_cor2[p][9]
+                    date_time = datetime.strptime(path[30:-10], '%Y%m%d_%H%M%S')
+                    data.append([suffix+path,date_time])
+        elif instrument=="LASCO":
+            asd = lascoc2_downloader(start_time=pre_diff,end_time=last_diff,nivel='level_05',size=2)
+            asd.search()
+            if len(asd.search_lascoc2) >= 1:   
+                asd.download()
+                for p in range(len(asd.search_lascoc2)):
+                
+                    path=asd.search_lascoc2[p][8]
+                    date_time = datetime.strptime(asd.search_lascoc2[p][0].value, "%Y-%m-%d %H:%M:%S.%f")
+                    data.append([suffix+path,date_time])
+    
 data = pd.DataFrame(data, columns=["PATH","DATE_TIME"])    
 data.to_csv(downloaded_files_list,  index=False)

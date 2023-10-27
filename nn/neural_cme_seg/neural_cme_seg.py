@@ -375,6 +375,10 @@ class neural_cme_segmentation():
         ok_ind = ok_ind[ok_ind2]
 
         return ok_ind
+    
+
+    def _filter_masks2(self, dates, masks, scores, labels, boxes, mask_prop):
+        print("hola")
 
     def _filter_masks(self, dates, masks, scores, labels, boxes, mask_prop):
         '''

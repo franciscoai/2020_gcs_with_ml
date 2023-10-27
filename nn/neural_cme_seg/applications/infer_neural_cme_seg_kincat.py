@@ -244,6 +244,7 @@ for i in range(len(catalogue.index)):
 
                     if len(all_masks)>0:
                         for i in range(len(all_images)):
+                            breakpoint()
                             plot_to_png(opath+"/"+folder_name+"/"+file_names[i]+".png", [all_orig_img[i]], [all_masks[i]],[all_center[i]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[i]], labels=[all_lbl[i]], boxes=[all_boxes[i]], scores=[all_scores[i]])
                     else:
                         print("No CME detected :-/")        
