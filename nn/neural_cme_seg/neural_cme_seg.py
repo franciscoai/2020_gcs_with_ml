@@ -10,6 +10,7 @@ import math
 from datetime import datetime
 from scipy.optimize import least_squares
 import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
 mpl.use('Agg')
 
 __author__ = "Francisco Iglesias"
@@ -378,7 +379,49 @@ class neural_cme_segmentation():
     
 
     def _filter_masks2(self, dates, masks, scores, labels, boxes, mask_prop):
-        print("hola")
+        colores = ['b', 'g', 'y', 'orange', 'r']
+        data=[]
+        for i in range(len(dates)):
+            for j in range(len(masks[i])):
+                cpa = mask_prop[i][j][2]
+                wa = mask_prop[i][j][3]
+                data.append((cpa,wa))
+                        
+        data = np.array(data)
+
+        # Especifica el número de clusters que deseas
+        n_clusters = 2  # Puedes ajustar esto según tu necesidad
+
+        # Ajusta el modelo K-Means
+        kmeans = KMeans(n_clusters=n_clusters)
+        kmeans.fit(data)
+
+        # Obtiene las etiquetas de grupo para cada punto
+        etiquetas = kmeans.labels_
+        #grupo_a_eliminar = 1
+        #data= data[etiquetas != grupo_a_eliminar]
+
+        # Inicializa una figura de Matplotlib
+        plt.figure()
+
+        # Itera a través de los puntos y colóralos según sus etiquetas de grupo
+        for i in range(len(data)):
+            cpa, wa = data[i]
+            grupo = etiquetas[i]
+            color = colores[grupo]
+            plt.scatter(wa, cpa, color=color)
+
+
+        # Etiquetas y leyendas
+        plt.xlabel('wa')
+        plt.ylabel('cpa')
+
+
+        plt.savefig("/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1/cor2_b/20090804/filtered/"+"cpa_vs_wa.png")
+        
+        breakpoint()
+
+        
 
     def _filter_masks(self, dates, masks, scores, labels, boxes, mask_prop):
         '''
@@ -598,7 +641,7 @@ class neural_cme_segmentation():
                 self._plot_mask_prop(all_dates, all_mask_prop, self.plot_params , ending='_all')
             # keeps only one mask per img based on cpa, aw and apex radius evolution consistency
             if filter:
-                ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop = self._filter_masks(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop)
+                ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop)
                 if len(ok_dates) > 0:
                     self._plot_mask_prop(ok_dates, [all_mask_prop], self.plot_params , ending='_filtered')   
 

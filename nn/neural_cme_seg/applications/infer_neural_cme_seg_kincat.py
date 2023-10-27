@@ -28,7 +28,8 @@ __email__ = "franciscoaiglesias@gmail.com"
 
 def read_fits(file_path,smooth_kernel=[0,0]):
     imageSize=[512,512]
-    try:       
+    try: 
+          
         file=glob.glob((file_path)[0:-5]+"*")
         img = fits.open(file[0])
         img=(img[0].data).astype("float32")
@@ -174,7 +175,7 @@ for i in range(len(catalogue.index)):
 
         folder=files[0][40:-26]
         print("WORKING ON FOLDER "+folder)
-        if folder=="20070509":
+        if folder=="20090804":
             for j in range(len(files)-1):
                 print(f'Processing {j} of {len(files)-1}')
                 #read fits
@@ -225,6 +226,7 @@ for i in range(len(catalogue.index)):
                         if all_scores is not None:
                             if all_scores[i] is not None:
                                 scr = all_scores[i]
+                        
                         if scr > scr_threshold:             
                             masked = zeros.copy()
                             masked[:, :][all_masks[i] > mask_threshold] = 1
@@ -241,10 +243,10 @@ for i in range(len(catalogue.index)):
                             h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
                             h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
                             fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
-
+                    
                     if len(all_masks)>0:
                         for i in range(len(all_images)):
-                            breakpoint()
+                            
                             plot_to_png(opath+"/"+folder_name+"/"+file_names[i]+".png", [all_orig_img[i]], [all_masks[i]],[all_center[i]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[i]], labels=[all_lbl[i]], boxes=[all_boxes[i]], scores=[all_scores[i]])
                     else:
                         print("No CME detected :-/")        
