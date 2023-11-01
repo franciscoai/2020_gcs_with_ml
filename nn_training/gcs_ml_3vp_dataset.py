@@ -114,7 +114,7 @@ def raytracewcsWrapper(header, params, imsize, occrad, in_sig, out_sig, nel):
 # CONSTANTS
 #files
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_10' #'/gehme/projects/2020_gcs_with_ml/data/cme_seg_training'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP' #'/gehme/projects/2020_gcs_with_ml/data/cme_seg_training'
 OVERWRITE = True # set to True to overwrite existing files
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 min_nviews = 3 # minimum number succesful views 
@@ -124,9 +124,10 @@ min_nviews = 3 # minimum number succesful views
 # level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme', 'satpos', 'plotranges'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[5,10],[0.2,0.6],[10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names {2.5,7} heights
-par_num = 5  # total number of samples that will be generated for each param (there are nsat images per param combination)
+par_rng = [[-180,180],[-70,70],[-90,90],[3,10],[0.2,0.6],[10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names {2.5,7} heights
+par_num = int(1e5)  # total number of samples that will be generated for each param (there are nsat images per param combination)
 rnd_par=False # when true it apllies a fixed seed to generate the same parameters for each run
+seed = 47 # seed to use when rnd_par is True
 same_corona=True # Set to True use a single corona back for all par_num cases
 same_position=True # Set to True to use the same set of satteite positions(not necesarly the same background image)
 
@@ -150,17 +151,9 @@ two_cmes = False # set to include two cme per image on some (random) cases
 used_params = []
 iter_counter = -1
 if not rnd_par:
-    np.random.seed(47)
+    np.random.seed(seed)
 
-# generate param arrays
-# par_num = [par_num] * len(par_rng)
-# all_par = []
-# for (rng, num) in zip(par_rng, par_num):
-#     cpar = np.linspace(rng[0],rng[1], num)
-#     if rnd_par:
-#         np.random.shuffle(cpar)
-#     all_par.append(cpar)
-
+OPATH = OPATH + "_size_" + str(par_num) + "_seed_" + str(seed)
 if os.path.exists(OPATH) and OVERWRITE:
     os.system("rm -r " + OPATH)
 os.makedirs(OPATH, exist_ok=True)
@@ -169,17 +162,6 @@ os.makedirs(OPATH, exist_ok=True)
 date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
 configfile_name = OPATH + '/' + date_str+'Set_Parameters.csv'
 succesful_df = pd.DataFrame(columns=par_names)
-# set.to_csv(configfile_name)
-# df = pd.DataFrame(pd.read_csv(configfile_name))
-# mask_prev = None
-
-# #check last image made
-# try:
-#     last_id = sorted([int(i) for i in os.listdir(OPATH) if not i.endswith('.csv')])[-1]-1
-#     if last_id>=0:
-#         df = df.iloc[last_id:]
-# except:
-#     print('No previous csv found, starting from the beginning')
 
 # defining lists
 satpos_all = []
