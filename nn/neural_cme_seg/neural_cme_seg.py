@@ -10,7 +10,9 @@ import math
 from datetime import datetime
 from scipy.optimize import least_squares
 import matplotlib.pyplot as plt
+import pandas as pd
 from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 mpl.use('Agg')
 
 __author__ = "Francisco Iglesias"
@@ -377,45 +379,109 @@ class neural_cme_segmentation():
 
         return ok_ind
     
+    def _select_mask(self, in_x, in_y, error_func, fit_func, in_cond, weights=[2]):
+        '''
+        Deletes the points that are more than criterion from the fit function given by fit_func
+        in_x: timestamps of the points to be filtered
+        in_y: y values of the points to be filtered
+        error_func: function to calculate the error between the fit and the data
+        fit_func: function to fit the data
+        in_cond: initial condition for the fit
+        criterion: maximum distance from the fit to consider a point as ok
+        percentual: if True, the criterion is a percentage of the y value
+        weights: data points weights for the fit. Must be a cevtor of len len(in_x) or int. 
+                 If It's a scalar int gives more weight to the last weights dates bcause CME is supoused to be larger and better defined
+        '''
+
+        sorted_indices = np.argsort(in_x)
+        x = in_x[sorted_indices]
+        y = in_y[sorted_indices]
+        selected_x = []
+        selected_y = []
+        current_x = x[0]
+        current_x_values = []
+        current_y_values = []
+
+        for i in range(len(x)):
+            if x[i] == current_x:
+                current_x_values.append(x[i])
+                current_y_values.append(y[i])
+            else:
+                fit = least_squares(error_func, in_cond, kwargs={'x': current_x_values - current_x_values[0], 'y': current_y_values, 'w': weights})
+                dist = np.abs(fit_func(current_x_values - current_x_values[0], *fit.x) - current_y_values)
+                min_dist_idx= np.argmin(dist)
+                selected_x.append(current_x_values[min_dist_idx])
+                selected_y.append(current_y_values[min_dist_idx])
+
+                # Update the current x-coordinate and the lists of values
+                current_x = x[i]
+                current_x_values = [x[i]]
+                current_y_values = [y[i]]
+        
+        # Add the last set of data.
+        fit = least_squares(error_func, in_cond, kwargs={'x': current_x_values - current_x_values[0], 'y': current_y_values, 'w': weights})
+        dist = np.abs(fit_func(current_x_values - current_x_values[0], *fit.x) - current_y_values)
+        min_dist_idx = np.argmin(dist)
+        selected_x.append(current_x_values[min_dist_idx])
+        selected_y.append(current_y_values[min_dist_idx])
+        
+        #selected_x = np.array(selected_x)
+        #selected_y = np.array(selected_y)
+
+        return selected_x, selected_y
+    
 
     def _filter_masks2(self, dates, masks, scores, labels, boxes, mask_prop):
-        colores = ['b', 'g', 'y', 'orange', 'r']
+        #transforms inputs in a dataframe
         data=[]
         for i in range(len(dates)):
             for j in range(len(masks[i])):
+                mask=mask_prop[i][j][0]
+                scr=mask_prop[i][j][1]
                 cpa = mask_prop[i][j][2]
-                wa = mask_prop[i][j][3]
-                data.append((cpa,wa))
-                        
-        data = np.array(data)
+                wa=mask_prop[i][j][3]
+                apex=mask_prop[i][j][4]
+                date= dates[i]
+                data.append((date,mask,scr,cpa,wa,apex))
+        df = pd.DataFrame(data, columns=["DATE_TIME","MASK","SCR","CPA","WA","APEX"])
 
-        # Especifica el número de clusters que deseas
-        n_clusters = 2  # Puedes ajustar esto según tu necesidad
+        #Gets the optimal number of clusters for the data
+        data= df["CPA"].values.reshape(-1, 1)
+        silhouette_scores = []
+        n_clusters_range = range(2, 5) 
+        for n_clusters in n_clusters_range:
+            kmeans = KMeans(n_clusters=n_clusters, random_state=0)
+            labels = kmeans.fit_predict(data)
+            silhouette_avg = silhouette_score(data, labels)
+            silhouette_scores.append(silhouette_avg)
 
-        # Ajusta el modelo K-Means
-        kmeans = KMeans(n_clusters=n_clusters)
-        kmeans.fit(data)
+        optimal_n_clusters = n_clusters_range[np.argmax(silhouette_scores)]
 
-        # Obtiene las etiquetas de grupo para cada punto
-        etiquetas = kmeans.labels_
-        #grupo_a_eliminar = 1
-        #data= data[etiquetas != grupo_a_eliminar]
+        #Adjust KMEANS to optimal cluster number
+        kmeans = KMeans(n_clusters=optimal_n_clusters,random_state=0)
+        labels = kmeans.fit_predict(data)
+        df['CME_ID'] = labels
+        all_filterd_x = []
+        all_filterd_y = []
+        
+        # gets one mask per cluster
+        colors=[]
+        for k in range(optimal_n_clusters):
+            filterd_df = df[df['CME_ID'] == k]
+            x_points =np.array([i.timestamp() for i in filterd_df["DATE_TIME"]])
+            y_points =np.array(filterd_df["CPA"])
+            filterd_x,filterd_y = self._select_mask(x_points, y_points, linear_error, linear, [1.,1.])
+            all_filterd_x.extend(filterd_x)
+            all_filterd_y.extend(filterd_y)
+            color = plt.cm.jet(k / optimal_n_clusters) 
+            colors.extend([color] * len(filterd_x))
 
-        # Inicializa una figura de Matplotlib
-        plt.figure()
-
-        # Itera a través de los puntos y colóralos según sus etiquetas de grupo
-        for i in range(len(data)):
-            cpa, wa = data[i]
-            grupo = etiquetas[i]
-            color = colores[grupo]
-            plt.scatter(wa, cpa, color=color)
-
-
-        # Etiquetas y leyendas
-        plt.xlabel('wa')
-        plt.ylabel('cpa')
-
+       
+        plt.figure(figsize=(8, 6))
+        plt.scatter(all_filterd_x, all_filterd_y, c=colors,label='All Clusters')
+        plt.xlabel('Dates')
+        plt.ylabel('CPA')
+        plt.legend()
 
         plt.savefig("/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1/cor2_b/20090804/filtered/"+"cpa_vs_wa.png")
         
