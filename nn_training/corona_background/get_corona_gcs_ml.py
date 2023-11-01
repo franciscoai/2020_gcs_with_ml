@@ -39,7 +39,8 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None, cu
     h_cor2b="/gehme/data/stereo/secchi/L1/b/img/cor2/20130209/20130209_062400_14c2B.fts"
     h_cor2a="/gehme/data/stereo/secchi/L1/a/img/cor2/20130209/20130209_062400_14c2A.fts" 
     h_lasco="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/lasco/c2/20130224_055918.fts"
-    size_occ=[2.6, 3.7, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun]
+    size_occ=[3.3, 3.3, 2.2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun]
+    occ_center=[(30,-15),(0,-5),(0,0)] # [(38,-15),(0,-5),(0,0)] # (y,x)
     # size_occ=[1.4, 1.4, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun] 
     max_time_diff= datetime.timedelta(hours=2)
 
@@ -99,8 +100,23 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None, cu
     if rnd_rot:
         oimg = scipy.ndimage.rotate(oimg, np.random.randint(low=0, high=360), reshape=False)
  
+    # shift oimg
+    if sat == 0:
+        shift_values = occ_center[0]
+        oimg = np.roll(oimg, shift_values[0], axis=0)
+        oimg = np.roll(oimg, shift_values[1], axis=1)
+    elif sat == 1:
+        shift_values = occ_center[1]
+        oimg = np.roll(oimg, shift_values[0], axis=0)
+        oimg = np.roll(oimg, shift_values[1], axis=1)
+    elif sat == 2:
+        shift_values = occ_center[2]
+        oimg = np.roll(oimg, shift_values[0], axis=0)
+        oimg = np.roll(oimg, shift_values[1], axis=1)
+
     if imsize is not None:
         oimg = rebin(oimg,imsize,operation='mean')
+
     return oimg, h0, size_occ[sat], obs_datetime
 
     # STEREO A C1
@@ -144,4 +160,3 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None, cu
     # if sat == 2:
     #     breakpoint()
     # return oimg, h0, size_occ[sat]
-
