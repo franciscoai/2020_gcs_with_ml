@@ -319,7 +319,6 @@ class neural_cme_segmentation():
                 return None
             for par in range(len(param[0][0])):
                 cparam = np.array([i[par] for j in param for i in j])           
-                
                 y_title = self.mask_prop_labels[par]
                 if y_title.endswith("ANG"):        
                     b = [np.degrees(i) for i in cparam]
@@ -339,6 +338,58 @@ class neural_cme_segmentation():
                     plt.close()
                 else:
                     return fig, ax
+                
+
+
+
+    def _plot_mask_prop2(self, dates, param, opath, ending='_filtered', x_title='Date and hour', style='*', save=True):
+            '''
+            plots the evolution of the cpa, aw and apex radius for all the masks found and the filtered ones
+            dates: list of datetime objects with the date of each event
+            param: 3d list with the mask properties for all masks found in each image. Each maks's has the following prop: [id,float(scores[i]),cpa_ang, wide_ang, apex_dist]
+            '''
+            
+            self.mask_prop_labels=['MASK ID', 'SCORE','CPA_ANG','WIDTH_ANG','APEX_RADIUS',"CME_ID"]
+
+            print('Plotting masks properties to '+opath)
+            # repeat dates for all masks
+            if ending == '_all':
+                x = []
+                for i in range(len(dates)):
+                    x.append([dates[i]]*len(param[i]))
+                x = np.array([i for j in x for i in j])
+            elif ending == '_filtered':                
+                x = dates.copy()
+            else:
+                print('Unrecognized value for ending parameter')
+                return None
+                        
+            fig, ax = plt.subplots()         
+            
+            for h in range(len(param)):
+                for m in range(param[h]):
+                    for par in range(len(param[0][0])):
+                        y_title = self.mask_prop_labels[par]
+                        cparam = np.array([j[h][par] for j in param])
+                        breakpoint()
+                        if y_title.endswith("ANG"):
+                            breakpoint()
+                            b = [np.degrees(i) for i in cparam]
+                        else:
+                            b = cparam
+                    
+                        ax.plot(x, b, style, label=y_title)
+
+                ax.legend()
+                ax.set_xlabel(x_title)
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+                if save:
+                    os.makedirs(opath, exist_ok=True)
+                    fig.savefig(opath+'/'+str.lower(y_title)+ending+".png") 
+                    
+                else:
+                    return fig, ax               
         
     def _filter_param(self, in_x, in_y, error_func, fit_func, in_cond, criterion, percentual=True, weights=[2]):
         '''
@@ -436,23 +487,26 @@ class neural_cme_segmentation():
         data=[]
         for i in range(len(dates)):
             for j in range(len(masks[i])):
-                mask=mask_prop[i][j][0]
+                mask_id=mask_prop[i][j][0]
                 scr=mask_prop[i][j][1]
                 cpa = mask_prop[i][j][2]
                 wa=mask_prop[i][j][3]
                 apex=mask_prop[i][j][4]
                 date= dates[i]
-                data.append((date,mask,scr,cpa,wa,apex))
-        df = pd.DataFrame(data, columns=["DATE_TIME","MASK","SCR","CPA","WA","APEX"])
-
+                label=labels[i][j]
+                box=boxes[i][j]
+                mask=masks[i][j]
+                data.append((date,mask_id,scr,cpa,wa,apex,label,box,mask))
+        df = pd.DataFrame(data, columns=["DATE_TIME","MASK_ID","SCR","CPA","WA","APEX","LABEL","BOX","MASK"])
+        
         #Gets the optimal number of clusters for the data
         data= df["CPA"].values.reshape(-1, 1)
         silhouette_scores = []
         n_clusters_range = range(2, 5) 
         for n_clusters in n_clusters_range:
             kmeans = KMeans(n_clusters=n_clusters, random_state=0)
-            labels = kmeans.fit_predict(data)
-            silhouette_avg = silhouette_score(data, labels)
+            km_labels = kmeans.fit_predict(data)
+            silhouette_avg = silhouette_score(data, km_labels)
             silhouette_scores.append(silhouette_avg)
 
         optimal_n_clusters = n_clusters_range[np.argmax(silhouette_scores)]
@@ -460,32 +514,56 @@ class neural_cme_segmentation():
         #Adjust KMEANS to optimal cluster number
         kmeans = KMeans(n_clusters=optimal_n_clusters,random_state=0)
         labels = kmeans.fit_predict(data)
-        df['CME_ID'] = labels
-        all_filterd_x = []
-        all_filterd_y = []
+        df['CME_ID'] = km_labels
         
+        all_filtered_x = []
+        all_filtered_y = []
         # gets one mask per cluster
-        colors=[]
         for k in range(optimal_n_clusters):
-            filterd_df = df[df['CME_ID'] == k]
-            x_points =np.array([i.timestamp() for i in filterd_df["DATE_TIME"]])
-            y_points =np.array(filterd_df["CPA"])
-            filterd_x,filterd_y = self._select_mask(x_points, y_points, linear_error, linear, [1.,1.])
-            all_filterd_x.extend(filterd_x)
-            all_filterd_y.extend(filterd_y)
-            color = plt.cm.jet(k / optimal_n_clusters) 
-            colors.extend([color] * len(filterd_x))
-
-       
-        plt.figure(figsize=(8, 6))
-        plt.scatter(all_filterd_x, all_filterd_y, c=colors,label='All Clusters')
-        plt.xlabel('Dates')
-        plt.ylabel('CPA')
-        plt.legend()
-
-        plt.savefig("/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1/cor2_b/20090804/filtered/"+"cpa_vs_wa.png")
+            filtered_df = df[df['CME_ID'] == k]
+            x_points =np.array([i.timestamp() for i in filtered_df["DATE_TIME"]])
+            y_points =np.array(filtered_df["CPA"])
+            filtered_x,filtered_y = self._select_mask(x_points, y_points, linear_error, linear, [1.,1.])
+            filtered_x = [pd.Timestamp(i, unit='s') for i in filtered_x]
+            all_filtered_x.extend(filtered_x)
+            all_filtered_y.extend(filtered_y)
         
-        breakpoint()
+        filtered_df = pd.DataFrame({'DATE_TIME': all_filtered_x, 'CPA': all_filtered_y})
+        full_df = df.merge(filtered_df, on=['DATE_TIME', 'CPA'], how='inner')
+        
+        #fix format to lists to be returned
+        all_dates=[]
+        all_masks=[]
+        all_scores= []
+        all_lbl=[]
+        all_boxes=[]
+        all_mask_prop=[]
+
+        i = 0  
+        while i < len(full_df):
+            event = full_df.loc[full_df["DATE_TIME"] == full_df["DATE_TIME"][i]]
+            all_dates.append(full_df["DATE_TIME"][i])
+            all_masks.append((event["MASK"].tolist()))
+            all_scores.append((event["SCR"].tolist()))            
+            all_lbl.append((event["LABEL"].tolist()))
+            all_boxes.append((event["BOX"].tolist()))
+            #Mask properties
+            mask_id = event["MASK_ID"].tolist()
+            scr = event["SCR"].tolist()
+            cpa = event["CPA"].tolist()
+            wa = event["WA"].tolist()
+            apex = event["APEX"].tolist()
+            cm_id = event["CME_ID"].tolist()
+            props = []
+            for j in range(len(event["CME_ID"])):
+                props.append((mask_id[j], scr[j], cpa[j], wa[j], apex[j], cm_id[j]))
+            all_mask_prop.append(props)
+            i += len(event)    
+
+        return all_dates,all_masks, all_scores, all_lbl, all_boxes,all_mask_prop
+
+
+        
 
         
 
@@ -709,7 +787,7 @@ class neural_cme_segmentation():
             if filter:
                 ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop)
                 if len(ok_dates) > 0:
-                    self._plot_mask_prop(ok_dates, [all_mask_prop], self.plot_params , ending='_filtered')   
+                    self._plot_mask_prop2(ok_dates, all_mask_prop, self.plot_params , ending='_filtered')   
 
                 #if any date is left with no mask, it fills its properties with None
                 if len(dates) != len(ok_dates):
