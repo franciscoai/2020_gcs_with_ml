@@ -351,7 +351,7 @@ class neural_cme_segmentation():
             
             self.mask_prop_labels=['MASK ID', 'SCORE','CPA_ANG','WIDTH_ANG','APEX_RADIUS',"CME_ID"]
 
-            print('Plotting masks properties to '+opath)
+            print('Plotting masks properties to '+ str(opath))
             # repeat dates for all masks
             if ending == '_all':
                 x = []
@@ -359,35 +359,45 @@ class neural_cme_segmentation():
                     x.append([dates[i]]*len(param[i]))
                 x = np.array([i for j in x for i in j])
             elif ending == '_filtered':                
-                x = dates.copy()
+                x = np.array(dates.copy())
             else:
                 print('Unrecognized value for ending parameter')
                 return None
                         
-            fig, ax = plt.subplots()         
-            
-            for h in range(len(param)):
-                for m in range(param[h]):
-                    for par in range(len(param[0][0])):
-                        y_title = self.mask_prop_labels[par]
-                        cparam = np.array([j[h][par] for j in param])
-                        breakpoint()
-                        if y_title.endswith("ANG"):
-                            breakpoint()
-                            b = [np.degrees(i) for i in cparam]
-                        else:
-                            b = cparam
-                    
-                        ax.plot(x, b, style, label=y_title)
+      
 
-                ax.legend()
+            colors = ["red","blue","orange","yellow","purple"]           
+            
+            for par in range(len(param[0][0])): #loops on props
+                fig, ax = plt.subplots()   
+                for cid in range(len(param[0])):#loops on id to plot
+                    cparam=[]
+                    for t in range(len(param)):#loops in time
+                        flag=0
+                        for id in range(len(param[0])):#loops in all id
+                            if param[t][id][5] == cid:
+                                cparam.append(param[t][id][par])
+                                flag=1
+                        if flag==0:
+                            cparam.append(np.nan)
+
+                    y_title = self.mask_prop_labels[par]
+
+                    if y_title.endswith("ANG"):
+                        b = np.array([np.degrees(i) for i in cparam])
+                    else:
+                        b = np.array(cparam)
+
+                    ok_idx=~np.isnan(cparam)
+                    ax.plot(x[ok_idx], b[ok_idx], style,color=colors[cid])
                 ax.set_xlabel(x_title)
                 plt.xticks(rotation=45)
+                plt.grid()
                 plt.tight_layout()
                 if save:
                     os.makedirs(opath, exist_ok=True)
-                    fig.savefig(opath+'/'+str.lower(y_title)+ending+".png") 
-                    
+                    fig.savefig(opath+'/'+str.lower(y_title)+ending+".png")
+                    plt.close()
                 else:
                     return fig, ax               
         
@@ -476,8 +486,7 @@ class neural_cme_segmentation():
         selected_x.append(current_x_values[min_dist_idx])
         selected_y.append(current_y_values[min_dist_idx])
         
-        #selected_x = np.array(selected_x)
-        #selected_y = np.array(selected_y)
+
 
         return selected_x, selected_y
     
@@ -519,18 +528,40 @@ class neural_cme_segmentation():
         all_filtered_x = []
         all_filtered_y = []
         # gets one mask per cluster
-        for k in range(optimal_n_clusters):
+        for k in range(optimal_n_clusters-1):
             filtered_df = df[df['CME_ID'] == k]
             x_points =np.array([i.timestamp() for i in filtered_df["DATE_TIME"]])
             y_points =np.array(filtered_df["CPA"])
             filtered_x,filtered_y = self._select_mask(x_points, y_points, linear_error, linear, [1.,1.])
+            #fills the dates that dosen't appear in filter_x with Nan in filterd_y
+            for j in range(len(x_points)-1):
+                if x_points[j] != filtered_x[j]:
+                    filtered_x.insert(j, x_points[j])
+                    filtered_y.insert(j, None)
+
+                if  (j==len(x_points)-2) & (len(x_points)-1 == len(filtered_x)):
+                    filtered_x.insert(j+1, x_points[j+1])
+                    filtered_y.insert(j+1, None)
+
             filtered_x = [pd.Timestamp(i, unit='s') for i in filtered_x]
             all_filtered_x.extend(filtered_x)
             all_filtered_y.extend(filtered_y)
-        
+
         filtered_df = pd.DataFrame({'DATE_TIME': all_filtered_x, 'CPA': all_filtered_y})
-        full_df = df.merge(filtered_df, on=['DATE_TIME', 'CPA'], how='inner')
+        full_df = filtered_df.merge(df, on=['DATE_TIME', 'CPA'], how='left')
         
+        #fills the columns with Nan if there is less than thye optimal number of masks
+        for i in range(len(full_df)):
+            count_dt = full_df['DATE_TIME'].value_counts()
+            
+            count= count_dt[full_df["DATE_TIME"][i]]
+            if count<optimal_n_clusters:
+                for j in range(optimal_n_clusters-count):
+                    new_row = {'DATE_TIME':full_df["DATE_TIME"][i], 'CPA':np.nan, 'MASK_ID':np.nan, 'SCR':np.nan, 'WA':np.nan, 'APEX':np.nan, 'LABEL':np.nan, 'BOX':np.nan,'MASK':np.nan, 'CME_ID':np.nan}
+                    new_row_df = pd.DataFrame(new_row, index=[i])
+                    full_df = pd.concat([full_df, new_row_df], ignore_index=True)
+        breakpoint()
+
         #fix format to lists to be returned
         all_dates=[]
         all_masks=[]
@@ -543,23 +574,23 @@ class neural_cme_segmentation():
         while i < len(full_df):
             event = full_df.loc[full_df["DATE_TIME"] == full_df["DATE_TIME"][i]]
             all_dates.append(full_df["DATE_TIME"][i])
-            all_masks.append((event["MASK"].tolist()))
-            all_scores.append((event["SCR"].tolist()))            
-            all_lbl.append((event["LABEL"].tolist()))
-            all_boxes.append((event["BOX"].tolist()))
+            all_masks.append((event["MASK"].values))
+            all_scores.append((event["SCR"].values))            
+            all_lbl.append((event["LABEL"].values))
+            all_boxes.append((event["BOX"].values))
             #Mask properties
-            mask_id = event["MASK_ID"].tolist()
-            scr = event["SCR"].tolist()
-            cpa = event["CPA"].tolist()
-            wa = event["WA"].tolist()
-            apex = event["APEX"].tolist()
-            cm_id = event["CME_ID"].tolist()
+            mask_id = event["MASK_ID"].values
+            scr = event["SCR"].values
+            cpa = event["CPA"].values
+            wa = event["WA"].values
+            apex = event["APEX"].values
+            cm_id = event["CME_ID"].values
             props = []
             for j in range(len(event["CME_ID"])):
                 props.append((mask_id[j], scr[j], cpa[j], wa[j], apex[j], cm_id[j]))
             all_mask_prop.append(props)
             i += len(event)    
-
+        
         return all_dates,all_masks, all_scores, all_lbl, all_boxes,all_mask_prop
 
 
@@ -791,25 +822,33 @@ class neural_cme_segmentation():
 
                 #if any date is left with no mask, it fills its properties with None
                 if len(dates) != len(ok_dates):
+                    ok_ind=[]
+                    j=0
+                    breakpoint()
                     for i in np.unique(dates):             
                         if i not in ok_dates:
                             print('Warning, no consistent mask found for date '+str(i)+', returning None')
-                            ok_dates.append(i)
-                            all_mask_prop.append(np.array([None for i in range(len(self.mask_prop_labels))]))
-                            all_masks.append(None)
-                            all_scores.append(None)
-                            all_lbl.append(None)
-                            all_boxes.append(None)       
-                    #resorts all lists based on date, do not convert to numpy array
-                    idx = np.argsort(ok_dates)
-                    ok_dates = [ok_dates[i] for i in idx]
-                    all_mask_prop = [all_mask_prop[i] for i in idx]
-                    all_masks = [all_masks[i] for i in idx]
-                    all_scores = [all_scores[i] for i in idx]
-                    all_lbl = [all_lbl[i] for i in idx]
-                    all_boxes = [all_boxes[i] for i in idx]                   
-            else:
-                ok_dates = dates.copy()             
+                        else:
+                            ok_ind.append(j)
+                        j+=1
+                    all_orig_img=[all_orig_img[r] for r in ok_ind]
+                    
+            #                 ok_dates.append(i)
+            #                 all_mask_prop.append(np.array([None for i in range(len(self.mask_prop_labels))]))
+            #                 all_masks.append(None)
+            #                 all_scores.append(None)
+            #                 all_lbl.append(None)
+            #                 all_boxes.append(None)       
+            #         #resorts all lists based on date, do not convert to numpy array
+            #         idx = np.argsort(ok_dates)
+            #         ok_dates = [ok_dates[i] for i in idx]
+            #         all_mask_prop = [all_mask_prop[i] for i in idx]
+            #         all_masks = [all_masks[i] for i in idx]
+            #         all_scores = [all_scores[i] for i in idx]
+            #         all_lbl = [all_lbl[i] for i in idx]
+            #         all_boxes = [all_boxes[i] for i in idx]                   
+            # else:
+            #     ok_dates = dates.copy()             
             return all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop
         else:
             ok_dates=[]
