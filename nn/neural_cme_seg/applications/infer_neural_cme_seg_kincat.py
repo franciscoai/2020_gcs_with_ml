@@ -208,30 +208,31 @@ for i in range(len(catalogue.index)):
                     all_headers.append(header)
                     
             if len(all_images)>=2:
-                ok_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop =  nn_seg.infer_event(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=final_path+'mask_props')
-                breakpoint()
+                ok_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=final_path+'mask_props')
+                
                 if all_masks is not None:
-                    zeros = np.zeros(np.shape(ok_orig_img[0]))
+                    zeros = np.zeros(np.shape(ok_orig_img[0][0]))
                     for i in range(len(ok_orig_img)):
-                        for k in range(len(all_scores[i])):
-                            if ~np.isnan(all_scores[i][k]):
-                                if all_scores[i][k] > scr_threshold:             
-                                    masked = zeros.copy()
-                                    masked[:, :][all_masks[i][k] > mask_threshold] = 1
-                                    # safe fits
-                                    ofile_fits = os.path.join(os.path.dirname(ofile), file_names[i]+"_CME_ID_"+str(int(all_mask_prop[i][k][5]))+'.fits')
-                                    h0 = all_headers[i]
-                                    # adapts hdr because we use smaller im size
-                                    sz_ratio = np.array(masked.shape)/np.array([h0['NAXIS1'], h0['NAXIS2']])
-                                    h0['NAXIS1'] = masked.shape[0]
-                                    h0['NAXIS2'] = masked.shape[1]
-                                    h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
-                                    h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
-                                    h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
-                                    h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
-                                    fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
 
-                        all_cme_ind = [all_mask_prop[i][k][5] for k in range(len(all_mask_prop[i]))]
+                        if ~np.isnan(all_scores[i]):
+                            if all_scores[i] > scr_threshold:             
+                                masked = zeros.copy()
+                                breakpoint()
+                                masked[:, :][(all_masks[i][0]) > mask_threshold] = 1
+                                # safe fits
+                                ofile_fits = os.path.join(os.path.dirname(ofile), file_names[i]+"_CME_ID_"+str(int(all_mask_prop[i][k][5]))+'.fits')
+                                h0 = all_headers[i]
+                                # adapts hdr because we use smaller im size
+                                sz_ratio = np.array(masked.shape)/np.array([h0['NAXIS1'], h0['NAXIS2']])
+                                h0['NAXIS1'] = masked.shape[0]
+                                h0['NAXIS2'] = masked.shape[1]
+                                h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
+                                h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
+                                h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
+                                h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
+                                fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
+
+                        #all_cme_ind = [all_mask_prop[i][k][5] for k in range(len(all_mask_prop[i]))]
                         plot_to_png(opath+"/"+folder_name+"/"+file_names[i]+".png", [ok_orig_img[i]], [all_masks[i]],[all_center[i]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[i]], labels=[all_lbl[i]], boxes=[all_boxes[i]], scores=[all_scores[i]], all_cme_ind=[all_cme_ind])  
 
                     data_kincat=[]
