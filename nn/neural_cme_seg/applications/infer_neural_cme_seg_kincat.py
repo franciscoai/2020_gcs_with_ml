@@ -28,7 +28,8 @@ __email__ = "franciscoaiglesias@gmail.com"
 
 def read_fits(file_path,smooth_kernel=[0,0]):
     imageSize=[512,512]
-    try:       
+    try: 
+          
         file=glob.glob((file_path)[0:-5]+"*")
         img = fits.open(file[0])
         img=(img[0].data).astype("float32")
@@ -40,7 +41,7 @@ def read_fits(file_path,smooth_kernel=[0,0]):
         print(f'WARNING. could not find file {file_path}')
         return None
 
-def plot_to_png(ofile,orig_img, masks,all_center,mask_threshold,scr_threshold, title=None, labels=None, boxes=None, scores=None):
+def plot_to_png(ofile,orig_img, masks,all_center,mask_threshold,scr_threshold, title=None, labels=None, boxes=None, scores=None, all_cme_ind=None):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
@@ -61,31 +62,22 @@ def plot_to_png(ofile,orig_img, masks,all_center,mask_threshold,scr_threshold, t
         axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
         axs[i+1].axis('off') 
      
-        if boxes[i] is not None:
-            nb = 2
-            for b in boxes[i]:
-                if scores[i] is not None:
-                    scr = scores[i]
-                else:
-                    scr = 0   
-                if scr > scr_threshold:             
-                    masked = nans.copy()
-                    masked[:, :][masks[i] > mask_threshold] = nb              
-                    axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
-                    box =  mpl.patches.Rectangle(boxes[i][0:2],boxes[i][2]-boxes[i][0],boxes[i][3]-boxes[i][1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
-                    axs[i+1].add_patch(box)
-                    axs[i+1].scatter(round(all_center[0][0]), round(all_center[0][1]), color='red', marker='x', s=100)                
-
-                    if labels[i] is not None: 
-                        
-                        axs[i+1].annotate(obj_labels[labels[i]]+':'+'{:.2f}'.format(scr),xy=boxes[i][0:2], fontsize=15, color=color[nb])
-                nb+=1
-    # axs[0].set_title(f'Cor A: {len(boxes[0])} objects detected') 
-    # axs[1].set_title(f'Cor B: {len(boxes[1])} objects detected')               
-    # axs[2].set_title(f'Lasco: {len(boxes[2])} objects detected')     
-    #if title is not None:
-    #    fig.suptitle('\n'.join([title[i]+' ; '+title[i+1] for i in range(0,len(title),2)]) , fontsize=16)
-    
+        for b in range(len(boxes[i])):
+            if ~np.isnan(scores[i][b]):
+                scr = scores[i][b]
+            else:
+                scr = 0   
+            if scr > scr_threshold:             
+                masked = nans.copy()            
+                masked[:, :][masks[i][b] > mask_threshold] = all_cme_ind[i][b]           
+                axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
+                
+                box =  mpl.patches.Rectangle(boxes[i][b][0:2],boxes[i][b][2]-boxes[i][b][0],boxes[i][b][3]-boxes[i][b][1], linewidth=2, edgecolor=color[int(all_cme_ind[i][b])], facecolor='none') # add box
+                axs[i+1].add_patch(box)
+                axs[i+1].scatter(round(all_center[0][0]), round(all_center[0][1]), color='red', marker='x', s=100)
+                if labels[i] is not None: 
+                    axs[i+1].annotate(obj_labels[labels[i][b]]+':'+'{:.2f}'.format(scr),xy=boxes[i][b][0:2], fontsize=15, color=color[int(all_cme_ind[i][b])])
+     
     plt.tight_layout()
     plt.savefig(ofile)
     plt.close()
@@ -174,7 +166,7 @@ for i in range(len(catalogue.index)):
 
         folder=files[0][40:-26]
         print("WORKING ON FOLDER "+folder)
-        if folder=="20070509":
+        if folder=="20090804":
             for j in range(len(files)-1):
                 print(f'Processing {j} of {len(files)-1}')
                 #read fits
@@ -216,38 +208,31 @@ for i in range(len(catalogue.index)):
                     all_headers.append(header)
                     
             if len(all_images)>=2:
-                all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop =  nn_seg.infer_event(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=final_path+'mask_props')
-                
+                ok_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop =  nn_seg.infer_event(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=final_path+'mask_props')
+                breakpoint()
                 if all_masks is not None:
-                    zeros = np.zeros(np.shape(all_orig_img[0]))
-                    for i in range(len(all_orig_img)):
-                        scr = 0
-                        if all_scores is not None:
-                            if all_scores[i] is not None:
-                                scr = all_scores[i]
-                        if scr > scr_threshold:             
-                            masked = zeros.copy()
-                            masked[:, :][all_masks[i] > mask_threshold] = 1
-                            # safe fits
-                            ofile_fits = os.path.join(os.path.dirname(ofile), file_names[i]+'.fits')
-                            h0 = all_headers[i]
+                    zeros = np.zeros(np.shape(ok_orig_img[0]))
+                    for i in range(len(ok_orig_img)):
+                        for k in range(len(all_scores[i])):
+                            if ~np.isnan(all_scores[i][k]):
+                                if all_scores[i][k] > scr_threshold:             
+                                    masked = zeros.copy()
+                                    masked[:, :][all_masks[i][k] > mask_threshold] = 1
+                                    # safe fits
+                                    ofile_fits = os.path.join(os.path.dirname(ofile), file_names[i]+"_CME_ID_"+str(int(all_mask_prop[i][k][5]))+'.fits')
+                                    h0 = all_headers[i]
+                                    # adapts hdr because we use smaller im size
+                                    sz_ratio = np.array(masked.shape)/np.array([h0['NAXIS1'], h0['NAXIS2']])
+                                    h0['NAXIS1'] = masked.shape[0]
+                                    h0['NAXIS2'] = masked.shape[1]
+                                    h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
+                                    h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
+                                    h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
+                                    h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
+                                    fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
 
-                            # adapts hdr because we use smaller im size
-                            sz_ratio = np.array(masked.shape)/np.array([h0['NAXIS1'], h0['NAXIS2']])
-                            h0['NAXIS1'] = masked.shape[0]
-                            h0['NAXIS2'] = masked.shape[1]
-                            h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
-                            h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
-                            h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
-                            h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
-                            fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
-
-                    if len(all_masks)>0:
-                        for i in range(len(all_images)):
-                            breakpoint()
-                            plot_to_png(opath+"/"+folder_name+"/"+file_names[i]+".png", [all_orig_img[i]], [all_masks[i]],[all_center[i]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[i]], labels=[all_lbl[i]], boxes=[all_boxes[i]], scores=[all_scores[i]])
-                    else:
-                        print("No CME detected :-/")        
+                        all_cme_ind = [all_mask_prop[i][k][5] for k in range(len(all_mask_prop[i]))]
+                        plot_to_png(opath+"/"+folder_name+"/"+file_names[i]+".png", [ok_orig_img[i]], [all_masks[i]],[all_center[i]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[i]], labels=[all_lbl[i]], boxes=[all_boxes[i]], scores=[all_scores[i]], all_cme_ind=[all_cme_ind])  
 
                     data_kincat=[]
                     for i in range(len(all_mask_prop)):
