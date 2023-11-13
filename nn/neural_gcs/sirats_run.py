@@ -36,9 +36,9 @@ def calculate_weights(ranges):
 
 # Dataset Parameters
 TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_onlyMask_size_100000_seed_59199'
-OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/gcs_ml_3VP_onlyMask_size_100000_seed_59199"
+OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/gcs_ml_3VP_onlyMask_size_100000_seed_59199_run1"
 BINARY_MASK = True
-BATCH_SIZE = 8
+BATCH_SIZE = 32
 BATCH_LIMIT = None
 SEED = 42
 IMG_SiZE = [3, 512, 512] # If [None, x, y], then the image size is not changed, otherwise it is resized to the specified size
@@ -48,8 +48,8 @@ DEVICE = 1
 INFERENCE_MODE = False
 SAVE_MODEL = True
 LOAD_MODEL = True
-EPOCHS = 30
-TRAIN_IDX_SIZE = 55000
+EPOCHS = 20
+TRAIN_IDX_SIZE = 49848
 GPU = 0
 LR = [1e-2, 1e-3]
 PAR_RNG = [[-180,180],[-70,70],[-90,90],[3,10],[0.2,0.6],[10,60],[1e-1,1e1]]
