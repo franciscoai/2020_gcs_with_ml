@@ -16,27 +16,44 @@ from nn.neural_gcs.cme_mvp_dataset import Cme_MVP_Dataset
 from nn.neural_gcs.sirats_model import Sirats_net
 from nn.utils.gcs_mask_generator import maskFromCloud
 
+
+def calculate_weights(ranges):
+    weights = []
+
+    for r in ranges:
+        min_val, max_val = r
+        range_size = max_val - min_val
+
+        # Avoid division by zero
+        if range_size == 0:
+            weight = 10.0  # Assign a weight of 10 if the range size is zero
+        else:
+            weight = 10.0 / range_size
+
+        weights.append(weight)
+
+    return weights
+
 # Dataset Parameters
-TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_100k'
-OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/sirats_v3_3VP_100k_test"
+TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_onlyMask_size_100000_seed_59199'
+OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/gcs_ml_3VP_onlyMask_size_100000_seed_59199"
 BINARY_MASK = True
 BATCH_SIZE = 8
 BATCH_LIMIT = None
 SEED = 42
-IMG_SiZE = [3, 512, 512]
+IMG_SiZE = [3, 512, 512] # If [None, x, y], then the image size is not changed, otherwise it is resized to the specified size
 
 # Train Parameters
-DEVICE = 0
-INFERENCE_MODE = True
+DEVICE = 1
+INFERENCE_MODE = False
 SAVE_MODEL = True
 LOAD_MODEL = True
-EPOCHS = 1
-TRAIN_IDX_SIZE = 9500
+EPOCHS = 30
+TRAIN_IDX_SIZE = 55000
 GPU = 0
 LR = [1e-2, 1e-3]
-# CMElon,CMElat,CMEtilt,height,k,ang
-GCS_PAR_RNG = torch.tensor([[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60]]) 
-LOSS_WEIGHTS = torch.tensor([100,100,100,10,1,10])
+PAR_RNG = [[-180,180],[-70,70],[-90,90],[3,10],[0.2,0.6],[10,60],[1e-1,1e1]]
+PAR_LOSS_WEIGHTS = torch.tensor(calculate_weights(PAR_RNG[:6])) #torch.tensor([0.1,0.1,0.1,1,10,0.5])
 os.makedirs(OPATH, exist_ok=True)
 
 
@@ -107,8 +124,6 @@ def test_specific_image():
     plt.savefig(os.path.join(masks_dir, 'test_image.png'))
     plt.close()
 
-
-
 def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, plotranges, opath, namefile):
     # Convert tensors to numpy arrays
     img = img.cpu().detach().numpy()
@@ -164,10 +179,9 @@ def run_training():
         test_onlyepoch_losses = []
         epoch_list.append(total_batches_per_epoch)  # Store the total number of batches processed
         total_batches_per_epoch = 0
-
         for i, (img, targets, sat_masks, occulter_masks, satpos, plotranges, idx) in enumerate(cme_train_dataloader, 0):
             total_batches_per_epoch += 1
-            loss_value = model.optimize_model(img, targets, loss_fn, optimizer, scheduler)
+            loss_value = model.optimize_model(img, targets, optimizer, PAR_LOSS_WEIGHTS)
             train_losses_per_batch.append(loss_value.detach().cpu())
             train_onlyepoch_losses.append(loss_value.detach().cpu())
 
@@ -185,7 +199,7 @@ def run_training():
         model.eval()
         with torch.no_grad():
             for i, (img, targets, sat_masks, occulter_masks, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
-                loss_test = model.test_model(img, targets, loss_fn)
+                loss_test = model.test_model(img, targets, PAR_LOSS_WEIGHTS)
                 test_losses_per_batch.append(loss_test.detach().cpu())
                 test_onlyepoch_losses.append(loss_test.detach().cpu())
             mean_test_error_in_batch.append(np.mean(test_onlyepoch_losses))
@@ -203,7 +217,7 @@ def run_training():
             print(f"Model saved at: {status}\n")
 
 if __name__ == '__main__':
-    dataset = Cme_MVP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE[1:3], binary_mask=True)
+    dataset = Cme_MVP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE, binary_mask=True)
     random.seed(SEED)
     total_samples = len(dataset)
     train_size = TRAIN_IDX_SIZE
@@ -225,15 +239,17 @@ if __name__ == '__main__':
     num_parameters = sum(p.numel() for p in model.parameters())
     print(f'Number of parameters: {num_parameters}\n')
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=LR[0])
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, (len(cme_train_dataloader) / BATCH_SIZE) * EPOCHS, eta_min=LR[1])
+    #optimizer = torch.optim.Adam(model.parameters(), lr=LR[0])
+    #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, (len(cme_train_dataloader) / BATCH_SIZE) * EPOCHS, eta_min=LR[1])
+    optimizer = torch.optim.Adadelta(model.parameters())
+    scheduler = None
     loss_fn = torch.nn.MSELoss()
 
     if not INFERENCE_MODE:
         run_training()
     else:
         data_iter = iter(cme_test_dataloader)
-        for i in range(10):
+        for i in range(100):
             img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = next(data_iter)
             img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = img[0], targets[0], sat_masks[0], occulter_masks[0], satpos[0], plotranges[0], idx[0]
             img = img.to(DEVICE)

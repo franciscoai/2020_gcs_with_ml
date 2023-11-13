@@ -47,20 +47,24 @@ class Sirats_net(nn.Module):
         return x
 
 
-    def optimize_model(self, img, targets, loss, optimizer, scheduler):
-        img, target = img.to(self.device), targets.to(self.device)
+    def optimize_model(self, img, targets, optimizer, par_loss_weight, scheduler=None):
+        img, target, par_loss_weight = img.to(self.device), targets.to(self.device), par_loss_weight.to(self.device)
         self.output_params = self.forward(img)
-        loss_value = loss(self.output_params, target)
+        loss_value = self.weighted_mse_loss(self.output_params, target, par_loss_weight)
         optimizer.zero_grad()
         loss_value.backward()
         optimizer.step()
-        scheduler.step()
+        if scheduler is not None:
+            scheduler.step()
         return loss_value
     
-    def test_model(self, img, targets, loss):
-        img, target = img.to(self.device), targets.to(self.device)
+    def weighted_mse_loss(self, input, target, weight):
+        return torch.mean(weight * (input - target) ** 2)
+    
+    def test_model(self, img, targets, par_loss_weight):
+        img, target, par_loss_weight = img.to(self.device), targets.to(self.device), par_loss_weight.to(self.device)
         self.output_params = self.forward(img)
-        loss_value = loss(self.output_params, target)
+        loss_value = self.weighted_mse_loss(self.output_params, target, par_loss_weight)
         return loss_value
     
     def infer(self, img):

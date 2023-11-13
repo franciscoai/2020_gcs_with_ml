@@ -124,7 +124,7 @@ def raytracewcsWrapper(header, params, imsize, occrad, in_sig, out_sig, nel):
 # CONSTANTS
 #files
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_test' #'/gehme/projects/2020_gcs_with_ml/data/cme_seg_training'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP' #'/gehme/projects/2020_gcs_with_ml/data/cme_seg_training'
 OVERWRITE = False # set to True to overwrite existing files
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 min_nviews = 3 # minimum number succesful views 
@@ -134,10 +134,10 @@ min_nviews = 3 # minimum number succesful views
 # level_cme: CME intensity level relative to the mean background corona
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme', 'satpos', 'plotranges'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[3,10],[0.2,0.6],[10,60],[1e-1,1e1]] # min-max ranges of each parameter in par_names {2.5,7} heights
-par_num = int(50)  # total number of samples that will be generated for each param (there are nsat images per param combination)
+par_rng = [[-180,180],[-70,70],[-90,90],[3,10],[0.1,0.6],[10,60],[1e-1,1e1]] # min-max ranges of each parameter in par_names {2.5,7} heights
+par_num = int(1e5)  # total number of samples that will be generated for each param (there are nsat images per param combination)
 rnd_par=False # when true it apllies a fixed seed to generate the same parameters for each run
-seed = 47 # seed to use when rnd_par is True
+seed = 72430 # seed to use when rnd_par is True
 same_corona=True # Set to True use a single corona back for all par_num cases
 same_position=True # Set to True to use the same set of satteite positions(not necesarly the same background image)
 
