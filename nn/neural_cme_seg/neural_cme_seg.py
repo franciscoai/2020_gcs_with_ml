@@ -349,23 +349,27 @@ class neural_cme_segmentation():
             param: 3d list with the mask properties for all masks found in each image. Each maks's has the following prop: [id,float(scores[i]),cpa_ang, wide_ang, apex_dist]
             '''
             parameters= ['CPA', 'MASK_ID', 'SCR', 'WA', 'APEX', 'CME_ID']
-            colors=["red","blue","orange","yellow","purple"]   
+            colors=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w'] 
 
             df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"])
             unique_dates=df["DATE_TIME"].unique()
             optimal_n_clusters=int(df["CME_ID"].max())+1
 
             for par in parameters:
-                fig, ax = plt.subplots()  
+                fig, ax = plt.subplots()
+                dt_list=[]
                 for k in range(optimal_n_clusters):
                     cluster_data=df.loc[(df["CME_ID"])==k]
                     x_points=cluster_data["DATE_TIME"].tolist()
                     y_points=cluster_data[par].tolist() 
                     y_title = par
+                    dt_list.extend(x_points)
                     ax.plot(x_points, y_points, style,color=colors[k])
+                hours = [str(timestamp.time()) for timestamp in dt_list]
+
                 ax.set_title(y_title)    
                 ax.set_xlabel(x_title)
-                plt.xticks(rotation=45)
+                plt.xticks(dt_list,hours,rotation=90)
                 plt.grid()
                 plt.tight_layout()
                 if save:
@@ -550,7 +554,7 @@ class neural_cme_segmentation():
         #Adjust KMEANS to optimal cluster number
         kmeans = KMeans(n_clusters=optimal_n_clusters,random_state=0)
         labels = kmeans.fit_predict(data)
-        df['CME_ID'] = km_labels
+        df['CME_ID'] = [int(i) for i in km_labels]
         
         all_filtered_x = []
         all_filtered_y = []
@@ -798,88 +802,20 @@ class neural_cme_segmentation():
             if filter:
                 df = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop)
                 self._plot_mask_prop2(df, self.plot_params , ending='_filtered')
-                unique_dates=df['DATE_TIME'].unique()
-                for date in dates:
-                    if date not in unique_dates:
-                        idx = dates.index(date)
-                        all_orig_img.pop(idx)
-                for m in unique_dates:
+                ok_dates=sorted(df['DATE_TIME'].unique())
+                for m in ok_dates:
                     event = df[df['DATE_TIME'] == m]
                     if event["MASK"].isnull().all():
                         idx = dates.index(m)
                         all_orig_img.pop(idx)
 
-                breakpoint()
+                all_idx=[]
+                for date in dates:
+                    if date not in ok_dates:
+                        idx = dates.index(date)
+                all_orig_img = [elemento for s, elemento in enumerate(all_orig_img) if s not in all_idx]      
+                df = df.dropna(subset=['MASK']) 
+                return all_orig_img,ok_dates, df
                         
-                    
-                    
 
-
-                breakpoint()
-                #fix format to lists to be returned
-                # all_dates=[]
-                # all_masks=[]
-                # all_scores= []
-                # all_lbl=[]
-                # all_boxes=[]
-                # all_mask_prop=[]
-                # all_img=[]
-
-                # i = 0  
-                # while i < len(df):
-                #     event = df.loc[df["DATE_TIME"] == df["DATE_TIME"][i]]
-                #     all_dates.append(df["DATE_TIME"][i])
-                #     all_masks.append((event["MASK"].values))
-                #     all_scores.append((event["SCR"].values))            
-                #     all_lbl.append((event["LABEL"].values))
-                #     all_boxes.append((event["BOX"].values))
-                #     breakpoint()
-                #     all_img.append((event["IMG"].values))
-                #     #Mask properties
-                #     mask_id = event["MASK_ID"].values
-                #     scr = event["SCR"].values
-                #     cpa = event["CPA"].values
-                #     wa = event["WA"].values
-                #     apex = event["APEX"].values
-                #     cm_id = event["CME_ID"].values
-                #     props = []
-                #     for j in range(len(event["CME_ID"])):
-                #         props.append([mask_id[j], scr[j], cpa[j], wa[j], apex[j], cm_id[j]])
-                #     all_mask_prop.append(props)
-                #     i += len(event)    
-                #if any date is left with no mask, it fills its properties with None
-                # if len(dates) != len(ok_dates):
-                #     ok_ind=[]
-                #     j=0
-                   
-                #     for i in np.unique(dates):             
-                #         if i not in ok_dates:
-                #             print('Warning, no consistent mask found for date '+str(i)+', returning None')
-                #         else:
-                #             ok_ind.append(j)
-                #         j+=1
-                #     all_orig_img=[all_orig_img[r] for r in ok_ind]
-                    
-            #                 ok_dates.append(i)
-            #                 all_mask_prop.append(np.array([None for i in range(len(self.mask_prop_labels))]))
-            #                 all_masks.append(None)
-            #                 all_scores.append(None)
-            #                 all_lbl.append(None)
-            #                 all_boxes.append(None)       
-            #         #resorts all lists based on date, do not convert to numpy array
-            #         idx = np.argsort(ok_dates)
-            #         ok_dates = [ok_dates[i] for i in idx]
-            #         all_mask_prop = [all_mask_prop[i] for i in idx]
-            #         all_masks = [all_masks[i] for i in idx]
-            #         all_scores = [all_scores[i] for i in idx]
-            #         all_lbl = [all_lbl[i] for i in idx]
-            #         all_boxes = [all_boxes[i] for i in idx]                   
-            # else:
-            #     ok_dates = dates.copy()             
-            #return all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop
-        #     return all_img,all_dates,all_masks,all_scores,all_lbl, all_boxes, all_mask_prop
-        # else:
-        #     ok_dates=[]
-        #     all_masks=None
-        #     return all_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop
 

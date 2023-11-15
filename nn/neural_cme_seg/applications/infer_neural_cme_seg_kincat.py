@@ -41,7 +41,7 @@ def read_fits(file_path,smooth_kernel=[0,0]):
         print(f'WARNING. could not find file {file_path}')
         return None
 
-def plot_to_png(ofile,orig_img, masks,all_center,mask_threshold,scr_threshold, title=None, labels=None, boxes=None, scores=None, all_cme_ind=None):
+def plot_to_png(ofile, orig_img, event, all_center, mask_threshold, scr_threshold, title=None):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
@@ -49,34 +49,28 @@ def plot_to_png(ofile,orig_img, masks,all_center,mask_threshold,scr_threshold, t
     
     color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
     obj_labels = ['Back', 'Occ','CME','N/A']
-    #
+    masks=event['MASK']
     cmap = mpl.colors.ListedColormap(color)  
     nans = np.full(np.shape(orig_img[0]), np.nan)
     fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
     axs = axs.ravel()
     
     for i in range(len(orig_img)):
-
         axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
         axs[i].axis('off')
         axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
         axs[i+1].axis('off') 
-     
-        for b in range(len(boxes[i])):
-            if ~np.isnan(scores[i][b]):
-                scr = scores[i][b]
-            else:
-                scr = 0   
+        for b in range(len(event['LABEL'])):
+            scr = event['SCR'][b]
             if scr > scr_threshold:             
                 masked = nans.copy()            
-                masked[:, :][masks[i][b] > mask_threshold] = all_cme_ind[i][b]           
+                masked[:, :][masks[b] > mask_threshold] = event['CME_ID'][b]           
                 axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
                 
-                box =  mpl.patches.Rectangle(boxes[i][b][0:2],boxes[i][b][2]-boxes[i][b][0],boxes[i][b][3]-boxes[i][b][1], linewidth=2, edgecolor=color[int(all_cme_ind[i][b])], facecolor='none') # add box
+                box =  mpl.patches.Rectangle(event['BOX'][b][0:2], event['BOX'][b][2]- event['BOX'][b][0], event['BOX'][b][3]- event['BOX'][b][1], linewidth=2, edgecolor=color[int(event['CME_ID'][b])] , facecolor='none') # add box
                 axs[i+1].add_patch(box)
                 axs[i+1].scatter(round(all_center[0][0]), round(all_center[0][1]), color='red', marker='x', s=100)
-                if labels[i] is not None: 
-                    axs[i+1].annotate(obj_labels[labels[i][b]]+':'+'{:.2f}'.format(scr),xy=boxes[i][b][0:2], fontsize=15, color=color[int(all_cme_ind[i][b])])
+                axs[i+1].annotate(obj_labels[event['LABEL'][b]]+':'+'{:.2f}'.format(scr),xy=event['BOX'][b][0:2], fontsize=15, color=color[int(event['CME_ID'][b])])
      
     plt.tight_layout()
     plt.savefig(ofile)
@@ -208,42 +202,53 @@ for i in range(len(catalogue.index)):
                     all_headers.append(header)
                     
             if len(all_images)>=2:
-                ok_orig_img, ok_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=final_path+'mask_props')
+                ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=final_path+'mask_props')
                 
-                if all_masks is not None:
-                    zeros = np.zeros(np.shape(ok_orig_img[0][0]))
-                    for i in range(len(ok_orig_img)):
+                zeros = np.zeros(np.shape(ok_orig_img[0]))
+                all_idx=[]
+                for date in all_dates:
+                    if date not in ok_dates:
+                        idx = all_dates.index(date)
+                        all_idx.append(idx)
+                file_names = [file_name for h, file_name in enumerate(file_names) if h not in all_idx]
+                all_center =[all_center for h,all_center in enumerate(all_center) if h not in all_idx]
+                all_plate_scl =[all_plate_scl for h,all_plate_scl in enumerate(all_plate_scl) if h not in all_idx]
+                all_dates =[all_dates for h,all_dates in enumerate(all_dates) if h not in all_idx]
+                all_occ_size =[all_occ_size for h,all_occ_size in enumerate(all_occ_size) if h not in all_idx]
+                all_headers =[all_headers  for h,all_headers in enumerate(all_headers) if h not in all_idx]
 
-                        if ~np.isnan(all_scores[i]):
-                            if all_scores[i] > scr_threshold:             
-                                masked = zeros.copy()
-                                breakpoint()
-                                masked[:, :][(all_masks[i][0]) > mask_threshold] = 1
-                                # safe fits
-                                ofile_fits = os.path.join(os.path.dirname(ofile), file_names[i]+"_CME_ID_"+str(int(all_mask_prop[i][k][5]))+'.fits')
-                                h0 = all_headers[i]
-                                # adapts hdr because we use smaller im size
-                                sz_ratio = np.array(masked.shape)/np.array([h0['NAXIS1'], h0['NAXIS2']])
-                                h0['NAXIS1'] = masked.shape[0]
-                                h0['NAXIS2'] = masked.shape[1]
-                                h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
-                                h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
-                                h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
-                                h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
-                                fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
+                for m in range(len(ok_dates)):
+                    event = df[df['DATE_TIME'] == ok_dates[m]].reset_index(drop=True)
+                    print(ok_dates[m],file_names[m],all_dates[m])
+                    image=ok_orig_img[m]
+                    for n in range(len(event['MASK'])):
+                        if event['SCR'][n] > scr_threshold:             
+                            masked = zeros.copy()
+                            masked[:, :][(event['MASK'][n]) > mask_threshold] = 1
+                            # safe fits
+                            ofile_fits = os.path.join(os.path.dirname(ofile), file_names[m]+"_CME_ID_"+str(int(event['CME_ID'][n]))+'.fits')
+                            h0 = all_headers[m]
+                            # adapts hdr because we use smaller im size
+                            sz_ratio = np.array(masked.shape)/np.array([h0['NAXIS1'], h0['NAXIS2']])
+                            h0['NAXIS1'] = masked.shape[0]
+                            h0['NAXIS2'] = masked.shape[1]
+                            h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
+                            h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
+                            h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
+                            h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
+                            fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
 
-                        #all_cme_ind = [all_mask_prop[i][k][5] for k in range(len(all_mask_prop[i]))]
-                        plot_to_png(opath+"/"+folder_name+"/"+file_names[i]+".png", [ok_orig_img[i]], [all_masks[i]],[all_center[i]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[i]], labels=[all_lbl[i]], boxes=[all_boxes[i]], scores=[all_scores[i]], all_cme_ind=[all_cme_ind])  
+                    plot_to_png(opath+"/"+folder_name+"/"+file_names[m]+".png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[m]])  
 
-                    data_kincat=[]
-                    for i in range(len(all_mask_prop)):
-                        if all(elemento is not None for elemento in all_mask_prop[i]):
-                            prop_list = all_mask_prop[i].tolist()
-                            prop_list.insert(0,ok_dates[i])
-                            data_kincat.append(prop_list)
-                
-                    df = pd.DataFrame(data_kincat, columns=kincat_col_names)
-                    df.to_csv(final_path+folder_name+'_filtered_stats', index=False)
+                # data_kincat=[]
+                # for i in range(len(all_mask_prop)):
+                #     if all(elemento is not None for elemento in all_mask_prop[i]):
+                #         prop_list = all_mask_prop[i].tolist()
+                #         prop_list.insert(0,ok_dates[i])
+                #         data_kincat.append(prop_list)
+            
+                # df = pd.DataFrame(data_kincat, columns=kincat_col_names)
+                # df.to_csv(final_path+folder_name+'_filtered_stats', index=False)
 
             else:
                 print("WARNING: COULD NOT PROCESS EVENT "+ files[0][49:-13] )
