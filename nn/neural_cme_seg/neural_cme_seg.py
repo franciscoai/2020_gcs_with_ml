@@ -27,11 +27,17 @@ def quadratic(t,a,b,c):
 def quadratic_error(p, x, y, w):
     return w*(quadratic(x, *p) - y)
 
+def quadratic_velocity(t, a, b):
+    return 2 * a * t + b
+
 def linear(t,a,b):
     return a*t + b
 
 def linear_error(p, x, y, w):
     return w*(linear(x, *p) - y)
+
+
+
 
 class neural_cme_segmentation():
     '''
@@ -471,7 +477,7 @@ class neural_cme_segmentation():
 
         return ok_ind
     
-    def _select_mask(self, in_x, in_y, error_func, fit_func, in_cond, weights=[2]):
+    def _select_mask(self,axis,k, in_x, in_y, error_func, fit_func, in_cond, weights=[2]):
         '''
         Deletes the points that are more than criterion from the fit function given by fit_func
         in_x: timestamps of the points to be filtered
@@ -484,45 +490,75 @@ class neural_cme_segmentation():
         weights: data points weights for the fit. Must be a cevtor of len len(in_x) or int. 
                  If It's a scalar int gives more weight to the last weights dates bcause CME is supoused to be larger and better defined
         '''
+        colors=["orange","cyan","yellow"]
+        vel_threshold=100 #km/s
+        #deletes points with y is nan
+        ok_ind = np.where(~np.isnan(in_y))[0]
+        x = in_x[ok_ind]
+        y = in_y[ok_ind]
 
-        sorted_indices = np.argsort(in_x)
-        x = in_x[sorted_indices]
-        y = in_y[sorted_indices]
-        selected_x = []
-        selected_y = []
-        current_x = x[0]
-        current_x_values = []
-        current_y_values = []
+        # fit the function using least_squares
+        used_weights = np.ones(len(x))
+        if len(weights) > 1:
+            used_weights = weights
+        fit=least_squares(error_func, in_cond , method='lm', kwargs={'x': x-x[0], 'y': y, 'w': used_weights}) # first fit to get a good initial condition
+        fit=least_squares(error_func, fit.x, loss='soft_l1', kwargs={'x': x-x[0], 'y': y, 'w': used_weights}) # second fit to ingnore outliers    
 
-        for i in range(len(x)):
-            if x[i] == current_x:
-                current_x_values.append(x[i])
-                current_y_values.append(y[i])
-            else:
-                fit = least_squares(error_func, in_cond, kwargs={'x': current_x_values - current_x_values[0], 'y': current_y_values, 'w': weights})
-                dist = np.abs(fit_func(current_x_values - current_x_values[0], *fit.x) - current_y_values)
-                min_dist_idx= np.argmin(dist)
-                selected_x.append(current_x_values[min_dist_idx])
-                selected_y.append(current_y_values[min_dist_idx])
+        #calculate the % distance from the fit
+        dist = np.abs(fit_func(x-x[0], *fit.x)-y)/y
+        if fit_func == quadratic:
+            velocity = quadratic_velocity(x - x[0], *fit.x[:-1])
+            average_velocity = np.mean(velocity)
+            if average_velocity < vel_threshold:
+                dist=None
 
-                # Update the current x-coordinate and the lists of values
-                current_x = x[i]
-                current_x_values = [x[i]]
-                current_y_values = [y[i]]
+            
+        label = f"y={fit.x[0]:.2f}x+{fit.x[1]:.2f}\nR={np.corrcoef(x, y)[0,1]:.2f}"
+        axis.plot(x, fit_func(x-x[0], *fit.x), color=colors[k], linestyle='--', label=label, linewidth=1.5)
+       
+        return dist, axis
+    
+        # sorted_indices = np.argsort(in_x)
+        # x = in_x[sorted_indices]
+        # y = in_y[sorted_indices]
+        # selected_x = []
+        # selected_y = []
+        # current_x = x[0]
+        # current_x_values = []
+        # current_y_values = []
+
+        # for i in range(len(x)):
+        #     if x[i] == current_x:
+        #         current_x_values.append(x[i])
+        #         current_y_values.append(y[i])
+        #     else:
+        #         fit = least_squares(error_func, in_cond, kwargs={'x': current_x_values - current_x_values[0], 'y': current_y_values, 'w': weights})
+        #         dist = np.abs(fit_func(current_x_values - current_x_values[0], *fit.x) - current_y_values)
+        #         min_dist_idx= np.argmin(dist)
+        #         selected_x.append(current_x_values[min_dist_idx])
+        #         selected_y.append(current_y_values[min_dist_idx])
+
+        #         # Update the current x-coordinate and the lists of values
+        #         current_x = x[i]
+        #         current_x_values = [x[i]]
+        #         current_y_values = [y[i]]
         
-        # Add the last set of data.
-        fit = least_squares(error_func, in_cond, kwargs={'x': current_x_values - current_x_values[0], 'y': current_y_values, 'w': weights})
-        dist = np.abs(fit_func(current_x_values - current_x_values[0], *fit.x) - current_y_values)
-        min_dist_idx = np.argmin(dist)
-        selected_x.append(current_x_values[min_dist_idx])
-        selected_y.append(current_y_values[min_dist_idx])
+        # # Add the last set of data.
+        # fit = least_squares(error_func, in_cond, kwargs={'x': current_x_values - current_x_values[0], 'y': current_y_values, 'w': weights})
+        # dist = np.abs(fit_func(current_x_values - current_x_values[0], *fit.x) - current_y_values)
+        # min_dist_idx = np.argmin(dist)
+        # selected_x.append(current_x_values[min_dist_idx])
+        # selected_y.append(current_y_values[min_dist_idx])
         
 
 
-        return selected_x, selected_y
+        # return selected_x, selected_y
     
 
     def _filter_masks2(self, dates, masks, scores, labels, boxes, mask_prop):
+        dist_threshold=50
+        style='*'
+        colors=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w'] 
         #transforms inputs in a dataframe
         data=[]
         for i in range(len(dates)):
@@ -558,32 +594,54 @@ class neural_cme_segmentation():
         
         all_filtered_x = []
         all_filtered_y = []
-        # gets one mask per cluster
+        fig,axs= plt.subplots(1,3,figsize=(12,4))
         for k in range(optimal_n_clusters):
             filtered_df = df[df['CME_ID'] == k]
             x_points =np.array([i.timestamp() for i in filtered_df["DATE_TIME"]])
-            y_points =np.array(filtered_df["CPA"])
-            filtered_x,filtered_y = self._select_mask(x_points, y_points, linear_error, linear, [1.,1.])
-            #fills the dates that dosen't appear in filter_x with Nan in filterd_y
-            for j in range(len(x_points)-1):
-                if x_points[j] != filtered_x[j]:
-                    filtered_x.insert(j, x_points[j])
-                    filtered_y.insert(j, None)
-
-                if  (j==len(x_points)-2) & (len(x_points)-1 == len(filtered_x)):
-                    filtered_x.insert(j+1, x_points[j+1])
-                    filtered_y.insert(j+1, None)
-
-            filtered_x = [pd.Timestamp(i, unit='s') for i in filtered_x]
-            all_filtered_x.extend(filtered_x)
-            all_filtered_y.extend(filtered_y)
-
-        filtered_df = pd.DataFrame({'DATE_TIME': all_filtered_x, 'CPA': all_filtered_y})
-        full_df = filtered_df.merge(df, on=['DATE_TIME', 'CPA'], how='left')
-        return full_df
-        
+            y_cpa=np.array(filtered_df["CPA"])
+            y_wa=np.array(filtered_df["WA"])
+            y_apex=np.array(filtered_df["APEX"])
+            apex_dist,axis3=self._select_mask(axs[2],k,x_points, y_apex, quadratic_error, quadratic, [1.,1.,0])
+            if apex_dist is None:
+                idx = df[df.isin(filtered_df.to_dict(orient='list')).all(axis=1)].index
+                df = df.drop(idx)
+            else:
+                cpa_dist,axis1 = self._select_mask(axs[0],k,x_points, y_cpa, linear_error, linear, [1.,1.])
+                wa_dist,axis2= self._select_mask(axs[1],k,x_points, y_wa, linear_error, linear, [1.,1.])
+                for h in range(len(x_points)):
+                    error=np.sqrt(cpa_dist**2+wa_dist**2+apex_dist**2)
+           
+        breakpoint()
         
 
+        #all_filtered_x = []
+        #all_filtered_y = []
+        # gets one mask per cluster
+        # for k in range(optimal_n_clusters):
+        #     filtered_df = df[df['CME_ID'] == k]
+        #     x_points =np.array([i.timestamp() for i in filtered_df["DATE_TIME"]])
+        #     y_points =np.array(filtered_df["CPA"])
+        #     filtered_x,filtered_y = self._select_mask(x_points, y_points, linear_error, linear, [1.,1.])
+        #     #fills the dates that dosen't appear in filter_x with Nan in filterd_y
+        #     for j in range(len(x_points)-1):
+        #         if x_points[j] != filtered_x[j]:
+        #             filtered_x.insert(j, x_points[j])
+        #             filtered_y.insert(j, None)
+
+        #         if  (j==len(x_points)-2) & (len(x_points)-1 == len(filtered_x)):
+        #             filtered_x.insert(j+1, x_points[j+1])
+        #             filtered_y.insert(j+1, None)
+
+        #     filtered_x = [pd.Timestamp(i, unit='s') for i in filtered_x]
+        #     all_filtered_x.extend(filtered_x)
+        #     all_filtered_y.extend(filtered_y)
+
+        # filtered_df = pd.DataFrame({'DATE_TIME': all_filtered_x, 'CPA': all_filtered_y})
+        # full_df = filtered_df.merge(df, on=['DATE_TIME', 'CPA'], how='left')
+        #return full_df
+        
+        
+    
         
 
         
