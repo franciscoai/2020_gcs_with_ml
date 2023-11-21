@@ -9,70 +9,33 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.use('Agg')
 #mpl.use('TkAgg')
+from pathlib import Path
 from pyGCS_raytrace import pyGCS
 from astropy.io import fits
 from torch.utils.data import DataLoader
 from nn.neural_gcs.cme_mvp_dataset import Cme_MVP_Dataset
-from nn.neural_gcs.sirats_model import Sirats_net
+from nn.neural_gcs.sirats_model import Sirats_net, Sirats_inception
 from nn.utils.gcs_mask_generator import maskFromCloud
+from nn.neural_gcs.sirats_config import Configuration
 
 
-def calculate_weights(ranges):
-    weights = []
+def test_specific_image(model, opath, img_size, binary_mask, device):
+    sat1_path = Path("/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20110317_filter_True/FMwLASCO201103173_0.fits")
+    sat2_path = Path("/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20110317_filter_True/FMwLASCO201103173_1.fits")
 
-    for r in ranges:
-        min_val, max_val = r
-        range_size = max_val - min_val
+    resize = torchvision.transforms.Resize(img_size[1:3], torchvision.transforms.InterpolationMode.BILINEAR)
 
-        # Avoid division by zero
-        if range_size == 0:
-            weight = 10.0  # Assign a weight of 10 if the range size is zero
-        else:
-            weight = 10.0 / range_size
-
-        weights.append(weight)
-
-    return weights
-
-# Dataset Parameters
-TRAINDIR = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_onlyMask_size_100000_seed_59199'
-OPATH = "/gehme-gpu/projects/2020_gcs_with_ml/output/gcs_ml_3VP_onlyMask_size_100000_seed_59199_run1"
-BINARY_MASK = True
-BATCH_SIZE = 32
-BATCH_LIMIT = None
-SEED = 42
-IMG_SiZE = [3, 512, 512] # If [None, x, y], then the image size is not changed, otherwise it is resized to the specified size
-
-# Train Parameters
-DEVICE = 1
-INFERENCE_MODE = False
-SAVE_MODEL = True
-LOAD_MODEL = True
-EPOCHS = 20
-TRAIN_IDX_SIZE = 49848
-GPU = 0
-LR = [1e-2, 1e-3]
-PAR_RNG = [[-180,180],[-70,70],[-90,90],[3,10],[0.2,0.6],[10,60],[1e-1,1e1]]
-PAR_LOSS_WEIGHTS = torch.tensor(calculate_weights(PAR_RNG[:6])) #torch.tensor([0.1,0.1,0.1,1,10,0.5])
-os.makedirs(OPATH, exist_ok=True)
-
-
-def test_specific_image():
-    sat1_path = "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20110317_filter_True/FMwLASCO201103173_0.fits"
-    sat2_path = "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20110317_filter_True/FMwLASCO201103173_1.fits"
-    resize = torchvision.transforms.Resize(IMG_SiZE[1:3], torchvision.transforms.InterpolationMode.BILINEAR)
-    #read fits
-    sat1 = fits.open(sat1_path)[0].data
-    sat2 = fits.open(sat2_path)[0].data
-    sat1_h = fits.open(sat1_path)[0].header
-    sat2_h = fits.open(sat2_path)[0].header
+    sat1_data, sat1_h = fits.getdata(sat1_path, header=True)
+    sat2_data, sat2_h = fits.getdata(sat2_path, header=True)
     headers = [sat1_h, sat2_h]
+
     satpos, plotranges = pyGCS.processHeaders(headers)
     satpos = np.array(satpos)
     plotranges = np.array(plotranges)
-    img = torch.tensor([sat1, sat2, sat1]) # it repeats because Lasco is not implemented yet
-    img = img.float()
-    if not BINARY_MASK:
+
+    img = torch.tensor([sat1_data, sat2_data, sat1_data], dtype=torch.float32)
+
+    if not binary_mask:
         sd_range = 1
         m = torch.mean(img)
         sd = torch.std(img)
@@ -80,15 +43,18 @@ def test_specific_image():
     else:
         img[img > 1] = 1
         img[img < 0] = 0
+
     img = resize(img)
-    img = img.to(DEVICE)
-    predictions = model.infer(img)
-    predictions = predictions.cpu().detach().numpy()
-    img = img.cpu().detach().numpy()
+    img = img.to(device)
+
+    with torch.no_grad():
+        predictions = model.infer(img).cpu().numpy()
+
+    img = img.cpu().numpy()
     predictions = np.squeeze(predictions)
-    mask_infered_sat1 = maskFromCloud(predictions, sat=0, satpos=[satpos[0,:]], imsize=IMG_SiZE[1:3], plotranges=[plotranges[0,:]])
-    mask_infered_sat2 = maskFromCloud(predictions, sat=0, satpos=[satpos[1,:]], imsize=IMG_SiZE[1:3], plotranges=[plotranges[1,:]])
-    
+
+    mask_infered_sat1 = maskFromCloud(predictions, sat=0, satpos=[satpos[0, :]], imsize=img_size[1:3], plotranges=[plotranges[0, :]])
+    mask_infered_sat2 = maskFromCloud(predictions, sat=0, satpos=[satpos[1, :]], imsize=img_size[1:3], plotranges=[plotranges[1, :]])
     fig, ax = plt.subplots(1, 2, figsize=(9, 5))
 
     # Define colors and colormap
@@ -119,7 +85,7 @@ def test_specific_image():
     ax[1].imshow(img[1, :, :], vmin=0, vmax=1, alpha=0.4, cmap=cmap)
 
     # Save the figure
-    masks_dir = os.path.join(OPATH, 'masks')
+    masks_dir = os.path.join(opath, 'masks')
     os.makedirs(masks_dir, exist_ok=True)
     plt.savefig(os.path.join(masks_dir, 'test_image.png'))
     plt.close()
@@ -127,6 +93,7 @@ def test_specific_image():
 def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, plotranges, opath, namefile):
     # Convert tensors to numpy arrays
     img = img.cpu().detach().numpy()
+    sat_masks = sat_masks.cpu().detach().numpy()
     target = target.cpu().detach().numpy()
     prediction = np.squeeze(prediction.cpu().detach().numpy())
     satpos = satpos.cpu().detach().numpy()
@@ -156,16 +123,19 @@ def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, pl
         nan_occulter[occulter_masks[i, :, :] > 0] = 1
         nan_mask[:, :][masks_infered[i, :, :] > 0] = 2
 
+        porcentual_mask_error = np.sum(np.abs(masks_infered[i, :, :] - sat_masks[i, :, :])) / np.sum(sat_masks[i, :, :])
+        
+
         ax[i].imshow(img[i, :, :], vmin=0, vmax=len(color) - 1, cmap=cmap)
         ax[i].imshow(nan_mask, cmap=cmap, alpha=0.6, vmin=0, vmax=len(color) - 1)
         ax[i].imshow(nan_occulter, cmap=cmap, alpha=0.25, vmin=0, vmax=len(color) - 1)
 
-    masks_dir = os.path.join(opath, 'masks')
+    masks_dir = os.path.join(opath, 'infered_masks')
     os.makedirs(masks_dir, exist_ok=True)
     plt.savefig(os.path.join(masks_dir, namefile))
     plt.close()
 
-def run_training():
+def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, epochs, opath, par_loss_weights, save_model):
     train_losses_per_batch = []
     mean_train_losses_per_batch = []
     test_losses_per_batch = []
@@ -173,7 +143,7 @@ def run_training():
     epoch_list = []
     total_batches_per_epoch = 0
 
-    for epoch in range(EPOCHS):
+    for epoch in range(epochs):
         model.train()
         train_onlyepoch_losses = []
         test_onlyepoch_losses = []
@@ -181,17 +151,17 @@ def run_training():
         total_batches_per_epoch = 0
         for i, (img, targets, sat_masks, occulter_masks, satpos, plotranges, idx) in enumerate(cme_train_dataloader, 0):
             total_batches_per_epoch += 1
-            loss_value = model.optimize_model(img, targets, optimizer, PAR_LOSS_WEIGHTS)
+            loss_value = model.optimize_model(img, targets, par_loss_weights)
             train_losses_per_batch.append(loss_value.detach().cpu())
             train_onlyepoch_losses.append(loss_value.detach().cpu())
 
-            if i % 10 == 0:            
-                print(f'Epoch: {epoch + 1}, Image: {(i + 1) * BATCH_SIZE}, Batch: {i + 1}, Loss: {loss_value:.5f}, learning rate: {optimizer.param_groups[-1]["lr"]:.7f}')
+            if i % 10 == 0:
+                print(f'Epoch: {epoch + 1}, Image: {(i + 1) * batch_size}, Batch: {i + 1}, Loss: {loss_value:.5f}, learning rate: {model.optimizer.param_groups[-1]["lr"]:.7f}')
 
             if i % 50 == 0:
-                model.plot_loss(train_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "train_loss.png"), plot_epoch=False)
+                model.plot_loss(train_losses_per_batch, epoch_list, batch_size, os.path.join(opath, "train_loss.png"), plot_epoch=False)
 
-            if i == BATCH_LIMIT:
+            if i == batch_size:
                 break
         mean_train_losses_per_batch.append(np.mean(train_onlyepoch_losses))
 
@@ -199,25 +169,50 @@ def run_training():
         model.eval()
         with torch.no_grad():
             for i, (img, targets, sat_masks, occulter_masks, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
-                loss_test = model.test_model(img, targets, PAR_LOSS_WEIGHTS)
+                loss_test = model.test_model(img, targets, par_loss_weights)
                 test_losses_per_batch.append(loss_test.detach().cpu())
                 test_onlyepoch_losses.append(loss_test.detach().cpu())
             mean_test_error_in_batch.append(np.mean(test_onlyepoch_losses))
 
         print(f'Epoch: {epoch + 1}, Test Loss: {loss_test:.5f}\n')
-        model.plot_loss(test_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "test_loss.png"), plot_epoch=False)
-        
+        model.plot_loss(test_losses_per_batch, epoch_list, batch_size, os.path.join(opath, "test_loss.png"), plot_epoch=False)
+
         # Plot mean loss per epoch
-        model.plot_loss(mean_train_losses_per_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "mean_train_loss.png"), plot_epoch=False, meanLoss=True)
-        model.plot_loss(mean_test_error_in_batch, epoch_list, BATCH_SIZE, os.path.join(OPATH, "mean_test_loss.png"), plot_epoch=False, meanLoss=True)
+        model.plot_loss(mean_train_losses_per_batch, epoch_list, batch_size, os.path.join(opath, "mean_train_loss.png"), plot_epoch=False, meanLoss=True)
+        model.plot_loss(mean_test_error_in_batch, epoch_list, batch_size, os.path.join(opath, "mean_test_loss.png"), plot_epoch=False, meanLoss=True)
 
         # Save model
-        if SAVE_MODEL:
-            status = model.save_model(OPATH)
+        if save_model:
+            status = model.save_model(opath)
             print(f"Model saved at: {status}\n")
 
-if __name__ == '__main__':
-    dataset = Cme_MVP_Dataset(root_dir=TRAINDIR, img_size=IMG_SiZE, binary_mask=True)
+
+def main():
+    # Configuración de parámetros
+    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/data/sirats_config/config.ini"))
+
+    TRAINDIR = configuration.train_dir
+    OPATH = configuration.opath
+    BINARY_MASK = configuration.binary_mask
+    BATCH_SIZE = configuration.batch_size
+    BATCH_LIMIT = configuration.batch_limit
+    SEED = configuration.rnd_seed
+    IMG_SIZE = configuration.img_size
+    DEVICE = configuration.device
+    INFERENCE_MODE = configuration.inference_mode
+    SAVE_MODEL = configuration.save_model
+    LOAD_MODEL = configuration.load_model
+    EPOCHS = configuration.epochs
+    TRAIN_IDX_SIZE = configuration.train_index_size
+    LR = configuration.lr
+    PAR_RNG = configuration.par_rng
+    PAR_LOSS_WEIGHTS = configuration.par_loss_weight
+    os.makedirs(OPATH, exist_ok=True)
+
+    # Cargar y procesar datos
+    dataset = Cme_MVP_Dataset(root_dir=TRAINDIR,
+                              img_size=IMG_SIZE,
+                              binary_mask=True)
     random.seed(SEED)
     total_samples = len(dataset)
     train_size = TRAIN_IDX_SIZE
@@ -225,10 +220,30 @@ if __name__ == '__main__':
     test_indices = list(set(range(total_samples)) - set(train_indices))
     train_dataset = torch.utils.data.Subset(dataset, train_indices)
     test_dataset = torch.utils.data.Subset(dataset, test_indices)
-    cme_train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    cme_test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    cme_train_dataloader = DataLoader(train_dataset,
+                                      batch_size=BATCH_SIZE,
+                                      shuffle=True)
+    cme_test_dataloader = DataLoader(test_dataset,
+                                     batch_size=BATCH_SIZE,
+                                     shuffle=True)
 
-    model = Sirats_net(device=DEVICE, output_size=6, img_shape=IMG_SiZE)
+    # Configurar el modelo
+    model = Sirats_inception(device=DEVICE,
+                             output_size=6,
+                             img_shape=IMG_SIZE,
+                             loss_weights=PAR_LOSS_WEIGHTS)
+
+    # Configurar optimizer, loss function y scheduler
+    optimizer = torch.optim.Adadelta(model.parameters())
+    scheduler = None
+    loss_fn = None
+
+    # Setear optimizer, loss function y scheduler al modelo
+    model.set_optimizer(optimizer)
+    model.set_loss_fn(loss_fn)
+    model.set_scheduler(scheduler)
+
+    # Cargar o inicializar el modelo
     if LOAD_MODEL:
         status = model.load_model(OPATH)
         if status:
@@ -239,20 +254,33 @@ if __name__ == '__main__':
     num_parameters = sum(p.numel() for p in model.parameters())
     print(f'Number of parameters: {num_parameters}\n')
 
-    #optimizer = torch.optim.Adam(model.parameters(), lr=LR[0])
-    #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, (len(cme_train_dataloader) / BATCH_SIZE) * EPOCHS, eta_min=LR[1])
-    optimizer = torch.optim.Adadelta(model.parameters())
-    scheduler = None
-    loss_fn = torch.nn.MSELoss()
-
+    # Ejecutar entrenamiento o inferencia
     if not INFERENCE_MODE:
-        run_training()
+        run_training(model, cme_train_dataloader, cme_test_dataloader,
+                     optimizer, BATCH_SIZE, EPOCHS, OPATH, PAR_LOSS_WEIGHTS,
+                     SAVE_MODEL)
     else:
-        data_iter = iter(cme_test_dataloader)
-        for i in range(100):
-            img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = next(data_iter)
-            img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = img[0], targets[0], sat_masks[0], occulter_masks[0], satpos[0], plotranges[0], idx[0]
+        for iteration, (img, targets, sat_masks, occulter_masks, satpos,
+                        plotranges, idx) in enumerate(cme_test_dataloader, 0):
+            print(f"Infering image {iteration}")
+            img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = img[
+                0], targets[0], sat_masks[0], occulter_masks[0], satpos[
+                    0], plotranges[0], idx[0]
             img = img.to(DEVICE)
             predictions = model.infer(img)
-            plot_mask_MVP(img, sat_masks, targets, predictions, occulter_masks, satpos, plotranges, opath=OPATH, namefile=f'targetVinfered_{idx}.png')
-        #test_specific_image()
+            plot_mask_MVP(img,
+                          sat_masks,
+                          targets,
+                          predictions,
+                          occulter_masks,
+                          satpos,
+                          plotranges,
+                          opath=OPATH,
+                          namefile=f'targetVinfered_{idx}.png')
+
+            if iteration == 5:
+                break
+                # test_specific_image(model)
+
+if __name__ == '__main__':
+    main()
