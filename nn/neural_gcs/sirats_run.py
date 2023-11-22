@@ -210,8 +210,6 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
             if i % 50 == 0:
                 model.plot_loss(train_losses_per_batch, epoch_list, batch_size, os.path.join(opath, "train_loss.png"), plot_epoch=False)
 
-            if i == batch_size:
-                break
         mean_train_losses_per_batch.append(np.mean(train_onlyepoch_losses))
 
         # Test
@@ -257,6 +255,7 @@ def main():
     PAR_RNG = configuration.par_rng
     PAR_LOSS_WEIGHTS = configuration.par_loss_weight
     os.makedirs(OPATH, exist_ok=True)
+
 
     # Cargar y procesar datos
     dataset = Cme_MVP_Dataset(root_dir=TRAINDIR,
