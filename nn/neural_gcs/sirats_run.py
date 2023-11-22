@@ -90,6 +90,18 @@ def test_specific_image(model, opath, img_size, binary_mask, device):
     plt.savefig(os.path.join(masks_dir, 'test_image.png'))
     plt.close()
 
+def calculate_non_overlapping_area(mask1, mask2):
+    # Combine masks to identify overlapping areas
+    overlapping_area = np.logical_and(mask1, mask2)
+
+    # Calculate the non-overlapping area
+    non_overlapping_area = np.logical_xor(mask1, overlapping_area)
+
+    # Calculate the percentage of non-overlapping pixels
+    percentage_non_overlapping = np.sum(non_overlapping_area) / np.sum(mask1) * 100.0
+
+    return percentage_non_overlapping
+
 def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, plotranges, opath, namefile):
     # Convert tensors to numpy arrays
     img = img.cpu().detach().numpy()
@@ -109,6 +121,8 @@ def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, pl
     color = ['purple', 'k', 'r', 'b']
     cmap = mpl.colors.ListedColormap(color)
 
+    non_overlapping_areas = []
+
     for i in range(IMG_SIZE[0]):
         mask_infered_sat = maskFromCloud(prediction, sat=0, satpos=[satpos[i, :]], imsize=IMG_SIZE[1:3], plotranges=[plotranges[i, :]])
         masks_infered = np.zeros(IMG_SIZE)
@@ -123,17 +137,22 @@ def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, pl
         nan_occulter[occulter_masks[i, :, :] > 0] = 1
         nan_mask[:, :][masks_infered[i, :, :] > 0] = 2
 
-        porcentual_mask_error = np.sum(np.abs(masks_infered[i, :, :] - sat_masks[i, :, :])) / np.sum(sat_masks[i, :, :])
-        
-
         ax[i].imshow(img[i, :, :], vmin=0, vmax=len(color) - 1, cmap=cmap)
         ax[i].imshow(nan_mask, cmap=cmap, alpha=0.6, vmin=0, vmax=len(color) - 1)
         ax[i].imshow(nan_occulter, cmap=cmap, alpha=0.25, vmin=0, vmax=len(color) - 1)
+
+        # Calculate non-overlapping area and store the result
+        non_overlapping_area = calculate_non_overlapping_area(sat_masks[i], masks_infered[i])
+        non_overlapping_areas.append(non_overlapping_area)
+
+        # Add non-overlapping area as a label at the bottom of the image
+        ax[i].text(0.5, -0.1, f'Non-Overlap: {non_overlapping_area:.2f}%', ha='center', va='center', transform=ax[i].transAxes)
 
     masks_dir = os.path.join(opath, 'infered_masks')
     os.makedirs(masks_dir, exist_ok=True)
     plt.savefig(os.path.join(masks_dir, namefile))
     plt.close()
+
 
 def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, epochs, opath, par_loss_weights, save_model):
     train_losses_per_batch = []
@@ -189,7 +208,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
 
 def main():
     # Configuración de parámetros
-    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/data/sirats_config/config.ini"))
+    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/config.ini"))
 
     TRAINDIR = configuration.train_dir
     OPATH = configuration.opath
