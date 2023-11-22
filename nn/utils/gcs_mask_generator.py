@@ -7,7 +7,7 @@ from nn.utils.coord_transformation import deg2px
 from pyGCS_raytrace import pyGCS
 
 
-def maskFromCloud(params, sat, satpos, imsize, plotranges):
+def maskFromCloud(params, satpos, imsize, plotranges, sat=0):
     clouds = pyGCS.getGCS(params[0], params[1], params[2], params[3], params[4], params[5], satpos)               
     x = clouds[sat, :, 1]
     y = clouds[0, :, 2]

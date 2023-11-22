@@ -8,7 +8,7 @@ import torchvision
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.use('Agg')
-#mpl.use('TkAgg')
+# mpl.use('TkAgg')
 from pathlib import Path
 from pyGCS_raytrace import pyGCS
 from astropy.io import fits
@@ -17,6 +17,8 @@ from nn.neural_gcs.cme_mvp_dataset import Cme_MVP_Dataset
 from nn.neural_gcs.sirats_model import Sirats_net, Sirats_inception
 from nn.utils.gcs_mask_generator import maskFromCloud
 from nn.neural_gcs.sirats_config import Configuration
+from pyGCS_raytrace import pyGCS
+from nn.utils.coord_transformation import pnt2arr
 
 
 def test_specific_image(model, opath, img_size, binary_mask, device):
@@ -92,15 +94,25 @@ def test_specific_image(model, opath, img_size, binary_mask, device):
 
 def calculate_non_overlapping_area(mask1, mask2):
     # Combine masks to identify overlapping areas
-    overlapping_area = np.logical_and(mask1, mask2)
+    non_overlapping_area_err = np.sum(np.abs(mask1 - mask2)) / np.sum(mask1)
+    return non_overlapping_area_err
 
-    # Calculate the non-overlapping area
-    non_overlapping_area = np.logical_xor(mask1, overlapping_area)
+def plot_histogram(errors, opath, namefile):
+    fig, ax = plt.subplots(1, 4, figsize=(9, 5))
+    flatten_errors = [item for sublist in errors for item in sublist]
+    ax[0].hist(flatten_errors, bins=100)
+    ax[0].set_title('AllVPs')
+    ax[1].hist(errors[0], bins=100)
+    ax[1].set_title('VP1')
+    ax[2].hist(errors[1], bins=100)
+    ax[2].set_title('VP2')
+    ax[3].hist(errors[2], bins=100)
+    ax[3].set_title('VP3')
 
-    # Calculate the percentage of non-overlapping pixels
-    percentage_non_overlapping = np.sum(non_overlapping_area) / np.sum(mask1) * 100.0
+    masks_dir = os.path.join(opath, 'infered_masks')
 
-    return percentage_non_overlapping
+    fig.savefig(os.path.join(masks_dir, namefile), dpi=300)
+    plt.close(fig)
 
 def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, plotranges, opath, namefile):
     # Convert tensors to numpy arrays
@@ -114,45 +126,63 @@ def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, pl
 
     IMG_SIZE = (img.shape[0], img.shape[1], img.shape[2])  # Assuming you have IMG_SIZE defined
 
-    fig, ax = plt.subplots(1, IMG_SIZE[0], figsize=(9, 5))
+    fig, ax = plt.subplots(2, IMG_SIZE[0], figsize=(13, 10))
     fig.tight_layout()
     fig.suptitle(f'target: {np.around(target, 3)}\nPrediction: {np.around(prediction, 3)}')
 
     color = ['purple', 'k', 'r', 'b']
     cmap = mpl.colors.ListedColormap(color)
 
-    non_overlapping_areas = []
+    error = []
 
     for i in range(IMG_SIZE[0]):
-        mask_infered_sat = maskFromCloud(prediction, sat=0, satpos=[satpos[i, :]], imsize=IMG_SIZE[1:3], plotranges=[plotranges[i, :]])
+        mask_infered_sat = maskFromCloud(prediction, satpos=[satpos[i, :]], imsize=IMG_SIZE[1:3], plotranges=[plotranges[i, :]])
         masks_infered = np.zeros(IMG_SIZE)
         masks_infered[i, :, :] = mask_infered_sat
+        sat_mask_for_err = maskFromCloud(target, satpos=[satpos[i, :]], imsize=IMG_SIZE[1:3], plotranges=[plotranges[i, :]])
+        sat_masks_for_err = np.zeros(IMG_SIZE)
+        sat_masks_for_err[i, :, :] = sat_mask_for_err
+
+        param_clouds = []
+        param_clouds += prediction.tolist()
+        param_clouds.append([satpos[i, :]])
+        clouds = pyGCS.getGCS(*param_clouds, nleg=50, ncirc=100, ncross=100)
+        x, y = clouds[0, :, 1], clouds[0, :, 2]
+        arr_cloud = pnt2arr(x, y, [plotranges[i, :]], IMG_SIZE[1:3], 0)
 
         nan_mask = np.full(IMG_SIZE[1:3], np.nan)
         nan_occulter = np.full(IMG_SIZE[1:3], np.nan)
 
         img[i, :, :][img[i, :, :] <= 0] = np.nan
         img[i, :, :][img[i, :, :] > 0] = 0
+        sat_mask_for_err[sat_mask_for_err <= 0] = np.nan
+        sat_mask_for_err[sat_mask_for_err > 0] = 0
+
+        arr_cloud[arr_cloud <= 0] = 0
+        arr_cloud[arr_cloud > 0] = 1
+        arr_cloud = np.flip(arr_cloud, axis=0)
 
         nan_occulter[occulter_masks[i, :, :] > 0] = 1
         nan_mask[:, :][masks_infered[i, :, :] > 0] = 2
 
-        ax[i].imshow(img[i, :, :], vmin=0, vmax=len(color) - 1, cmap=cmap)
-        ax[i].imshow(nan_mask, cmap=cmap, alpha=0.6, vmin=0, vmax=len(color) - 1)
-        ax[i].imshow(nan_occulter, cmap=cmap, alpha=0.25, vmin=0, vmax=len(color) - 1)
+        non_overlapping_area = calculate_non_overlapping_area(sat_masks_for_err[i], masks_infered[i])
+        
+        error.append(non_overlapping_area)
 
-        # Calculate non-overlapping area and store the result
-        non_overlapping_area = calculate_non_overlapping_area(sat_masks[i], masks_infered[i])
-        non_overlapping_areas.append(non_overlapping_area)
+        ax[0][i].imshow(sat_mask_for_err, vmin=0, vmax=len(color) - 1, cmap=cmap)
+        ax[0][i].imshow(nan_mask, cmap=cmap, alpha=0.6, vmin=0, vmax=len(color) - 1)
+        #ax[0][i].imshow(nan_occulter, cmap=cmap, alpha=0.25, vmin=0, vmax=len(color) - 1)
+        ax[0][i].set_title(f'non-overlapping area: {np.around(non_overlapping_area, 3)}')
 
-        # Add non-overlapping area as a label at the bottom of the image
-        ax[i].text(0.5, -0.1, f'Non-Overlap: {non_overlapping_area:.2f}%', ha='center', va='center', transform=ax[i].transAxes)
+        ax[1][i].imshow(img[i, :, :], cmap="gray")
+        ax[1][i].imshow(arr_cloud, cmap='Greens', alpha=0.6, vmin=0, vmax=1)
 
     masks_dir = os.path.join(opath, 'infered_masks')
     os.makedirs(masks_dir, exist_ok=True)
-    plt.savefig(os.path.join(masks_dir, namefile))
+    plt.savefig(os.path.join(masks_dir, namefile), dpi=300)
     plt.close()
 
+    return error
 
 def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, epochs, opath, par_loss_weights, save_model):
     train_losses_per_batch = []
@@ -208,7 +238,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
 
 def main():
     # Configuración de parámetros
-    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/config.ini"))
+    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run1.ini"))
 
     TRAINDIR = configuration.train_dir
     OPATH = configuration.opath
@@ -275,19 +305,19 @@ def main():
 
     # Ejecutar entrenamiento o inferencia
     if not INFERENCE_MODE:
-        run_training(model, cme_train_dataloader, cme_test_dataloader,
-                     optimizer, BATCH_SIZE, EPOCHS, OPATH, PAR_LOSS_WEIGHTS,
+        run_training(model, cme_train_dataloader, cme_test_dataloader, BATCH_SIZE, EPOCHS, OPATH, PAR_LOSS_WEIGHTS,
                      SAVE_MODEL)
     else:
-        for iteration, (img, targets, sat_masks, occulter_masks, satpos,
-                        plotranges, idx) in enumerate(cme_test_dataloader, 0):
+        errorVP1 = []
+        errorVP2 = []
+        errorVP3 = []
+    
+        for iteration, (img, targets, sat_masks, occulter_masks, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
             print(f"Infering image {iteration}")
-            img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = img[
-                0], targets[0], sat_masks[0], occulter_masks[0], satpos[
-                    0], plotranges[0], idx[0]
+            img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = img[0], targets[0], sat_masks[0], occulter_masks[0], satpos[0], plotranges[0], idx[0]
             img = img.to(DEVICE)
             predictions = model.infer(img)
-            plot_mask_MVP(img,
+            error = plot_mask_MVP(img,
                           sat_masks,
                           targets,
                           predictions,
@@ -296,8 +326,15 @@ def main():
                           plotranges,
                           opath=OPATH,
                           namefile=f'targetVinfered_{idx}.png')
+            
+            errorVP1.append(error[0])
+            errorVP2.append(error[1])
+            errorVP3.append(error[2])
 
-            if iteration == 5:
+            if iteration == 25:
+                errors = [errorVP1, errorVP2, errorVP3]
+                print("Plotting histogram")
+                plot_histogram(errors, OPATH, 'histogram.png')
                 break
                 # test_specific_image(model)
 

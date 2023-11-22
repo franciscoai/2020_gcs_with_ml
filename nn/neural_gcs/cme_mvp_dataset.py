@@ -120,6 +120,6 @@ class Cme_MVP_Dataset(Dataset):
     def __define_transforms(self):
         transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(
-                self.img_size[1:3], "bilinear"),
+                self.img_size[1:3], torchvision.transforms.InterpolationMode.BILINEAR),
         ])
         return transform

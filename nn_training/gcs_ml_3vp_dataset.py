@@ -8,18 +8,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from pyGCS_raytrace import pyGCS
 from pyGCS_raytrace.rtraytracewcs import rtraytracewcs
 from nn_training.get_cme_mask import get_cme_mask,get_mask_cloud
-#from nn_training.corona_background.get_corona import get_corona
 from nn_training.corona_background.get_corona_gcs_ml import get_corona
 import numpy as np
 import datetime
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import sunpy
-#from sunpy.coordinates.ephemeris import get_horizons_coord
 import sunpy.map
 import pandas as pd
-#from sunpy.sun.constants import radius as _RSUN
-#from ext_libs.rebin import rebin
 from nn_training.low_freq_map import low_freq_map
 import scipy
 from nn.utils.coord_transformation import deg2px, center_rSun_pixel, pnt2arr
@@ -375,7 +371,7 @@ while iter_counter != par_num:
             if synth_int_image:
                 case_stuff.append(btot)
         elif mesh and otype=='png':
-            clouds = pygcsWrapper(params, satpos)                
+            clouds = pygcsWrapper(params, satpos)             
             x = clouds[sat, :, 1]
             y = clouds[0, :, 2]    
             arr_cloud=pnt2arr(x,y,plotranges,imsize, sat)

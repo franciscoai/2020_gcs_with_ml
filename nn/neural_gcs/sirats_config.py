@@ -21,7 +21,7 @@ class Configuration:
         self.batch_limit = None if self.batch_limit == 'None' else int(self.batch_limit)
         self.rnd_seed = self.config.getint("General Configuration", 'rnd_seed')
         self.img_size = self.config["General Configuration"]['img_size'].split(',')
-        self.img_size = [float(i) for i in self.img_size]
+        self.img_size = [int(i) for i in self.img_size]
         self.device = self.config.getint("General Configuration", 'device')
         self.inference_mode = self.config.getboolean("General Configuration", 'inference_mode')
         self.save_model = self.config.getboolean("General Configuration", 'save_model')
