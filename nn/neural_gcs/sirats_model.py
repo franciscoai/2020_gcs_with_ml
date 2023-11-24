@@ -203,7 +203,7 @@ class Sirats_inception(nn.Module):
     def infer(self, img):
         self.eval()
         with torch.inference_mode():
-            predictions = self.forward(img[None, :, :, :])
+            predictions = self.forward(img)
         return predictions
     
     def custom_loss(self, predictions, targets, device='cuda:0'):

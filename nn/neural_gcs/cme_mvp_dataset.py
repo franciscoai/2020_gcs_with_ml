@@ -26,14 +26,11 @@ class Cme_MVP_Dataset(Dataset):
     def __get_dirs(self, root_dir):
         imgs = []
         dirs = os.listdir(root_dir)
-        dirs = [int(d) for d in dirs if not d.endswith('.csv')]
+        dirs = [int(d) for d in dirs if not d.endswith('.csv') and not d.endswith('.back')]
         dirs.sort()
         for d in dirs:
             imgs.append(os.path.join(root_dir, str(d)))
         return imgs
-
-    def __len__(self):
-        return len(self.imgs)
 
     def __getitem__(self, idx):
         flag = True
@@ -123,3 +120,6 @@ class Cme_MVP_Dataset(Dataset):
                 self.img_size[1:3], torchvision.transforms.InterpolationMode.BILINEAR),
         ])
         return transform
+    
+    def __len__(self):
+        return len(self.imgs)

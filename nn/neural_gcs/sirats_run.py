@@ -4,6 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath
 import torch
 import numpy as np
 import random
+import pickle
 import torchvision
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -98,16 +99,16 @@ def calculate_non_overlapping_area(mask1, mask2):
     return non_overlapping_area_err
 
 def plot_histogram(errors, opath, namefile):
-    fig, ax = plt.subplots(1, 4, figsize=(9, 5))
+    fig, ax = plt.subplots(1, 4, figsize=(14, 7))
     flatten_errors = [item for sublist in errors for item in sublist]
-    ax[0].hist(flatten_errors, bins=100)
-    ax[0].set_title('AllVPs')
-    ax[1].hist(errors[0], bins=100)
-    ax[1].set_title('VP1')
-    ax[2].hist(errors[1], bins=100)
-    ax[2].set_title('VP2')
-    ax[3].hist(errors[2], bins=100)
-    ax[3].set_title('VP3')
+    ax[0].hist(flatten_errors, bins=30)
+    ax[0].set_title(f'AllVPs, mean: {np.around(np.mean(flatten_errors), 2)}, std: {np.around(np.std(flatten_errors), 2)}')
+    ax[1].hist(errors[0], bins=30)
+    ax[1].set_title(f'VP1, mean: {np.around(np.mean(errors[0]), 2)}, std: {np.around(np.std(errors[0]), 2)}')
+    ax[2].hist(errors[1], bins=30)
+    ax[2].set_title(f'VP2, mean: {np.around(np.mean(errors[1]), 2)}, std: {np.around(np.std(errors[1]), 2)}')
+    ax[3].hist(errors[2], bins=30)
+    ax[3].set_title(f'VP3, mean: {np.around(np.mean(errors[2]), 2)}, std: {np.around(np.std(errors[2]), 2)}')
 
     masks_dir = os.path.join(opath, 'infered_masks')
 
@@ -246,7 +247,9 @@ def main():
     SEED = configuration.rnd_seed
     IMG_SIZE = configuration.img_size
     DEVICE = configuration.device
-    INFERENCE_MODE = configuration.inference_mode
+    DO_TRAINING = configuration.do_training
+    DO_INFERENCE = configuration.do_inference
+    IMAGES_TO_INFER = configuration.images_to_infer
     SAVE_MODEL = configuration.save_model
     LOAD_MODEL = configuration.load_model
     EPOCHS = configuration.epochs
@@ -303,39 +306,42 @@ def main():
     print(f'Number of parameters: {num_parameters}\n')
 
     # Ejecutar entrenamiento o inferencia
-    if not INFERENCE_MODE:
+    if DO_TRAINING:
         run_training(model, cme_train_dataloader, cme_test_dataloader, BATCH_SIZE, EPOCHS, OPATH, PAR_LOSS_WEIGHTS,
                      SAVE_MODEL)
-    else:
+
+    if DO_INFERENCE:
         errorVP1 = []
         errorVP2 = []
         errorVP3 = []
     
+        img_counter = 0
+        stop_flag = False
         for iteration, (img, targets, sat_masks, occulter_masks, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
-            print(f"Infering image {iteration}")
-            img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = img[0], targets[0], sat_masks[0], occulter_masks[0], satpos[0], plotranges[0], idx[0]
+            # img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = img[0], targets[0], sat_masks[0], occulter_masks[0], satpos[0], plotranges[0], idx[0]
             img = img.to(DEVICE)
             predictions = model.infer(img)
-            error = plot_mask_MVP(img,
-                          sat_masks,
-                          targets,
-                          predictions,
-                          occulter_masks,
-                          satpos,
-                          plotranges,
-                          opath=OPATH,
-                          namefile=f'targetVinfered_{idx}.png')
-            
-            errorVP1.append(error[0])
-            errorVP2.append(error[1])
-            errorVP3.append(error[2])
-
-            if iteration == 25:
-                errors = [errorVP1, errorVP2, errorVP3]
-                print("Plotting histogram")
-                plot_histogram(errors, OPATH, 'histogram.png')
+            # I want to do for image in batch
+            for i in range(BATCH_SIZE):
+                img_counter += 1
+                print(f"Plotting image {img_counter} of {IMAGES_TO_INFER}")
+                error = plot_mask_MVP(img[i], sat_masks[i], targets[i], predictions[i], occulter_masks[i], satpos[i], plotranges[i], OPATH, f'img_{img_counter}.png')
+                errorVP1.append(error[0])
+                errorVP2.append(error[1])
+                errorVP3.append(error[2])
+                if img_counter == IMAGES_TO_INFER:
+                    stop_flag = True
+                    break
+            if stop_flag:
                 break
-                # test_specific_image(model)
+        errors = [errorVP1, errorVP2, errorVP3]
+        print("Plotting histogram")
+        plot_histogram(errors, OPATH, 'histogram.png')
+
+        # Save errors in a pickle file
+        with open(os.path.join(OPATH, 'errors.pkl'), 'wb') as f:
+            pickle.dump(errors, f)
+            f.close()
 
 if __name__ == '__main__':
     main()

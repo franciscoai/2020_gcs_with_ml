@@ -23,7 +23,9 @@ class Configuration:
         self.img_size = self.config["General Configuration"]['img_size'].split(',')
         self.img_size = [int(i) for i in self.img_size]
         self.device = self.config.getint("General Configuration", 'device')
-        self.inference_mode = self.config.getboolean("General Configuration", 'inference_mode')
+        self.do_training = self.config.getboolean("General Configuration", 'do_training')
+        self.do_inference = self.config.getboolean("General Configuration", 'do_inference')
+        self.images_to_infer = self.config.getint("General Configuration", 'images_to_infer')
         self.save_model = self.config.getboolean("General Configuration", 'save_model')
         self.load_model = self.config.getboolean("General Configuration", 'load_model')
 
@@ -37,4 +39,4 @@ class Configuration:
         self.par_loss_weight = torch.tensor(self.calculate_weights(self.par_rng[:6]))
 
     def calculate_weights(self, ranges):
-        return [10.0 / (max_val - min_val) for min_val, max_val in ranges]
+        return [1. / (max_val - min_val) for min_val, max_val in ranges]

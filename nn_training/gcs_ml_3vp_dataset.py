@@ -120,7 +120,7 @@ def raytracewcsWrapper(header, params, imsize, occrad, in_sig, out_sig, nel):
 # CONSTANTS
 #files
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP' #'/gehme/projects/2020_gcs_with_ml/data/cme_seg_training'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_onlyMask_anothertest'
 OVERWRITE = False # set to True to overwrite existing files
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 min_nviews = 3 # minimum number succesful views 
@@ -132,13 +132,13 @@ par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme', 's
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[3,10],[0.1,0.6],[10,60],[1e-1,1e1]] # min-max ranges of each parameter in par_names {2.5,7} heights
 par_num = int(1e5)  # total number of samples that will be generated for each param (there are nsat images per param combination)
-rnd_par=False # when true it apllies a fixed seed to generate the same parameters for each run
-seed = 72430 # seed to use when rnd_par is True
+rnd_par=False # when true it apllies a random seed to generate the same parameters for each run
+seed = 36872 # seed to use when rnd_par is False
 same_corona=True # Set to True use a single corona back for all par_num cases
 same_position=True # Set to True to use the same set of satteite positions(not necesarly the same background image)
 
 # Syntethic image options
-synth_int_image=True # set to True to generate a synthetic image with a cme
+synth_int_image=False # set to True to generate a synthetic image with a cme
 plot_mask_rtc_only=False # set to True to plot only the mask from raytracing, synth_int_image must be True
 imsize=np.array([512, 512], dtype='int32') # output image size
 level_occ=0. #mean level of the occulter relative to the background level
@@ -187,6 +187,11 @@ elif os.path.exists(OPATH) and not OVERWRITE:
     failed_df = pd.read_csv(faileddf_name, index_col=0)
     iter_counter = len(succesful_df.index)
     total_iter = iter_counter + len(failed_df.index)
+
+    # create backup of the csv file
+    os.system("cp " + configfile_name + " " + configfile_name + ".back")
+    os.system("cp " + faileddf_name + " " + faileddf_name + ".back")
+
     #iterate the np.random to the last iteration
     for i in range(total_iter):
         temp = get_params(par_names, par_rng)
@@ -406,3 +411,7 @@ while iter_counter != par_num:
             failed_df.loc[iter_counter] = array_of_objects
 
         save_to_csv(failed_df, faileddf_name)
+
+# When all finished, make backup of the csv file
+os.system("cp " + configfile_name + " " + configfile_name + ".back")
+os.system("cp " + faileddf_name + " " + faileddf_name + ".back")
