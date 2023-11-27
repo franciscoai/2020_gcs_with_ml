@@ -15,7 +15,6 @@ class Configuration:
         # General Configuration
         self.train_dir = Path(self.config.get("General Configuration", 'training_data_path'))
         self.opath = Path(self.config.get("General Configuration", 'output_path'))
-        self.binary_mask = self.config.getboolean("General Configuration", 'binary_mask')
         self.batch_size = self.config.getint("General Configuration", 'batch_size')
         self.batch_limit = self.config.get("General Configuration", 'batch_limit')
         self.batch_limit = None if self.batch_limit == 'None' else int(self.batch_limit)

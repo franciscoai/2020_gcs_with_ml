@@ -11,9 +11,60 @@ sys.path.append(os.path.dirname(os.path.dirname(
 from torchvision.models.inception import inception_v3, Inception_V3_Weights
 
 
-class Sirats_net(nn.Module):
+class SiratsNet(nn.Module):
+    def __init__(self, device, output_size=6, img_shape=[3, 512, 512]):
+        super(SiratsNet, self).__init__()
+
+        self.img_shape = img_shape
+        self.output_size = output_size
+        self.device = torch.device(
+            f'cuda:{device}') if torch.cuda.is_available() else torch.device('cpu')
+        print(f'\nUsing device: {self.device}\n')
+
+        # send to device
+        self.to(self.device)
+
+    def plot_loss(self, losses, epoch_list, batch_size, opath, plot_epoch=True, meanLoss=False):
+        if not meanLoss:
+            plt.plot(np.arange(len(losses))*batch_size, losses)
+            plt.yscale('log')
+            plt.xlabel('# Image')
+            plt.ylabel('Loss')
+            plt.grid("both")
+            # add vertical line every epoch
+            if plot_epoch:
+                for epoch in range(len(epoch_list)):
+                    plt.axvline(x=epoch*epoch_list[epoch]
+                                * batch_size, color='r', linestyle='--')
+            plt.savefig(opath)
+            plt.close()
+        else:
+            plt.plot(losses)
+            plt.yscale('log')
+            plt.xlabel('# Epoch')
+            plt.ylabel('Mean Loss')
+            plt.grid("both")
+            plt.savefig(opath)
+            plt.close()
+
+    def save_model(self, opath):
+        models_path = os.path.join(opath, 'models')
+        os.makedirs(models_path, exist_ok=True)
+        torch.save(self.state_dict(), models_path+'/model.pth')
+        return models_path+'/model.pth'
+
+    def load_model(self, opath):
+        models_path = os.path.join(opath, 'models')
+        if os.path.exists(models_path+'/model.pth'):
+            self.load_state_dict(torch.load(models_path+'/model.pth'))
+            return models_path+'/model.pth'
+        else:
+            return None
+
+
+class SiratsAlexNet(SiratsNet):
     def __init__(self, device, output_size=6, img_shape=[3, 512, 512], loss_weights=[100,100,100,10,1,10]):
-        super(Sirats_net, self).__init__()
+        super(SiratsAlexNet, self).__init__(device, output_size, img_shape)
 
         self.device = torch.device(
             f'cuda:{device}') if torch.cuda.is_available() else torch.device('cpu')
@@ -61,9 +112,6 @@ class Sirats_net(nn.Module):
             scheduler.step()
         return loss_value
     
-    def weighted_mse_loss(self, input, target, weight):
-        return torch.mean(weight * (input - target) ** 2)
-    
     def test_model(self, img, targets, par_loss_weight):
         img, target, par_loss_weight = img.to(self.device), targets.to(self.device), par_loss_weight.to(self.device)
         self.output_params = self.forward(img)
@@ -80,43 +128,6 @@ class Sirats_net(nn.Module):
         self.loss_weights = self.loss_weights.to(device)
         loss = torch.mean((predictions - targets) / self.loss_weights[None,:])**2
         return loss
-
-    def plot_loss(self, losses, epoch_list, batch_size, opath, plot_epoch=True, meanLoss=False):
-        if not meanLoss:
-            plt.plot(np.arange(len(losses))*batch_size, losses)
-            plt.yscale('log')
-            plt.xlabel('# Image')
-            plt.ylabel('Loss')
-            plt.grid("both")
-            # add vertical line every epoch
-            if plot_epoch:
-                for epoch in range(len(epoch_list)):
-                    plt.axvline(x=epoch*epoch_list[epoch]
-                                * batch_size, color='r', linestyle='--')
-            plt.savefig(opath)
-            plt.close()
-        else:
-            plt.plot(losses)
-            plt.yscale('log')
-            plt.xlabel('# Epoch')
-            plt.ylabel('Mean Loss')
-            plt.grid("both")
-            plt.savefig(opath)
-            plt.close()
-
-    def save_model(self, opath):
-        models_path = os.path.join(opath, 'models')
-        os.makedirs(models_path, exist_ok=True)
-        torch.save(self.state_dict(), models_path+'/model.pth')
-        return models_path+'/model.pth'
-
-    def load_model(self, opath):
-        models_path = os.path.join(opath, 'models')
-        if os.path.exists(models_path+'/model.pth'):
-            self.load_state_dict(torch.load(models_path+'/model.pth'))
-            return models_path+'/model.pth'
-        else:
-            return None
 
     def _generateLayer(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, pool=True, pool_params=[1, 1, 0]):
         return torch.nn.Sequential(
@@ -140,15 +151,11 @@ class Sirats_net(nn.Module):
             in_channels=192, out_channels=128, kernel_size=3, stride=1, padding=1, pool=True, pool_params=[3, 1, 1])
         return torch.nn.Sequential(layer1, layer2, layer3, layer4, layer5)
 
-class Sirats_inception(nn.Module):
+
+class SiratsInception(SiratsNet):
     def __init__(self, device, optimizer=None, loss_fn=None, scheduler=None, output_size=6, img_shape=[3, 512, 512], loss_weights=[100,100,100,10,1,10]):
-        super(Sirats_inception, self).__init__()
+        super(SiratsInception, self).__init__(device, output_size, img_shape)
 
-        self.device = torch.device(
-            f'cuda:{device}') if torch.cuda.is_available() else torch.device('cpu')
-        print(f'\nUsing device: {self.device}\n')
-
-        self.img_shape = img_shape
         self.optimizer = optimizer
         self.loss_fn = loss_fn
         self.scheduler = scheduler
@@ -182,7 +189,6 @@ class Sirats_inception(nn.Module):
     def optimize_model(self, img, targets, par_loss_weight):
         img, target, par_loss_weight = img.to(self.device), targets.to(self.device), par_loss_weight.to(self.device)
         self.output_params = self.forward(img)
-        # loss_value = self.loss_fn(self.output_params, target)
         loss_value = self.weighted_mse_loss(self.output_params, target, par_loss_weight)
         self.optimizer.zero_grad()
         loss_value.backward()
@@ -210,43 +216,6 @@ class Sirats_inception(nn.Module):
         self.loss_weights = self.loss_weights.to(device)
         loss = torch.mean((predictions - targets) / self.loss_weights[None,:])**2
         return loss
-
-    def plot_loss(self, losses, epoch_list, batch_size, opath, plot_epoch=True, meanLoss=False):
-        if not meanLoss:
-            plt.plot(np.arange(len(losses))*batch_size, losses)
-            plt.yscale('log')
-            plt.xlabel('# Image')
-            plt.ylabel('Loss')
-            plt.grid("both")
-            # add vertical line every epoch
-            if plot_epoch:
-                for epoch in range(len(epoch_list)):
-                    plt.axvline(x=epoch*epoch_list[epoch]
-                                * batch_size, color='r', linestyle='--')
-            plt.savefig(opath)
-            plt.close()
-        else:
-            plt.plot(losses)
-            plt.yscale('log')
-            plt.xlabel('# Epoch')
-            plt.ylabel('Mean Loss')
-            plt.grid("both")
-            plt.savefig(opath)
-            plt.close()
-
-    def save_model(self, opath):
-        models_path = os.path.join(opath, 'models')
-        os.makedirs(models_path, exist_ok=True)
-        torch.save(self.state_dict(), models_path+'/model.pth')
-        return models_path+'/model.pth'
-
-    def load_model(self, opath):
-        models_path = os.path.join(opath, 'models')
-        if os.path.exists(models_path+'/model.pth'):
-            self.load_state_dict(torch.load(models_path+'/model.pth'))
-            return models_path+'/model.pth'
-        else:
-            return None
         
     def set_optimizer(self, optimizer):
         self.optimizer = optimizer

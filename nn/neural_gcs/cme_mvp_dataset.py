@@ -1,5 +1,3 @@
-from torch.utils.data import Dataset
-from torchvision.io import read_image
 import warnings
 import os
 import torchvision
@@ -7,6 +5,8 @@ import torch
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from torch.utils.data import Dataset
+from torchvision.io import read_image
 mpl.use('Agg')
 
 
@@ -117,7 +117,6 @@ class Cme_MVP_Dataset(Dataset):
 
         satpos = torch.squeeze(satpos)
         plotranges = torch.squeeze(plotranges)
-
         return img, targets, sat_masks, occulter_masks, satpos, plotranges, idx
 
     def __normalize(self, img):
@@ -125,10 +124,12 @@ class Cme_MVP_Dataset(Dataset):
             img[img > 1] = 1
             img[img < 0] = 0
         else: # Real image
-            sd_range = 1
+            sd_range=1.5
             m = torch.mean(img)
             sd = torch.std(img)
             img = (img - m + sd_range * sd) / (2 * sd_range * sd)
+            img[img >1]=1
+            img[img <0]=0
         return img
 
     def __define_transforms(self):

@@ -15,7 +15,7 @@ from pyGCS_raytrace import pyGCS
 from astropy.io import fits
 from torch.utils.data import DataLoader
 from nn.neural_gcs.cme_mvp_dataset import Cme_MVP_Dataset
-from nn.neural_gcs.sirats_model import Sirats_net, Sirats_inception
+from nn.neural_gcs.sirats_model import SiratsInception
 from nn.utils.gcs_mask_generator import maskFromCloud
 from nn.neural_gcs.sirats_config import Configuration
 from pyGCS_raytrace import pyGCS
@@ -237,11 +237,10 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
 
 def main():
     # Configuración de parámetros
-    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/developer_config.ini"))
+    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run3.ini"))
 
     TRAINDIR = configuration.train_dir
     OPATH = configuration.opath
-    BINARY_MASK = configuration.binary_mask
     BATCH_SIZE = configuration.batch_size
     BATCH_LIMIT = configuration.batch_limit
     SEED = configuration.rnd_seed
@@ -278,12 +277,12 @@ def main():
     cme_test_dataloader = DataLoader(test_dataset,
                                      batch_size=BATCH_SIZE,
                                      shuffle=True)
-
     # Configurar el modelo
-    model = Sirats_inception(device=DEVICE,
+    model = SiratsInception(device=DEVICE,
                              output_size=6,
                              img_shape=IMG_SIZE,
                              loss_weights=PAR_LOSS_WEIGHTS)
+    
 
     # Configurar optimizer, loss function y scheduler
     optimizer = torch.optim.Adadelta(model.parameters())
