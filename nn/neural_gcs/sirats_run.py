@@ -237,7 +237,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
 
 def main():
     # Configuración de parámetros
-    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run2.ini"))
+    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/developer_config.ini"))
 
     TRAINDIR = configuration.train_dir
     OPATH = configuration.opath
@@ -247,6 +247,7 @@ def main():
     SEED = configuration.rnd_seed
     IMG_SIZE = configuration.img_size
     DEVICE = configuration.device
+    ONLY_MASK = configuration.only_mask
     DO_TRAINING = configuration.do_training
     DO_INFERENCE = configuration.do_inference
     IMAGES_TO_INFER = configuration.images_to_infer
@@ -263,7 +264,7 @@ def main():
     # Cargar y procesar datos
     dataset = Cme_MVP_Dataset(root_dir=TRAINDIR,
                               img_size=IMG_SIZE,
-                              binary_mask=True)
+                              only_mask=ONLY_MASK)
     random.seed(SEED)
     total_samples = len(dataset)
     train_size = TRAIN_IDX_SIZE
