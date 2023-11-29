@@ -192,7 +192,6 @@ for i in range(len(catalogue.index)):
                         # crpix2 = imsize_nn[1]-header['CRPIX2']
                         # crpix=[crpix1,crpix2]
 
-                    
                     all_center.append(occ_center)
                     all_plate_scl.append(plt_scl)                    
                     all_images.append(img)
