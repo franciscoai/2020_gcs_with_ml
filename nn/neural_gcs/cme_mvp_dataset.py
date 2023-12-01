@@ -2,6 +2,7 @@ import warnings
 import os
 import torchvision
 import torch
+import logging
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -120,8 +121,8 @@ class Cme_MVP_Dataset(Dataset):
             plotranges = torch.squeeze(plotranges)
             return img, targets, sat_masks, occulter_masks, satpos, plotranges, idx
         
-        except:
-            print(f"Error reading data from {self.imgs[idx]}")
+        except Exception as e:
+            logging.error(f"Error reading data from {self.imgs[idx]}: {str(e)}")
             return self.__getitem__(idx+1)
 
     def __normalize(self, img):
@@ -135,6 +136,11 @@ class Cme_MVP_Dataset(Dataset):
             img = (img - m + sd_range * sd) / (2 * sd_range * sd)
             img[img >1]=1
             img[img <0]=0
+            
+        if torch.isnan(img).any():
+            warnings.warn("NaN values found in the image tensor.")
+            raise ValueError("NaN values found in the image tensor.")
+            
         return img
 
     def __define_transforms(self):

@@ -6,6 +6,7 @@ import numpy as np
 import random
 import pickle
 import torchvision
+import logging
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.use('Agg')
@@ -206,7 +207,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
             train_onlyepoch_losses.append(loss_value.detach().cpu())
 
             if i % 10 == 0:
-                print(f'Epoch: {epoch + 1}, Image: {(i + 1) * batch_size}, Batch: {i + 1}, Loss: {loss_value:.5f}, learning rate: {model.optimizer.param_groups[-1]["lr"]:.7f}')
+                logging.info(f'Epoch: {epoch + 1}, Image: {(i + 1) * batch_size}, Batch: {i + 1}, Loss: {loss_value:.5f}, learning rate: {model.optimizer.param_groups[-1]["lr"]:.7f}')
 
             if i % 50 == 0:
                 model.plot_loss(train_losses_per_batch, epoch_list, batch_size, os.path.join(opath, "train_loss.png"), plot_epoch=False)
@@ -222,7 +223,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
                 test_onlyepoch_losses.append(loss_test.detach().cpu())
             mean_test_error_in_batch.append(np.mean(test_onlyepoch_losses))
 
-        print(f'Epoch: {epoch + 1}, Test Loss: {loss_test:.5f}\n')
+        logging.info(f'Epoch: {epoch + 1}, Test Loss: {loss_test:.5f}\n')
         model.plot_loss(test_losses_per_batch, epoch_list, batch_size, os.path.join(opath, "test_loss.png"), plot_epoch=False)
 
         # Plot mean loss per epoch
@@ -232,7 +233,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
         # Save model
         if save_model:
             status = model.save_model(opath)
-            print(f"Model saved at: {status}\n")
+            logging.info(f"Model saved at: {status}\n")
 
 
 def main():
@@ -259,6 +260,23 @@ def main():
     PAR_LOSS_WEIGHTS = configuration.par_loss_weight
     os.makedirs(OPATH, exist_ok=True)
 
+
+    # Logging configuration
+    LOGF_PATH = os.path.join(OPATH, 'sirats.log')
+    logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(funcName)-5s: %(levelname)-s, %(message)s',
+                    datefmt='%m-%d %H:%M',
+                    filename=LOGF_PATH,
+                    filemode='w')
+    # define a Handler which writes INFO messages or higher to the sys.stderr
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    # set a format which is simpler for console use
+    formatter = logging.Formatter('%(asctime)s  %(funcName)-5s: %(levelname)-s, %(message)s',datefmt='%m-%d %H:%M')
+    # tell the handler to use this format
+    console.setFormatter(formatter)
+    # add the handler to the root logger
+    logging.getLogger('').addHandler(console)
 
     # Cargar y procesar datos
     dataset = Cme_MVP_Dataset(root_dir=TRAINDIR,
@@ -298,12 +316,12 @@ def main():
     if LOAD_MODEL:
         status = model.load_model(OPATH)
         if status:
-            print(f"Model loaded from: {status}\n")
+            logging.info(f"Model loaded from: {status}\n")
         else:
-            print(f"No model found at: {OPATH}, starting from scratch\n")
+            logging.warn(f"No model found at: {OPATH}, starting from scratch\n")
 
     num_parameters = sum(p.numel() for p in model.parameters())
-    print(f'Number of parameters: {num_parameters}\n')
+    logging.info(f'Number of parameters: {num_parameters}\n')
 
     # Ejecutar entrenamiento o inferencia
     if DO_TRAINING:
@@ -325,7 +343,7 @@ def main():
             # I want to do for image in batch
             for i in range(BATCH_SIZE):
                 img_counter += 1
-                print(f"Plotting image {img_counter} of {IMAGES_TO_INFER}")
+                logging.info(f"Plotting image {img_counter} of {IMAGES_TO_INFER}")
                 error = plot_mask_MVP(img[i], sat_masks[i], targets[i], predictions[i], occulter_masks[i], satpos[i], plotranges[i], OPATH, f'img_{img_counter}.png')
                 errorVP1.append(error[0])
                 errorVP2.append(error[1])
@@ -336,7 +354,7 @@ def main():
             if stop_flag:
                 break
         errors = [errorVP1, errorVP2, errorVP3]
-        print("Plotting histogram")
+        logging.info("Plotting histogram")
         plot_histogram(errors, OPATH, 'histogram.png')
 
         # Save errors in a pickle file

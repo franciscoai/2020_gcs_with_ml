@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-from torch import nn
+import logging
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.realpath(__file__)))))
 
-# imports for inception model
+from torch import nn
 from torchvision.models.inception import inception_v3, Inception_V3_Weights
 
 
@@ -19,7 +19,7 @@ class SiratsNet(nn.Module):
         self.output_size = output_size
         self.device = torch.device(
             f'cuda:{device}') if torch.cuda.is_available() else torch.device('cpu')
-        print(f'\nUsing device: {self.device}\n')
+        logging.info(f'\nUsing device: {self.device}\n')
 
         # send to device
         self.to(self.device)
@@ -68,7 +68,7 @@ class SiratsAlexNet(SiratsNet):
 
         self.device = torch.device(
             f'cuda:{device}') if torch.cuda.is_available() else torch.device('cpu')
-        print(f'\nUsing device: {self.device}\n')
+        logging.info(f'\nUsing device: {self.device}\n')
 
         self.img_shape = img_shape
         self.loss_weights = loss_weights
