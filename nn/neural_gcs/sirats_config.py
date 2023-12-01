@@ -26,6 +26,7 @@ class Configuration:
         self.do_training = self.config.getboolean("General Configuration", 'do_training')
         self.do_inference = self.config.getboolean("General Configuration", 'do_inference')
         self.images_to_infer = self.config.getint("General Configuration", 'images_to_infer')
+        self.model_arq = self.config.get("General Configuration", 'model_arq')
         self.save_model = self.config.getboolean("General Configuration", 'save_model')
         self.load_model = self.config.getboolean("General Configuration", 'load_model')
 

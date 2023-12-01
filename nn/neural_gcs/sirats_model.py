@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-from torch import nn
+import logging
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.realpath(__file__)))))
 
-# imports for inception model
+from torch import nn
 from torchvision.models.inception import inception_v3, Inception_V3_Weights
 
 
@@ -19,7 +19,7 @@ class SiratsNet(nn.Module):
         self.output_size = output_size
         self.device = torch.device(
             f'cuda:{device}') if torch.cuda.is_available() else torch.device('cpu')
-        print(f'\nUsing device: {self.device}\n')
+        logging.info(f'\nUsing device: {self.device}\n')
 
         # send to device
         self.to(self.device)
@@ -68,7 +68,7 @@ class SiratsAlexNet(SiratsNet):
 
         self.device = torch.device(
             f'cuda:{device}') if torch.cuda.is_available() else torch.device('cpu')
-        print(f'\nUsing device: {self.device}\n')
+        logging.info(f'\nUsing device: {self.device}\n')
 
         self.img_shape = img_shape
         self.loss_weights = loss_weights
@@ -211,11 +211,88 @@ class SiratsInception(SiratsNet):
         with torch.inference_mode():
             predictions = self.forward(img)
         return predictions
+        
+    def set_optimizer(self, optimizer):
+        self.optimizer = optimizer
     
-    def custom_loss(self, predictions, targets, device='cuda:0'):
-        self.loss_weights = self.loss_weights.to(device)
-        loss = torch.mean((predictions - targets) / self.loss_weights[None,:])**2
-        return loss
+    def set_loss_fn(self, loss_fn):
+        self.loss_fn = loss_fn
+
+    def set_scheduler(self, scheduler):
+        self.scheduler = scheduler
+
+class SiratsDistribution(SiratsNet):
+    def __init__(self, device, optimizer=None, loss_fn=None, scheduler=None, output_size=6, img_shape=[3, 512, 512], loss_weights=[100,100,100,10,1,10]):
+        super(SiratsDistribution, self).__init__(device, output_size, img_shape)
+
+        self.optimizer = optimizer
+        self.loss_fn = loss_fn
+        self.scheduler = scheduler
+        self.loss_weights = loss_weights
+
+        self.fc = torch.nn.Sequential(
+            torch.nn.Linear(2048, 1024),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.Dropout(),
+            torch.nn.Linear(1024, 512)
+        )
+
+        self.mean_layer = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(512, output_size)
+        )
+
+        self.std_layer = nn.Sequential(
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(512, output_size),
+            nn.Softplus() # enforces positivity
+        )
+
+
+        self.backbone = inception_v3(weights=Inception_V3_Weights.DEFAULT)
+        self.backbone.aux_logits = False
+        self.backbone.fc = torch.nn.Identity()
+
+        for param in self.backbone.parameters():
+            param.requires_grad = True
+
+        # send to device
+        self.to(self.device)
+
+    def forward(self, x):
+        x = self.backbone(x)
+        output = self.fc(x)
+        mean = self.mean_layer(output)
+        std = self.std_layer(output)
+        return torch.distributions.Normal(mean, std)
+
+    def optimize_model(self, img, targets, par_loss_weight):
+        img, target, par_loss_weight = img.to(self.device), targets.to(self.device), par_loss_weight.to(self.device)
+        self.output_params = self.forward(img)
+        loss_value = self.prob_density_loss(self.output_params, target, par_loss_weight)
+        self.optimizer.zero_grad()
+        loss_value.backward()
+        self.optimizer.step()
+        if self.scheduler is not None:
+            self.scheduler.step()
+        return loss_value
+    
+    def test_model(self, img, targets, par_loss_weight):
+        img, target, par_loss_weight = img.to(self.device), targets.to(self.device), par_loss_weight.to(self.device)
+        self.output_params = self.forward(img)
+        loss_value = self.prob_density_loss(self.output_params, target, par_loss_weight)
+        return loss_value
+    
+    def prob_density_loss(self, norma_dist, target, weights):
+        neg_log_likelihood = -norma_dist.log_prob(target)
+        return torch.mean(neg_log_likelihood)
+    
+    def infer(self, img):
+        self.eval()
+        with torch.inference_mode():
+            predictions = self.forward(img)
+        return predictions
         
     def set_optimizer(self, optimizer):
         self.optimizer = optimizer
