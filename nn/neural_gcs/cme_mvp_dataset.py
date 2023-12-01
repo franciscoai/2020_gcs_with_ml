@@ -138,7 +138,6 @@ class Cme_MVP_Dataset(Dataset):
             img[img <0]=0
             
         if torch.isnan(img).any():
-            warnings.warn("NaN values found in the image tensor.")
             raise ValueError("NaN values found in the image tensor.")
             
         return img

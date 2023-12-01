@@ -16,7 +16,7 @@ from pyGCS_raytrace import pyGCS
 from astropy.io import fits
 from torch.utils.data import DataLoader
 from nn.neural_gcs.cme_mvp_dataset import Cme_MVP_Dataset
-from nn.neural_gcs.sirats_model import SiratsDistribution
+from nn.neural_gcs.sirats_model import SiratsInception, SiratsDistribution
 from nn.utils.gcs_mask_generator import maskFromCloud
 from nn.neural_gcs.sirats_config import Configuration
 from pyGCS_raytrace import pyGCS
@@ -238,7 +238,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
 
 def main():
     # Configuración de parámetros
-    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/developer_config.ini"))
+    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_distribution_run1.ini"))
 
     TRAINDIR = configuration.train_dir
     OPATH = configuration.opath
@@ -251,6 +251,7 @@ def main():
     DO_TRAINING = configuration.do_training
     DO_INFERENCE = configuration.do_inference
     IMAGES_TO_INFER = configuration.images_to_infer
+    MODEL_ARQ = configuration.model_arq
     SAVE_MODEL = configuration.save_model
     LOAD_MODEL = configuration.load_model
     EPOCHS = configuration.epochs
@@ -296,10 +297,16 @@ def main():
                                      batch_size=BATCH_SIZE,
                                      shuffle=True)
     # Configurar el modelo
-    model = SiratsDistribution(device=DEVICE,
-                             output_size=6,
-                             img_shape=IMG_SIZE,
-                             loss_weights=PAR_LOSS_WEIGHTS)
+    if MODEL_ARQ == 'inception':
+        model = SiratsInception(device=DEVICE,
+                                output_size=6,
+                                img_shape=IMG_SIZE,
+                                loss_weights=PAR_LOSS_WEIGHTS)
+    elif MODEL_ARQ == 'distribution':
+        model = SiratsDistribution(device=DEVICE,
+                                output_size=6,
+                                img_shape=IMG_SIZE,
+                                loss_weights=PAR_LOSS_WEIGHTS)
     
 
     # Configurar optimizer, loss function y scheduler
@@ -318,7 +325,7 @@ def main():
         if status:
             logging.info(f"Model loaded from: {status}\n")
         else:
-            logging.warn(f"No model found at: {OPATH}, starting from scratch\n")
+            logging.warning(f"No model found at: {OPATH}, starting from scratch\n")
 
     num_parameters = sum(p.numel() for p in model.parameters())
     logging.info(f'Number of parameters: {num_parameters}\n')
