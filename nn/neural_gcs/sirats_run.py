@@ -15,7 +15,7 @@ from pyGCS_raytrace import pyGCS
 from astropy.io import fits
 from torch.utils.data import DataLoader
 from nn.neural_gcs.cme_mvp_dataset import Cme_MVP_Dataset
-from nn.neural_gcs.sirats_model import SiratsInception
+from nn.neural_gcs.sirats_model import SiratsDistribution
 from nn.utils.gcs_mask_generator import maskFromCloud
 from nn.neural_gcs.sirats_config import Configuration
 from pyGCS_raytrace import pyGCS
@@ -237,7 +237,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
 
 def main():
     # Configuración de parámetros
-    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run3.ini"))
+    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/developer_config.ini"))
 
     TRAINDIR = configuration.train_dir
     OPATH = configuration.opath
@@ -278,7 +278,7 @@ def main():
                                      batch_size=BATCH_SIZE,
                                      shuffle=True)
     # Configurar el modelo
-    model = SiratsInception(device=DEVICE,
+    model = SiratsDistribution(device=DEVICE,
                              output_size=6,
                              img_shape=IMG_SIZE,
                              loss_weights=PAR_LOSS_WEIGHTS)
@@ -321,6 +321,7 @@ def main():
             # img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = img[0], targets[0], sat_masks[0], occulter_masks[0], satpos[0], plotranges[0], idx[0]
             img = img.to(DEVICE)
             predictions = model.infer(img)
+            predictions = predictions.mean
             # I want to do for image in batch
             for i in range(BATCH_SIZE):
                 img_counter += 1
