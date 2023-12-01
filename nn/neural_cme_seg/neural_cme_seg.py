@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+import matplotlib.dates as mdates
+
 mpl.use('Agg')
 
 __author__ = "Francisco Iglesias"
@@ -356,9 +358,7 @@ class neural_cme_segmentation():
             colors=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w'] 
 
             df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"])
-            unique_dates=df["DATE_TIME"].unique()
             optimal_n_clusters=int(df["CME_ID"].max())+1
-
             for par in parameters:
                 fig, ax = plt.subplots()
                 dt_list=[]
@@ -370,7 +370,6 @@ class neural_cme_segmentation():
                     dt_list.extend(x_points)
                     ax.plot(x_points, y_points, style,color=colors[k])
                 hours = [str(timestamp.time()) for timestamp in dt_list]
-
                 ax.set_title(y_title)    
                 ax.set_xlabel(x_title)
                 plt.xticks(dt_list,hours,rotation=90)
@@ -384,57 +383,7 @@ class neural_cme_segmentation():
                     return fig, ax 
                
             
-            # self.mask_prop_labels=['MASK ID', 'SCORE','CPA_ANG','WIDTH_ANG','APEX_RADIUS',"CME_ID"]
-
-            # print('Plotting masks properties to '+ str(opath))
-            # # repeat dates for all masks
-            # if ending == '_all':
-            #     x = []
-            #     for i in range(len(dates)):
-            #         x.append([dates[i]]*len(param[i]))
-            #     x = np.array([i for j in x for i in j])
-            # elif ending == '_filtered':                
-            #     x = np.array(dates.copy())
-            # else:
-            #     print('Unrecognized value for ending parameter')
-            #     return None
-                        
-      
-
-            # colors = ["red","blue","orange","yellow","purple"]           
             
-            # for par in range(len(param[0][0])): #loops on props
-            #     fig, ax = plt.subplots()   
-            #     for cid in range(len(param[0])):#loops on id to plot
-            #         cparam=[]
-            #         for t in range(len(param)):#loops in time
-            #             flag=0
-            #             for id in range(len(param[0])):#loops in all id
-            #                 if param[t][id][5] == cid:
-            #                     cparam.append(param[t][id][par])
-            #                     flag=1
-            #             if flag==0:
-            #                 cparam.append(np.nan)
-
-            #         y_title = self.mask_prop_labels[par]
-
-            #         if y_title.endswith("ANG"):
-            #             b = np.array([np.degrees(i) for i in cparam])
-            #         else:
-            #             b = np.array(cparam)
-
-            #         ok_idx=~np.isnan(cparam)
-            #         ax.plot(x[ok_idx], b[ok_idx], style,color=colors[cid])
-            #     ax.set_xlabel(x_title)
-            #     plt.xticks(rotation=45)
-            #     plt.grid()
-            #     plt.tight_layout()
-            #     if save:
-            #         os.makedirs(opath, exist_ok=True)
-            #         fig.savefig(opath+'/'+str.lower(y_title)+ending+".png")
-            #         plt.close()
-            #     else:
-            #         return fig, ax               
         
     def _filter_param(self, in_x, in_y, error_func, fit_func, in_cond, criterion, percentual=True, weights=[2]):
         '''
@@ -488,7 +437,7 @@ class neural_cme_segmentation():
         weights: data points weights for the fit. Must be a cevtor of len len(in_x) or int. 
                  If It's a scalar int gives more weight to the last weights dates bcause CME is supoused to be larger and better defined
         '''
-        colors=["orange","cyan","yellow"]
+        colors=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
         vel_threshold=1 #km/s
         #deletes points with y is nan
         ok_ind = np.where(~np.isnan(in_y))[0]
@@ -499,20 +448,24 @@ class neural_cme_segmentation():
         used_weights = np.ones(len(x))
         if len(weights) > 1:
             used_weights = weights
+        breakpoint()
         fit=least_squares(error_func, in_cond , method='lm', kwargs={'x': x-x[0], 'y': y, 'w': used_weights}) # first fit to get a good initial condition
         fit=least_squares(error_func, fit.x, loss='soft_l1', kwargs={'x': x-x[0], 'y': y, 'w': used_weights}) # second fit to ingnore outliers    
 
         #calculate the % distance from the fit
         dist = np.abs(fit_func(x-x[0], *fit.x)-y)/y
-
+        
         if fit_func == quadratic:
-            x0=fit_func(x-x[0], *fit.x)[0]
-            x1=fit_func(x-x[0], *fit.x)[-1]
-            t0=x[0] 
-            t1=x[-1]
-            average_velocity=(x1-x0)/(t1-t0)
-            if average_velocity < vel_threshold:
+            a=fit.x[0]
+            if a<=0:
                 dist=None
+            # x0=fit_func(x-x[0], *fit.x)[0]
+            # x1=fit_func(x-x[0], *fit.x)[-1]
+            # t0=x[0] 
+            # t1=x[-1]
+            # average_velocity=(x1-x0)/(t1-t0)
+            # if average_velocity < vel_threshold:
+            #     dist=None
 
         label = f"y={fit.x[0]:.2f}x+{fit.x[1]:.2f}\nR={np.corrcoef(x, y)[0,1]:.2f}"
         axis.plot(x, fit_func(x-x[0], *fit.x), color=colors[k], linestyle='--', label=label, linewidth=1.5)
@@ -521,7 +474,7 @@ class neural_cme_segmentation():
     
     
 
-    def _filter_masks2(self, dates, masks, scores, labels, boxes, mask_prop,plate_scl):
+    def _filter_masks2(self, dates, masks, scores, labels, boxes, mask_prop,plate_scl,opath):
         dist_threshold=50
         style='*'
         colors=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w'] 
@@ -562,25 +515,34 @@ class neural_cme_segmentation():
         labels = kmeans.fit_predict(data)
         df['CME_ID'] = [int(i) for i in km_labels]
         
-        all_filtered_x = []
-        all_filtered_y = []
-        fig,axs= plt.subplots(1,3,figsize=(12,4))
+        
+        fig,axs= plt.subplots(1,3, figsize=(24, 8))
         min_error=[]
+        dt_list=[]
+        hours=[]
         for k in range(optimal_n_clusters):
             filtered_df = df[df['CME_ID'] == k]
             x_points =np.array([i.timestamp() for i in filtered_df["DATE_TIME"]])
             y_cpa=np.array(filtered_df["CPA"])
             y_wa=np.array(filtered_df["WA"])
             y_apex=np.array(filtered_df["APEX"])
-            apex_dist,axis3=self._select_mask(axs[2],k,x_points, y_apex, quadratic_error, quadratic, [1.,1.,0])            
+                     
             cpa_dist,axis1 = self._select_mask(axs[0],k,x_points, y_cpa, linear_error, linear, [1.,1.])
             wa_dist,axis2= self._select_mask(axs[1],k,x_points, y_wa, linear_error, linear, [1.,1.])
+            apex_dist,axis3=self._select_mask(axs[2],k,x_points, y_apex, quadratic_error, quadratic, [1.,1.,0])   
+                  
+            #Plotting data and the fitted function befor filtrating
+            hours.extend([str(i.time()) for i in filtered_df["DATE_TIME"]])
+            dt_list.extend(x_points)
+            axs[0].scatter(x_points, filtered_df["CPA"], color=colors[k])
+            axs[1].scatter(x_points, filtered_df["WA"], color=colors[k])
+            axs[2].scatter(x_points, filtered_df["APEX"], color=colors[k])
+            
             if apex_dist is None:
                 idx = df[df['CME_ID'] == k].index
                 df = df.drop(idx)
                 df = df.reset_index(drop=True)
             else:
-            
                 filtered_df["APEX_DIST"]=apex_dist
                 filtered_df["CPA_DIST"]=cpa_dist
                 filtered_df["WA_DIST"]=wa_dist
@@ -593,21 +555,40 @@ class neural_cme_segmentation():
                     min_error.append(filtered_mask)
         min_error_df = pd.DataFrame(min_error)
         min_error_df = min_error_df.reset_index(drop=True)
-          
-            
-            
-        #     #plotting fits
-        #     axs[0].set_title("CPA")
-        #     axs[0].scatter(x_points,y_cpa,color=colors[k])
-        #     axs[1].set_title("WA")
-        #     axs[1].scatter(x_points,y_wa,color=colors[k])
-        #     axs[2].set_title("APEX")
-        #     axs[2].scatter(x_points,y_apex,color=colors[k])
         
-       
-        # plt.tight_layout()
-        # plt.savefig("/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1/cor2_b/20090804/filtered/fitting.png")
-        # breakpoint()
+      
+        axs[0].set_xticks(dt_list,hours,rotation=45)
+        axs[1].set_xticks(dt_list,hours,rotation=45)
+        axs[2].set_xticks(dt_list,hours,rotation=45)
+        axs[0].grid()
+        axs[1].grid()
+        axs[2].grid()
+        plt.tight_layout()
+        fig.savefig(opath+"/fitted_data.png")
+        
+        #ploting filtered data
+        clusters = min_error_df['CME_ID'].unique()
+        fig2,ax= plt.subplots(1,3, figsize=(24, 8))
+        x_ax=[]
+        time=[]
+        for l in clusters:
+            filtered_event=min_error_df[min_error_df['CME_ID'] == l]
+            x=np.array([i.timestamp() for i in filtered_event["DATE_TIME"]])
+            x_ax.extend(x)
+            time.extend([str(i.time()) for i in filtered_event["DATE_TIME"]])
+            ax[0].scatter(x, filtered_event["CPA"], color=colors[l])
+            ax[1].scatter(x, filtered_event["WA"], color=colors[l])
+            ax[2].scatter(x, filtered_event["APEX"], color=colors[l])
+        ax[0].set_xticks(x_ax,time,rotation=45)
+        ax[1].set_xticks(x_ax,time,rotation=45)
+        ax[2].set_xticks(x_ax,time,rotation=45)
+        ax[0].grid()
+        ax[1].grid()
+        ax[2].grid()
+        plt.tight_layout()
+        fig2.savefig(opath+"/filtered_fitted_data.png")
+        plt.close() 
+        return min_error_df
         
 
         
@@ -826,8 +807,7 @@ class neural_cme_segmentation():
                 self._plot_mask_prop(all_dates, all_mask_prop, self.plot_params , ending='_all')
             # keeps only one mask per img based on cpa, aw and apex radius evolution consistency
             if filter:
-                df = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,all_plate_scl)
-                self._plot_mask_prop2(df, self.plot_params , ending='_filtered')
+                df = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,all_plate_scl,self.plot_params)
                 ok_dates=sorted(df['DATE_TIME'].unique())
                 for m in ok_dates:
                     event = df[df['DATE_TIME'] == m]

@@ -160,7 +160,7 @@ for i in range(len(catalogue.index)):
 
         folder=files[0][40:-26]
         print("WORKING ON FOLDER "+folder)
-        if folder=="20090804":
+        if folder=="20070515":
             for j in range(len(files)-1):
                 print(f'Processing {j} of {len(files)-1}')
                 #read fits
@@ -218,7 +218,6 @@ for i in range(len(catalogue.index)):
 
                 for m in range(len(ok_dates)):
                     event = df[df['DATE_TIME'] == ok_dates[m]].reset_index(drop=True)
-                    print(ok_dates[m],file_names[m],all_dates[m])
                     image=ok_orig_img[m]
                     for n in range(len(event['MASK'])):
                         if event['SCR'][n] > scr_threshold:             
