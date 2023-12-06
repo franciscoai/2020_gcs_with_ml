@@ -426,7 +426,7 @@ class neural_cme_segmentation():
     
     def _select_mask(self,axis,k, in_x, in_y, error_func, fit_func, in_cond, weights=[2]):
         '''
-        Deletes the points that are more than criterion from the fit function given by fit_func
+        Fits diferent tipe of functions to the giving xy points, according to the fit function given (fit_func). Also calculates the distance from the original data to the fitted function.
         in_x: timestamps of the points to be filtered
         in_y: y values of the points to be filtered
         error_func: function to calculate the error between the fit and the data
@@ -436,6 +436,7 @@ class neural_cme_segmentation():
         percentual: if True, the criterion is a percentage of the y value
         weights: data points weights for the fit. Must be a cevtor of len len(in_x) or int. 
                  If It's a scalar int gives more weight to the last weights dates bcause CME is supoused to be larger and better defined
+        Returns the distance (in an array form), parabola (indacates the concavity, beeing this negative=True and positive=False) and axis(plots the fit function)
         '''
         colors=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
         vel_threshold=1 #km/s
@@ -448,7 +449,7 @@ class neural_cme_segmentation():
         used_weights = np.ones(len(x))
         if len(weights) > 1:
             used_weights = weights
-        breakpoint()
+        
         fit=least_squares(error_func, in_cond , method='lm', kwargs={'x': x-x[0], 'y': y, 'w': used_weights}) # first fit to get a good initial condition
         fit=least_squares(error_func, fit.x, loss='soft_l1', kwargs={'x': x-x[0], 'y': y, 'w': used_weights}) # second fit to ingnore outliers    
 
@@ -458,7 +459,11 @@ class neural_cme_segmentation():
         if fit_func == quadratic:
             a=fit.x[0]
             if a<=0:
-                dist=None
+                parabola=True
+            else:
+                parabola=False    
+        else:
+            parabola=False
             # x0=fit_func(x-x[0], *fit.x)[0]
             # x1=fit_func(x-x[0], *fit.x)[-1]
             # t0=x[0] 
@@ -470,14 +475,20 @@ class neural_cme_segmentation():
         label = f"y={fit.x[0]:.2f}x+{fit.x[1]:.2f}\nR={np.corrcoef(x, y)[0,1]:.2f}"
         axis.plot(x, fit_func(x-x[0], *fit.x), color=colors[k], linestyle='--', label=label, linewidth=1.5)
        
-        return dist, axis
+        return dist,parabola, axis
     
     
 
     def _filter_masks2(self, dates, masks, scores, labels, boxes, mask_prop,plate_scl,opath):
-        dist_threshold=50
-        style='*'
+        '''
+        Filters the masks by creating clusters based on the cpa and fitting functions to every cluster found, according to cpa, wa and apex_dist.
+        The filter criterion is based on the minimal distances from the mask properties(cpa, wa and apex_dist) to the fitted functions, from wich the euclidian distance its calculated. 
+        Also keeps only one mask per date per cluster.
+        It returns min_error dataframe, containing all the filtered masks and their properties, including the CME_ID.
+        '''
+        min_points=5 # minimum amount of points in every cluster
         colors=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w'] 
+
         #transforms inputs in a dataframe
         data=[]
         for i in range(len(dates)):
@@ -491,32 +502,43 @@ class neural_cme_segmentation():
                 box=boxes[i][j]
                 mask=masks[i][j]
                 #Transform apex in pixels to Km
-                apex=((mask_prop[i][j][4])*plate_scl[i][0])* (math.pi / (180 * 3600)) #apex in pixels to apex in radians
+                apex=((mask_prop[i][j][4])*plate_scl[i])* (math.pi / (180 * 3600)) #apex in pixels to apex in radians
                 mean_dist= sun_const.get("mean distance").value #mean distance to the sun
                 apex=(apex*mean_dist)/1000 # apex in Km
                 data.append((date,mask_id,scr,cpa,wa,apex,label,box,mask))
         df = pd.DataFrame(data, columns=["DATE_TIME","MASK_ID","SCR","CPA","WA","APEX","LABEL","BOX","MASK"])
         df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"])
 
+        
         #Gets the optimal number of clusters for the data
         data= df["CPA"].values.reshape(-1, 1)
         silhouette_scores = []
-        n_clusters_range = range(2, 5) 
+        if len(data)<5:
+            n_clusters_range = range(2, len(data))
+        else: 
+            n_clusters_range = range(2, 5) 
         for n_clusters in n_clusters_range:
             kmeans = KMeans(n_clusters=n_clusters, random_state=0)
             km_labels = kmeans.fit_predict(data)
-            silhouette_avg = silhouette_score(data, km_labels)
-            silhouette_scores.append(silhouette_avg)
+            #Verify if every cluster has the minimum amount of points
+            cluster_counts = pd.Series(km_labels).value_counts()
+            condition = all(count > min_points for count in cluster_counts)
+            if condition:
+                silhouette_avg = silhouette_score(data, km_labels)
+                silhouette_scores.append(silhouette_avg)
 
-        optimal_n_clusters = n_clusters_range[np.argmax(silhouette_scores)]
-
-        #Adjust KMEANS to optimal cluster number
-        kmeans = KMeans(n_clusters=optimal_n_clusters,random_state=0)
-        labels = kmeans.fit_predict(data)
-        df['CME_ID'] = [int(i) for i in km_labels]
+        #gets the optimal amount of clusters
+        if len(silhouette_scores)>0:
+            optimal_n_clusters = n_clusters_range[np.argmax(silhouette_scores)]
+            #Adjust KMEANS to optimal cluster number
+            kmeans = KMeans(n_clusters=optimal_n_clusters,random_state=0)
+            labels = kmeans.fit_predict(data)
+            df['CME_ID'] = [int(i) for i in labels]
+        else:
+            optimal_n_clusters=1
+            df['CME_ID'] = 0
         
-        
-        fig,axs= plt.subplots(1,3, figsize=(24, 8))
+        fig,axs= plt.subplots(1,3, figsize=(12, 4))
         min_error=[]
         dt_list=[]
         hours=[]
@@ -527,9 +549,9 @@ class neural_cme_segmentation():
             y_wa=np.array(filtered_df["WA"])
             y_apex=np.array(filtered_df["APEX"])
                      
-            cpa_dist,axis1 = self._select_mask(axs[0],k,x_points, y_cpa, linear_error, linear, [1.,1.])
-            wa_dist,axis2= self._select_mask(axs[1],k,x_points, y_wa, linear_error, linear, [1.,1.])
-            apex_dist,axis3=self._select_mask(axs[2],k,x_points, y_apex, quadratic_error, quadratic, [1.,1.,0])   
+            cpa_dist,cpa_parabola,axis1 = self._select_mask(axs[0],k,x_points, y_cpa, linear_error, linear, [1.,1.])
+            wa_dist,wa_parabola,axis2= self._select_mask(axs[1],k,x_points, y_wa, linear_error, linear, [1.,1.])
+            apex_dist,apex_parabola,axis3=self._select_mask(axs[2],k,x_points, y_apex, quadratic_error, quadratic, [1.,1.,0])   
                   
             #Plotting data and the fitted function befor filtrating
             hours.extend([str(i.time()) for i in filtered_df["DATE_TIME"]])
@@ -538,7 +560,7 @@ class neural_cme_segmentation():
             axs[1].scatter(x_points, filtered_df["WA"], color=colors[k])
             axs[2].scatter(x_points, filtered_df["APEX"], color=colors[k])
             
-            if apex_dist is None:
+            if apex_parabola & optimal_n_clusters>1:
                 idx = df[df['CME_ID'] == k].index
                 df = df.drop(idx)
                 df = df.reset_index(drop=True)
@@ -553,6 +575,7 @@ class neural_cme_segmentation():
                     event= filtered_df[filtered_df['DATE_TIME'] == m]
                     filtered_mask = event.loc[event['ERROR'].idxmin()]
                     min_error.append(filtered_mask)
+        
         min_error_df = pd.DataFrame(min_error)
         min_error_df = min_error_df.reset_index(drop=True)
         
@@ -563,12 +586,14 @@ class neural_cme_segmentation():
         axs[0].grid()
         axs[1].grid()
         axs[2].grid()
+        axs[0].set_title("CPA")
+        axs[1].set_title("WA")
+        axs[2].set_title("APEX")
         plt.tight_layout()
         fig.savefig(opath+"/fitted_data.png")
-        
         #ploting filtered data
         clusters = min_error_df['CME_ID'].unique()
-        fig2,ax= plt.subplots(1,3, figsize=(24, 8))
+        fig2,ax= plt.subplots(1,3, figsize=(12, 4))
         x_ax=[]
         time=[]
         for l in clusters:
@@ -585,6 +610,10 @@ class neural_cme_segmentation():
         ax[0].grid()
         ax[1].grid()
         ax[2].grid()
+        ax[0].set_title("CPA")
+        ax[1].set_title("WA")
+        ax[2].set_title("APEX")
+
         plt.tight_layout()
         fig2.savefig(opath+"/filtered_fitted_data.png")
         plt.close() 
@@ -794,17 +823,17 @@ class neural_cme_segmentation():
             # appends results only if mask_prop[1] is not NaN, i.e., if it fulfills the filters in compute_mask_prop
             ok_ind = np.where(~np.isnan(np.array(mask_prop)[:,1]))[0]
             if len(ok_ind) >0:
-                all_masks.append([mask[i] for i in ok_ind])
-                all_scores.append([score[i] for i in ok_ind])
-                all_lbl.append([lbl[i] for i in ok_ind])
-                all_boxes.append([box[i] for i in ok_ind])
-                all_mask_prop.append([mask_prop[i] for i in ok_ind])
-                all_plate_scl.append([in_plate_scl[i] for i in ok_ind])
+                all_masks.append([mask[j] for j in ok_ind])
+                all_scores.append([score[j] for j in ok_ind])
+                all_lbl.append([lbl[j] for j in ok_ind])
+                all_boxes.append([box[j] for j in ok_ind])
+                all_mask_prop.append([mask_prop[j] for j in ok_ind])
+                all_plate_scl.append(in_plate_scl[i])
                 all_dates.append(dates[i])
         if len(all_masks)>=2:
             # plots parameters
             if plot_params is not None:
-                self._plot_mask_prop(all_dates, all_mask_prop, self.plot_params , ending='_all')
+                self._plot_mask_prop2(all_dates, all_mask_prop, self.plot_params , ending='_all')
             # keeps only one mask per img based on cpa, aw and apex radius evolution consistency
             if filter:
                 df = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,all_plate_scl,self.plot_params)
