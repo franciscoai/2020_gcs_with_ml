@@ -24,8 +24,8 @@ class SiratsNet(nn.Module):
         # send to device
         self.to(self.device)
 
-    def plot_loss(self, losses, epoch_list, batch_size, opath, plot_epoch=True, meanLoss=False):
-        if not meanLoss:
+    def plot_loss(self, losses, epoch_list, batch_size, opath, plot_epoch=True, medianLoss=False):
+        if not medianLoss:
             plt.plot(np.arange(len(losses))*batch_size, losses)
             plt.yscale('log')
             plt.xlabel('# Image')

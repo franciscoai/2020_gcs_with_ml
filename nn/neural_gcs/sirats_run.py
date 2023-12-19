@@ -188,9 +188,9 @@ def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, pl
 
 def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, epochs, opath, par_loss_weights, save_model):
     train_losses_per_batch = []
-    mean_train_losses_per_batch = []
+    median_train_losses_per_batch = []
     test_losses_per_batch = []
-    mean_test_error_in_batch = []
+    median_test_error_in_batch = []
     epoch_list = []
     total_batches_per_epoch = 0
 
@@ -212,7 +212,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
             if i % 50 == 0:
                 model.plot_loss(train_losses_per_batch, epoch_list, batch_size, os.path.join(opath, "train_loss.png"), plot_epoch=False)
 
-        mean_train_losses_per_batch.append(np.mean(train_onlyepoch_losses))
+        median_train_losses_per_batch.append(np.median(train_onlyepoch_losses))
 
         # Test
         model.eval()
@@ -221,14 +221,14 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
                 loss_test = model.test_model(img, targets, par_loss_weights)
                 test_losses_per_batch.append(loss_test.detach().cpu())
                 test_onlyepoch_losses.append(loss_test.detach().cpu())
-            mean_test_error_in_batch.append(np.mean(test_onlyepoch_losses))
+            median_test_error_in_batch.append(np.median(test_onlyepoch_losses))
 
         logging.info(f'Epoch: {epoch + 1}, Test Loss: {loss_test:.5f}\n')
         model.plot_loss(test_losses_per_batch, epoch_list, batch_size, os.path.join(opath, "test_loss.png"), plot_epoch=False)
 
         # Plot mean loss per epoch
-        model.plot_loss(mean_train_losses_per_batch, epoch_list, batch_size, os.path.join(opath, "mean_train_loss.png"), plot_epoch=False, meanLoss=True)
-        model.plot_loss(mean_test_error_in_batch, epoch_list, batch_size, os.path.join(opath, "mean_test_loss.png"), plot_epoch=False, meanLoss=True)
+        model.plot_loss(median_train_losses_per_batch, epoch_list, batch_size, os.path.join(opath, "mean_train_loss.png"), plot_epoch=False, medianLoss=True)
+        model.plot_loss(median_test_error_in_batch, epoch_list, batch_size, os.path.join(opath, "mean_test_loss.png"), plot_epoch=False, medianLoss=True)
 
         # Save model
         if save_model:
@@ -238,7 +238,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
 
 def main():
     # Configuración de parámetros
-    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_distribution_run1.ini"))
+    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_distribution_run2.ini"))
 
     TRAINDIR = configuration.train_dir
     OPATH = configuration.opath
