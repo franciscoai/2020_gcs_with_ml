@@ -9,6 +9,7 @@ from datetime import timedelta, datetime, time
 from scipy.optimize import least_squares
 
 def get_NN(iodir,sat):
+    column_names=["DATE_TIME","MASK","SCORE","CPA_ANG","WIDE_ANG","APEX",'LABEL', 'BOX', 'CME_ID', 'APEX_DIST', 'CPA_DIST', 'WA_DIST', 'ERROR']
     df_list=[]
     odir=iodir+'/'+sat+"/"
     ext_folders = os.listdir(odir)
@@ -16,10 +17,15 @@ def get_NN(iodir,sat):
         odir_filter=odir+ext_folder+"/filtered"
         if os.path.exists(odir_filter):
             csv_path=odir_filter+"/"+ext_folder+"_filtered_stats"
-            df=pd.read_csv(csv_path)
-            df_list.append(df)
-    df_full = pd.concat(df_list, ignore_index=True)
+            df=pd.read_csv(csv_path, names=column_names)
+            if len(df["CME_ID"].unique())>1:
+                predominant_cme = df["CME_ID"].value_counts().idxmax()
+                event= df.loc[df["CME_ID"]==predominant_cme]
+                df_list.append(event)
 
+            else:
+                df_list.append(df)
+    df_full = pd.concat(df_list, ignore_index=True)
     return df_full
 
 def get_GCS(iodir,sat):
@@ -106,6 +112,7 @@ def get_vourlidas(folder,sat):
                 df = df[df["S/C"] == "B"]
             else:
                 print("satellite not recognized")
+        
             df_list.append(df)
         df_full = pd.concat(df_list, ignore_index=True)
         for i in cols:
@@ -136,7 +143,7 @@ def comparator(NN,seeds,vourlidas,gcs):
     seeds['DATE_TIME'] = pd.to_datetime(seeds['DATE_TIME'], format="YYYY/MM/DD HH:MM:SS")
     NN['DATE_TIME'] = pd.to_datetime(NN['DATE_TIME'])
     vourlidas['Date_Time'] =vourlidas['Date']+" "+vourlidas['Time']
-    vourlidas['Date_Time'] = pd.to_datetime(vourlidas['Date_Time'])
+    vourlidas['Date_Time'] = pd.to_datetime(vourlidas['Date_Time'], format="mixed")
     vourlidas = vourlidas.sort_values(by='Date_Time')
     NN.sort_values(by='DATE_TIME', inplace=True)
     seeds.sort_values(by='DATE_TIME', inplace=True)
@@ -148,15 +155,14 @@ def comparator(NN,seeds,vourlidas,gcs):
     #adjust the 0 degree to the nort
     for i in NN_ang_col:
         if i=="WIDE_ANG":
-            NN[i]=np.degrees(NN[i])
+
+            NN[i]=np.degrees([float(num) for num in NN[i]])
             gcs[i]=np.degrees(gcs[i])
         else:
-            NN[i]= np.degrees(NN[i])-90#-np.degrees(NN[i])+270
+            NN[i]= np.degrees([float(num) for num in NN[i]])-90#-np.degrees(NN[i])+270
             gcs[i]= np.degrees(gcs[i])-90
         NN.loc[NN[i] < 0, i] += 360  
         gcs.loc[gcs[i] < 0, i] += 360  
-
-     
 
     #goups all the hours in each day and calculates medain a std of cpa_ang and wide_ang
     df = NN.groupby('DATE').agg({'WIDE_ANG': ['min', 'std'],'CPA_ANG': ['median', 'std'],})
@@ -243,7 +249,7 @@ def get_r(xdf,ydf):
 ################################################################################### MAIN ######################################################################################
 odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1"
 folder="/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications"
-sat="cor2_b"#cor2_a
+sat="cor2_b"#cor2_b
 
 #-----------------
 plot_dir=odir+'/'+sat+'_comparison'
@@ -294,7 +300,7 @@ ax.set_xlabel('GCS')
 ax.set_title('CPA [deg]')
 ax.legend()
 ax.grid(True)
-fig.savefig(plot_dir + '/CPA_ANG_all.png', dpi=300, bbox_inches='tight')
+fig.savefig(plot_dir + '/CPA_ANG_all2.png', dpi=300, bbox_inches='tight')
 
 fig2, ax2 = plt.subplots(figsize=(6, 6))
 label = 'VOURLIDAS ; '+get_r(df["GCS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"])
@@ -330,7 +336,7 @@ ax2.set_xlabel('GCS')
 ax2.set_title('AW [deg]')
 ax2.legend()
 ax2.grid(True)
-fig2.savefig(plot_dir + '/WIDE_ANG_all.png', dpi=300, bbox_inches='tight')
+fig2.savefig(plot_dir + '/WIDE_ANG_all2.png', dpi=300, bbox_inches='tight')
 
 
 fig3, (ax3, ax4, ax5) = plt.subplots(1, 3, figsize=(18, 6))
@@ -361,7 +367,7 @@ ax5.set_xlabel('GCS')
 ax5.set_title('AW [deg]')
 ax5.legend()
 ax5.grid(True)
-fig3.savefig(plot_dir + '/WIDE_ANG.png', dpi=300, bbox_inches='tight')
+fig3.savefig(plot_dir + '/WIDE_ANG2.png', dpi=300, bbox_inches='tight')
              
 fig4, (ax6, ax7, ax8) = plt.subplots(1, 3, figsize=(18, 6))
 ax6.errorbar(df["GCS_CPA_ANG"], df["VOURLIDAS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='GCS vs SEEDS')
@@ -394,7 +400,7 @@ ax8.set_xlabel('GCS')
 ax8.set_title('CPA [deg]')
 ax8.legend()
 ax8.grid(True)
-fig4.savefig(plot_dir + '/CPA_ANG.png', dpi=300, bbox_inches='tight')
+fig4.savefig(plot_dir + '/CPA_ANG2.png', dpi=300, bbox_inches='tight')
              
 plt.show()
 plt.close()

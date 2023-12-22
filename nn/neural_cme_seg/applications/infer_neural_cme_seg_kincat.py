@@ -134,7 +134,7 @@ catalogue = catalogue.reset_index(drop=True)
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 
-for i in range(25,len(catalogue.index)):
+for i in range(len(catalogue.index)):
     print("Reading date range nª "+str(i))
     date_helcat = datetime.strptime((catalogue["PRE_DATE"][i]+" "+catalogue["PRE_TIME"][i]),'%Y-%m-%d %H:%M') #forms datetime object
     start_date = date_helcat 
@@ -160,7 +160,7 @@ for i in range(25,len(catalogue.index)):
 
         folder=files[0][40:-26]
         print("WORKING ON FOLDER "+folder)
-        #if folder=="20080517":
+        #if folder=="20080317":
         for j in range(len(files)-1):
             print(f'Processing {j} of {len(files)-1}')
             #read fits
@@ -202,7 +202,7 @@ for i in range(25,len(catalogue.index)):
                 
         if len(all_images)>=2:
             ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=final_path+'mask_props')
-            
+
             zeros = np.zeros(np.shape(ok_orig_img[0]))
             all_idx=[]
             for date in all_dates:
@@ -238,15 +238,10 @@ for i in range(25,len(catalogue.index)):
 
                 plot_to_png(opath+"/"+folder_name+"/"+file_names[m]+".png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[m]])  
 
-            # data_kincat=[]
-            # for i in range(len(all_mask_prop)):
-            #     if all(elemento is not None for elemento in all_mask_prop[i]):
-            #         prop_list = all_mask_prop[i].tolist()
-            #         prop_list.insert(0,ok_dates[i])
-            #         data_kincat.append(prop_list)
-        
-            # df = pd.DataFrame(data_kincat, columns=kincat_col_names)
-            # df.to_csv(final_path+folder_name+'_filtered_stats', index=False)
+            #Saves df for future comparison
+            col_drop= ['MASK'] # its necessary to drop mask column (its a matrix) to succsessfully save the csv file
+            df = df.drop(col_drop, axis=1)
+            df.to_csv(final_path+folder_name+'_filtered_stats', index=False)
 
         else:
             print("WARNING: COULD NOT PROCESS EVENT "+ files[0][49:-13] )
