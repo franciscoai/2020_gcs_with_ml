@@ -53,13 +53,12 @@ class SiratsNet(nn.Module):
         torch.save(self.state_dict(), models_path+'/model.pth')
         return models_path+'/model.pth'
 
-    def load_model(self, opath):
-        models_path = os.path.join(opath, 'models')
-        if os.path.exists(models_path+'/model.pth'):
-            self.load_state_dict(torch.load(models_path+'/model.pth'))
-            return models_path+'/model.pth'
-        else:
-            return None
+    def load_model(self, model_path):
+        try:
+            self.load_state_dict(torch.load(model_path))
+            return True
+        except:
+            return False
 
 
 class SiratsAlexNet(SiratsNet):
