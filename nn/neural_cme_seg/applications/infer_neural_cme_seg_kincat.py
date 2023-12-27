@@ -91,7 +91,7 @@ imsize_nn=[512,512] #for rebin befor the nn
 smooth_kernel=[2,2] #changes the gaussian filter size
 occ_size = [50,52] # occulter radius in pixels. An artifitial occulter with constant value equal to the mean of the image is added before inference. Use 0 to avoid
 occ_center=[[256,256],[260,247]]
-sat="cor2_b"#"cor2_a"
+sat="cor2_a"#"cor2_b"
 
 if sat=="cor2_a":
     downloaded_files_list = repo_dir + '/nn_training/kincat/helcatslist_20160601_sta_downloaded.csv' # list of downloaded files
