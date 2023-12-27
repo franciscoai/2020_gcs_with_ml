@@ -579,39 +579,40 @@ class neural_cme_segmentation():
             else:
                 for i in range(len(filtered_df)):
                     min_error.append(filtered_df.iloc[i])
-
-
-        for r in range(optimal_n_clusters):
-                breakpoint()
+        ############################################### CODE IN PROCESS :)  ##############################
+        parabola_criterion = [filter_criterion[v][0] for v in range(optimal_n_clusters)]
+        count_false = all(valor is False for valor in parabola_criterion)
+        if count_false:
+            velocity_criterion = [filter_criterion[v][1] for v in range(optimal_n_clusters)]
+            optimal_vel_idx = np.argmax(np.abs(velocity_criterion))
+            selected_cluster= df[df['CME_ID'] == optimal_vel_idx]
+            min_error.append(selected_cluster)
             
-                result = [filter_criterion[v][0] for v in range(optimal_n_clusters)]
-                count_false = all(valor is False for valor in result)
-                if count_false:
-                breakpoint()
-                if (apex_parabola & (optimal_n_clusters>1)):
+        else:
+            for r in range(optimal_n_clusters):
+                filtered_df = df[df['CME_ID'] == r]
+                if (filter_criterion[r][0] & (optimal_n_clusters>1)):
                     idx = df[df['CME_ID'] == r].index
                     df = df.drop(idx)
                     df = df.reset_index(drop=True)
                 else:
-                    filtered_df["APEX_DIST"]=apex_dist
-                    filtered_df["CPA_DIST"]=cpa_dist
-                    filtered_df["WA_DIST"]=wa_dist
-                    error=np.sqrt(cpa_dist**2+wa_dist**2+apex_dist**2)
-                    filtered_df["ERROR"]=error
-                    unique_dates= filtered_df["DATE_TIME"].unique()
-                    #filtering disperse masks according to cpa distance criterion
-                    breakpoint() 
-                    filter_cpa=filtered_df.loc[filtered_df["CPA_DIST"]>MAX_CPA_DIST]
+                    filtered_df["CPA_DIST"] = dist[r][0]
+                    filtered_df["WA_DIST"] = dist[r][1]
+                    filtered_df["APEX_DIST"] = dist[r][2]
+                    error=np.sqrt(dist[r][0]**2+dist[r][1]**2+dist[r][2]**2)
+                    filtered_df["ERROR"] = error
+                    unique_dates = filtered_df["DATE_TIME"].unique()
+                    #filtering disperse masks according to cpa distance criterion 
+                    filter_cpa = filtered_df.loc[filtered_df["CPA_DIST"]>MAX_CPA_DIST]
                     filtered_df = filtered_df[~filtered_df.isin(filter_cpa)].dropna()
-                    breakpoint()
                     for m in unique_dates:    
                         event= filtered_df[filtered_df['DATE_TIME'] == m]
                         filtered_mask = event.loc[event['ERROR'].idxmin()]
                         min_error.append(filtered_mask)
-           
+        
         min_error_df = pd.DataFrame(min_error)
         min_error_df = min_error_df.reset_index(drop=True)
-      
+        ################################################## :) ############################################################
         axs[0].set_xticks(dt_list,hours,rotation=45)
         axs[1].set_xticks(dt_list,hours,rotation=45)
         axs[2].set_xticks(dt_list,hours,rotation=45)
