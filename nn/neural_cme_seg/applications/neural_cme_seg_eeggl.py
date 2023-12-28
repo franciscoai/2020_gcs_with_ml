@@ -114,44 +114,52 @@ model_version="v4"
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2013-09-29/C2/lvl1/'
 
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/Cor2A/lvl1/'
-ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/Cor2B/lvl1/'
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/C2/lvl1/'
+#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/Cor2B/lvl1/'
+ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/C2/lvl1/'
 
 #----------------
-aux="oculter_60_250/"
-#aux=""
+#aux="oculter_60_250/"
+aux="occ_medida_RD/"
 
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/Cor2A/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/Cor2B/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/C2/'
+#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/C2/'+aux
 
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2011-02-15/Cor2A/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2011-02-15/Cor2B/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2011-02-15/C2/'
+#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2011-02-15/C2/'+aux
 
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-03-15/Cor2A/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-03-15/Cor2B/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-03-15/C2/'
+#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-03-15/C2/'+aux
 
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-09-29/Cor2A/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-09-29/Cor2B/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-09-29/C2/'
+#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-09-29/C2/'+aux
 
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/Cor2A/'+aux
-opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/Cor2B/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/C2/'
+#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/Cor2B/'+aux
+opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/C2/'+aux
 
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/'
 file_ext=".fts"
 trained_model = '6000.torch'
-occ_size = 50 # Artifitial occulter radius in pixels. Use 0 to avoid. [Stereo a/b C1, Stereo a/b C2, Lasco C2]
-instrument = 'cor2'
+#-----------------------------
+base_difference = False
+running_difference = True
+
+#instr='cor2_a'
+#instr='cor2_b'
+instr='lascoC2'
+#----------------------------
+occ_center=None
+#occ_center=[[256,256],[260,247]]
+occ_size = [50,52]
 
 #main
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
-
 
 #OBS: files is a list of all files but NOT in correct temporal order.
 #loads images
@@ -177,16 +185,69 @@ with open(ipath+'list.txt', 'r') as file:
     lines = file.readlines()
 image_names = [line.strip() for line in lines]
 
-#First image set to background
-background = image_names[0]
+if instr=="cor2_a":
+    occ_center=occ_center[0]
+    if occ_center:
+        occ_size= occ_size[0]
+elif instr=="cor2_b":
+    occ_size= occ_size[1]
+    if occ_center:
+        occ_center=occ_center[1]
+    #else:
+    #    occ_center=[hdr1["crpix1"],hdr1["crpix2"]]
 
-img0,hdr0 = read_fits(ipath+background,header=True)
-for image in image_names[1:]:
-    img1, hdr1 = read_fits(ipath+image,header=True)
-    
-    img_diff = img1 - img0
+for j in range(1,len(image_names)):
+        
+    if base_difference:
+        #First image set to background
+        img0, hdr0 = read_fits(ipath+image_names[0],header=True)
+        img1, hdr1 = read_fits(ipath+image_names[j],header=True)
 #    img_diff[img_mask == 0] = 0
-    """    
+        
+    if running_difference:
+        img0, hdr0 = read_fits(ipath+image_names[j-1],header=True)
+        img1, hdr1 = read_fits(ipath+image_names[j  ],header=True)
+   
+    if not occ_center:
+        occ_center=[hdr1["crpix1"],hdr1["crpix2"]]
+        #En esta resta asumimos que ambas imagenes tienen igual centerpix1/2, y ambas son north up.
+    img_diff = img1 - img0
+    
+    #orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=60,centerpix=[255,255+10],occulter_size_ext=240) 
+    
+    #Cor2 con mascara original
+    #orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, getmask=True,hdr=hdr1) 
+    
+    #Cor2 con mascara centrada ---> Cor2B me funciona mejor con esto, usando crpix1/2
+    #orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=60,centerpix=occ_center,occulter_size_ext=255)
+    
+    #Cor2 con mascara centrada (a medida) ---> Cor2A me funciona mejor con esto
+    #orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=occ_size,centerpix=occ_center,occulter_size_ext=250)
+    
+    #C2
+    orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=90,centerpix=occ_center,occulter_size_ext=300)
+    
+    #centerpix=[255,265])
+    # plot the predicted mask
+    ofile = opath+"/"+os.path.basename(image_names[j])+'.png'
+    plot_to_png(ofile, [orig_img], [masks], scores=[scores], labels=[labels], boxes=[boxes])
+    
+
+"""
+for f in files:
+    print(f'Processing file {f}')
+    if file_ext == ".fits" or file_ext == ".fts":
+        img = read_fits(f)
+    else:
+        img = cv2.imread(f)
+    breakpoint()
+    orig_img, masks, scores, labels, boxes  = nn_seg.infer(img, model_param=None, resize=False, occulter_size=0)
+    # plot the predicted mask
+    ofile = opath+"/"+os.path.basename(f)+'.png'
+    plot_to_png(ofile, [img], [masks], scores=[scores], labels=[labels], boxes=[boxes])
+"""
+
+"""    
     #-----------------------------------------------------------------------
     valores = img_diff[~np.isnan(img_diff)]
     hist, bins, _ = plt.hist(valores, bins=30, range=((np.min(valores)+np.std(valores)), (np.max(valores)-np.std(valores))), color='blue', alpha=0.7, density=True)
@@ -207,35 +268,3 @@ for image in image_names[1:]:
     plt.savefig("/gehme-gpu/projects/2023_eeggl_validation/output/histo_real.png")
     #-----------------------------------------------------------------------
     """
-    #orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=60,centerpix=[255,255+10],occulter_size_ext=240) 
-    
-    #Cor2 con mascara original
-    #orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, getmask=True,hdr=hdr1) 
-    
-    #Cor2 con mascara centrada
-    orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=60,centerpix=[hdr1["crpix1"],hdr1["crpix2"]],occulter_size_ext=250)
-    
-    #C2
-    #orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=90,centerpix=[hdr1["crpix1"],hdr1["crpix2"]],occulter_size_ext=300)
-    
-    #centerpix=[255,265])
-    # plot the predicted mask
-    ofile = opath+"/"+os.path.basename(image)+'.png'
-    plot_to_png(ofile, [orig_img], [masks], scores=[scores], labels=[labels], boxes=[boxes])
-    
-
-"""
-for f in files:
-    print(f'Processing file {f}')
-    if file_ext == ".fits" or file_ext == ".fts":
-        img = read_fits(f)
-    else:
-        img = cv2.imread(f)
-    breakpoint()
-    orig_img, masks, scores, labels, boxes  = nn_seg.infer(img, model_param=None, resize=False, occulter_size=0)
-    # plot the predicted mask
-    ofile = opath+"/"+os.path.basename(f)+'.png'
-    plot_to_png(ofile, [img], [masks], scores=[scores], labels=[labels], boxes=[boxes])
-"""
-
-
