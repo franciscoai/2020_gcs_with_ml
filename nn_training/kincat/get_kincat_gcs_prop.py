@@ -173,7 +173,7 @@ repo_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__fi
 kincat_orig_dir=repo_dir+"/nn_training/kincat/helcatslist_20160601.txt"
 odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1/"
 
-sat="cor2_b"#cor2_b
+sat="cor2_a"#cor2_b
 imageSize=[512,512]
 mod_scale=True
 mask_threshold=0.6 # value to consider a pixel belongs to the objec

@@ -29,7 +29,7 @@ def get_NN(iodir,sat):
     return df_full
 
 def get_GCS(iodir,sat):
-    
+    #breakpoint()
     df_list=[]
     odir=iodir+'/'+sat+"/"
     ext_folders = os.listdir(odir)
@@ -43,6 +43,7 @@ def get_GCS(iodir,sat):
             except:
                 continue
     df_full = pd.concat(df_list, ignore_index=True)
+    #breakpoint()
     return df_full
 
 
@@ -249,7 +250,7 @@ def get_r(xdf,ydf):
 ################################################################################### MAIN ######################################################################################
 odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1"
 folder="/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications"
-sat="cor2_b"#cor2_b
+sat="cor2_a"#cor2_a
 
 #-----------------
 plot_dir=odir+'/'+sat+'_comparison'
@@ -260,6 +261,7 @@ seeds=get_seeds(folder,sat)
 vourlidas= get_vourlidas(folder,sat)
 gcs=get_GCS(odir,sat)
 df=comparator(NN,seeds,vourlidas,gcs)
+
 date_to_tag_vourlidas = pd.to_datetime([datetime(2008, 5, 17)])
 date_to_tag_seeds = pd.to_datetime([datetime(2008, 5, 17)])
 date_to_tag_nn = pd.to_datetime([datetime(2008, 5, 17)])
@@ -406,5 +408,3 @@ plt.show()
 plt.close()
 
 
-
-#df.loc[df["SEEDS_WIDE_ANG"]>200]

@@ -557,66 +557,72 @@ class neural_cme_segmentation():
         dist=[]
         for k in range(optimal_n_clusters):
             filtered_df = df[df['CME_ID'] == k]
-            #if len(filtered_df["CME_ID"])>=3:
-            x_points =np.array([i.timestamp() for i in filtered_df["DATE_TIME"]])
-            y_cpa=np.array(filtered_df["CPA"])
-            y_wa=np.array(filtered_df["WA"])
-            y_apex=np.array(filtered_df["APEX"])
-                    
-            cpa_dist,cpa_parabola,cpa_vel,axis1 = self._select_mask(axs[0],k,x_points, y_cpa, linear_error, linear, [1.,1.])
-            wa_dist,wa_parabola,wa_vel,axis2= self._select_mask(axs[1],k,x_points, y_wa, linear_error, linear, [1.,1.])
-            apex_dist,apex_parabola,apex_vel,axis3=self._select_mask(axs[2],k,x_points, y_apex, quadratic_error, quadratic, [1.,1.,0])   
-
-            dist.append([cpa_dist,wa_dist,apex_dist])
-            filter_criterion.append([apex_parabola,apex_vel])
             
-            #Plotting data and the fitted function before filtering
-            hours.extend([str(i.time()) for i in filtered_df["DATE_TIME"]])
-            dt_list.extend(x_points)
-            axs[0].scatter(x_points, filtered_df["CPA"], color=colors[k])
-            axs[1].scatter(x_points, filtered_df["WA"], color=colors[k])
-            axs[2].scatter(x_points, filtered_df["APEX"], color=colors[k])    
-            # else:
-            #     for i in range(len(filtered_df)):
-            #         min_error.append(filtered_df.iloc[i])
+            #filtering small events (less than 3 images per event with one cluster), we keep all the masks for this event
+            if (optimal_n_clusters==1) & (len(filtered_df["CME_ID"])<=3):
+                for i in range(len(filtered_df)):
+                    min_error.append(filtered_df.iloc[i])
+                min_error_df = pd.DataFrame(min_error)
+               
+            else:
+                x_points =np.array([i.timestamp() for i in filtered_df["DATE_TIME"]])
+                y_cpa=np.array(filtered_df["CPA"])
+                y_wa=np.array(filtered_df["WA"])
+                y_apex=np.array(filtered_df["APEX"])
+
+                #Fits the corresponding function type and calculates the distance from the masks to the fitted function, the concavity of the function and the median velocity of it   
+                cpa_dist,cpa_parabola,cpa_vel,axis1 = self._select_mask(axs[0],k,x_points, y_cpa, linear_error, linear, [1.,1.])
+                wa_dist,wa_parabola,wa_vel,axis2= self._select_mask(axs[1],k,x_points, y_wa, linear_error, linear, [1.,1.])
+                apex_dist,apex_parabola,apex_vel,axis3=self._select_mask(axs[2],k,x_points, y_apex, quadratic_error, quadratic, [1.,1.,0])   
+                dist.append([cpa_dist,wa_dist,apex_dist])
+                filter_criterion.append([apex_parabola,apex_vel])
                 
-        #filtering cases where all apex parabolas are negative
-        parabola_criterion = [filter_criterion[v][0] for v in range(optimal_n_clusters)]
-        count = all(valor is True for valor in parabola_criterion)
-        if count:
-            velocity_criterion = [filter_criterion[v][1] for v in range(optimal_n_clusters)]
-            optimal_vel_idx = np.argmax(np.abs(velocity_criterion))
-            selected_cluster= df[df['CME_ID'] == optimal_vel_idx]
-            min_error_df = pd.DataFrame(selected_cluster)
+                #Plotting data and the fitted function before filtering
+                hours.extend([str(i.time()) for i in filtered_df["DATE_TIME"]])
+                dt_list.extend(x_points)
+                axs[0].scatter(x_points, filtered_df["CPA"], color=colors[k])
+                axs[1].scatter(x_points, filtered_df["WA"], color=colors[k])
+                axs[2].scatter(x_points, filtered_df["APEX"], color=colors[k])    
 
-        #filtering cases where at least one apex parabola is positive 
-        else:
-            for r in range(optimal_n_clusters):
-                filtered_df = df[df['CME_ID'] == r]
-                #Droping negative apex parabola cases
-                if (filter_criterion[r][0] & (optimal_n_clusters>1)):
-                    idx = df[df['CME_ID'] == r].index
-                    df = df.drop(idx)
-                    df = df.reset_index(drop=True)
+        if len(filtered_df["CME_ID"])>=3:        
+            #filtering cases where all apex parabolas are negative
+            parabola_criterion = [filter_criterion[v][0] for v in range(optimal_n_clusters)]
+            count = all(valor is True for valor in parabola_criterion)
+            if count:
+                velocity_criterion = [filter_criterion[v][1] for v in range(optimal_n_clusters)]
+                optimal_vel_idx = np.argmax(np.abs(velocity_criterion))
+                selected_cluster= df[df['CME_ID'] == optimal_vel_idx]
+                min_error_df = pd.DataFrame(selected_cluster)
 
-                else:
-                    filtered_df["CPA_DIST"] = dist[r][0]
-                    filtered_df["WA_DIST"] = dist[r][1]
-                    filtered_df["APEX_DIST"] = dist[r][2]
-                    error=np.sqrt(dist[r][0]**2+dist[r][1]**2+dist[r][2]**2)
-                    filtered_df["ERROR"] = error
-                    
-                    #filtering disperse masks according to cpa distance criterion 
-                    filter_cpa = filtered_df.loc[filtered_df["CPA_DIST"]>MAX_CPA_DIST]
-                    filtered_df = filtered_df[~filtered_df.isin(filter_cpa)].dropna()
-                    unique_dates = filtered_df["DATE_TIME"].unique()
-                    for m in unique_dates:
-                        event = filtered_df[filtered_df['DATE_TIME'] == str(m)]
-                        filtered_mask = event.loc[event['ERROR'].idxmin()]
-                        min_error.append(filtered_mask)
+            #filtering cases where at least one apex parabola is positive 
+            else:
+                for r in range(optimal_n_clusters):
+                    filtered_df = df[df['CME_ID'] == r]
+                    #Droping negative apex parabola cases
+                    if (filter_criterion[r][0] & (optimal_n_clusters>1)):
+                        idx = df[df['CME_ID'] == r].index
+                        df = df.drop(idx)
+                        df = df.reset_index(drop=True)
+
+                    else:
+                        filtered_df["CPA_DIST"] = dist[r][0]
+                        filtered_df["WA_DIST"] = dist[r][1]
+                        filtered_df["APEX_DIST"] = dist[r][2]
+                        error=np.sqrt(dist[r][0]**2+dist[r][1]**2+dist[r][2]**2)
+                        filtered_df["ERROR"] = error
                         
+                        #filtering disperse masks according to cpa distance criterion 
+                        filter_cpa = filtered_df.loc[filtered_df["CPA_DIST"]>MAX_CPA_DIST]
+                        filtered_df = filtered_df[~filtered_df.isin(filter_cpa)].dropna()
+                        unique_dates = filtered_df["DATE_TIME"].unique()
+                        #filtering cases with more than one mask per day per cluster, keeps one per cluster (the one with the minimal error)
+                        for m in unique_dates:
+                            event = filtered_df[filtered_df['DATE_TIME'] == str(m)]
+                            filtered_mask = event.loc[event['ERROR'].idxmin()]
+                            min_error.append(filtered_mask)
+                            
         
-            min_error_df = pd.DataFrame(min_error)
+                min_error_df = pd.DataFrame(min_error)
         min_error_df = min_error_df.reset_index(drop=True)
         
        
