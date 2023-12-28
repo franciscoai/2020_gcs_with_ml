@@ -16,12 +16,28 @@ from pyGCS_raytrace import pyGCS
 from astropy.io import fits
 from torch.utils.data import DataLoader
 from nn.neural_gcs.cme_mvp_dataset import Cme_MVP_Dataset
-from nn.neural_gcs.sirats_model import SiratsInception, SiratsDistribution
+from nn.neural_gcs.sirats_model import SiratsNet, SiratsInception, SiratsDistribution
 from nn.utils.gcs_mask_generator import maskFromCloud
 from nn.neural_gcs.sirats_config import Configuration
 from pyGCS_raytrace import pyGCS
 from nn.utils.coord_transformation import pnt2arr
 
+
+def load_model(model: SiratsNet, model_folder: Path):
+    model_path = os.path.join(model_folder, 'model.pth')
+    os.makedirs(model_folder, exist_ok=True)  # Ensure directory exists
+    if os.path.isfile(model_path):
+        status = model.load_model(model_path)  # Load directly
+        if status:
+            copy_and_rename_existing_model(model_folder)
+            logging.info(f"Model loaded from: {model_path}\n")
+    else:
+        logging.warning(f"No model found at: {model_path}, starting from scratch\n")
+
+def copy_and_rename_existing_model(model_folder: Path):
+    models_counter = len(os.listdir(model_folder))
+    new_path = os.path.join(model_folder, f"model_run{models_counter}")
+    os.system(f'cp {os.path.join(model_folder, "model.pth")} {new_path}')
 
 def test_specific_image(model, opath, img_size, binary_mask, device):
     sat1_path = Path("/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20110317_filter_True/FMwLASCO201103173_0.fits")
@@ -235,10 +251,9 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
             status = model.save_model(opath)
             logging.info(f"Model saved at: {status}\n")
 
-
 def main():
     # Configuración de parámetros
-    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_distribution_run2.ini"))
+    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run4.ini"))
 
     TRAINDIR = configuration.train_dir
     OPATH = configuration.opath
@@ -260,7 +275,6 @@ def main():
     PAR_RNG = configuration.par_rng
     PAR_LOSS_WEIGHTS = configuration.par_loss_weight
     os.makedirs(OPATH, exist_ok=True)
-
 
     # Logging configuration
     LOGF_PATH = os.path.join(OPATH, 'sirats.log')
@@ -321,11 +335,7 @@ def main():
 
     # Cargar o inicializar el modelo
     if LOAD_MODEL:
-        status = model.load_model(OPATH)
-        if status:
-            logging.info(f"Model loaded from: {status}\n")
-        else:
-            logging.warning(f"No model found at: {OPATH}, starting from scratch\n")
+        load_model(model, os.path.join(OPATH, 'models'))
 
     num_parameters = sum(p.numel() for p in model.parameters())
     logging.info(f'Number of parameters: {num_parameters}\n')
@@ -343,11 +353,12 @@ def main():
         img_counter = 0
         stop_flag = False
         for iteration, (img, targets, sat_masks, occulter_masks, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
-            # img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = img[0], targets[0], sat_masks[0], occulter_masks[0], satpos[0], plotranges[0], idx[0]
             img = img.to(DEVICE)
             predictions = model.infer(img)
-            predictions = predictions.mean
-            # I want to do for image in batch
+
+            if MODEL_ARQ == 'distribution':
+                predictions = predictions.mean()
+
             for i in range(BATCH_SIZE):
                 img_counter += 1
                 logging.info(f"Plotting image {img_counter} of {IMAGES_TO_INFER}")
