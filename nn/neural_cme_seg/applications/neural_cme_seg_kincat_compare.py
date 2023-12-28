@@ -29,7 +29,7 @@ def get_NN(iodir,sat):
     return df_full
 
 def get_GCS(iodir,sat):
-    
+    breakpoint()
     df_list=[]
     odir=iodir+'/'+sat+"/"
     ext_folders = os.listdir(odir)
@@ -43,6 +43,7 @@ def get_GCS(iodir,sat):
             except:
                 continue
     df_full = pd.concat(df_list, ignore_index=True)
+    breakpoint()
     return df_full
 
 
@@ -249,7 +250,7 @@ def get_r(xdf,ydf):
 ################################################################################### MAIN ######################################################################################
 odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1"
 folder="/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications"
-sat="cor2_b"#cor2_b
+sat="cor2_b"#cor2_a
 
 #-----------------
 plot_dir=odir+'/'+sat+'_comparison'
@@ -260,40 +261,15 @@ seeds=get_seeds(folder,sat)
 vourlidas= get_vourlidas(folder,sat)
 gcs=get_GCS(odir,sat)
 df=comparator(NN,seeds,vourlidas,gcs)
-date_to_tag_vourlidas = pd.to_datetime([datetime(2008, 5, 17)])
-date_to_tag_seeds = pd.to_datetime([datetime(2008, 5, 17)])
-date_to_tag_nn = pd.to_datetime([datetime(2008, 5, 17)])
+
+# date_to_tag_vourlidas = pd.to_datetime([datetime(2008, 5, 17)])
+# date_to_tag_seeds = pd.to_datetime([datetime(2008, 5, 17)])
+# date_to_tag_nn = pd.to_datetime([datetime(2008, 5, 17)])
 
 fig, ax = plt.subplots(figsize=(6, 6))
-label = 'VOURLIDAS ; '+get_r(df["GCS_CPA_ANG"], df["VOURLIDAS_CPA_ANG"])
-#ax.errorbar(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"], xerr=df["NN_CPA_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label=label)
-# add a tag to the plot
-
-ax.scatter(df["GCS_CPA_ANG"],df["VOURLIDAS_CPA_ANG"], color='green', label=label)
-for date in date_to_tag_vourlidas:
-    x = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["GCS_CPA_ANG"]
-    y = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["VOURLIDAS_CPA_ANG"]
-    if len(x) > 0:
-        ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
-label = 'SEEDS ; '+get_r(df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"])
-#ax.errorbar(df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"], xerr=df["GCS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label=label)
-ax.scatter(df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"], color='blue', label=label)
-# add a tag to the plot
-for date in date_to_tag_seeds:
-    x = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["GCS_CPA_ANG"]
-    y = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["SEEDS_CPA_ANG"]
-    if len(x) > 0:
-        ax.plot(x,y)
-        ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
-label = 'NN ; '+get_r(df["GCS_CPA_ANG"],df["NN_CPA_ANG_MEDIAN"])
-ax.scatter(df["GCS_CPA_ANG"], df["NN_CPA_ANG_MEDIAN"], color='red', label=label)
-for date in date_to_tag_nn:
-    x = df.loc[df["NN_DATE_TIME"].dt.date==date]["GCS_CPA_ANG"]
-    y = df.loc[df["NN_DATE_TIME"].dt.date==date]["NN_CPA_ANG_MEDIAN"]
-    if len(x) > 0:
-        ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
-
-
+ax.scatter(df["GCS_CPA_ANG"],df["VOURLIDAS_CPA_ANG"], color='green')#, label=label)
+ax.scatter(df["GCS_CPA_ANG"], df["NN_CPA_ANG_MEDIAN"], color='red')#, label=label)
+ax.scatter(df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"], color='blue')#, label=label)
 ax.plot([0, 450], [0, 450], color='black', linestyle='-',linewidth=0.5)
 ax.set_xlim(0, ax.get_xlim()[1])
 ax.set_xlabel('GCS')
@@ -301,110 +277,149 @@ ax.set_title('CPA [deg]')
 ax.legend()
 ax.grid(True)
 fig.savefig(plot_dir + '/CPA_ANG_all2.png', dpi=300, bbox_inches='tight')
+breakpoint()
 
-fig2, ax2 = plt.subplots(figsize=(6, 6))
-label = 'VOURLIDAS ; '+get_r(df["GCS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"])
-ax2.scatter(df["GCS_WIDE_ANG"],df["VOURLIDAS_WIDE_ANG"], color='green', label=label)
-#ax2.errorbar(df["GCS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"], xerr=df["NN_WIDE_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label=label)
-# add a tag to the plot
-for date in date_to_tag_vourlidas:
-    x = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["GCS_WIDE_ANG"]
-    y = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["VOURLIDAS_WIDE_ANG"]
-    if len(x) > 0:
-        ax2.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
-label = 'SEEDS ; '+get_r(df["GCS_WIDE_ANG"], df["SEEDS_WIDE_ANG"])
-ax2.scatter(df["GCS_WIDE_ANG"], df["SEEDS_WIDE_ANG"], color='blue', label=label)
-#ax2.errorbar(df["NN_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"], xerr=df["NN_WIDE_ANG_STD"], fmt='o', color='blue', ecolor='gray', capsize=5, label=label)
-# add a tag to the plot
-for date in date_to_tag_seeds:
-    x = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["GCS_WIDE_ANG"]
-    y = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["SEEDS_WIDE_ANG"]
-    if len(x) > 0:
-        ax2.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+# fig, ax = plt.subplots(figsize=(6, 6))
+# label = 'VOURLIDAS ; '+get_r(df["GCS_CPA_ANG"], df["VOURLIDAS_CPA_ANG"])
+# #ax.errorbar(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"], xerr=df["NN_CPA_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label=label)
+# # add a tag to the plot
 
-label = 'NN ; '+get_r(df["GCS_WIDE_ANG"],df["NN_WIDE_ANG_MEDIAN"])
-ax2.scatter(df["GCS_WIDE_ANG"], df["NN_WIDE_ANG_MEDIAN"], color='red', label=label)
-for date in date_to_tag_nn:
-    x = df.loc[df["NN_DATE_TIME"].dt.date==date]["GCS_WIDE_ANG"]
-    y = df.loc[df["NN_DATE_TIME"].dt.date==date]["NN_WIDE_ANG_MEDIAN"]
-    if len(x) > 0:
-        ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
-
-ax2.plot([0, 250], [0, 250], color='black', linestyle='-',linewidth=0.5)
-ax2.set_xlim(0, ax2.get_xlim()[1])
-ax2.set_xlabel('GCS')
-ax2.set_title('AW [deg]')
-ax2.legend()
-ax2.grid(True)
-fig2.savefig(plot_dir + '/WIDE_ANG_all2.png', dpi=300, bbox_inches='tight')
+# ax.scatter(df["GCS_CPA_ANG"],df["VOURLIDAS_CPA_ANG"], color='green', label=label)
+# for date in date_to_tag_vourlidas:
+#     x = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["GCS_CPA_ANG"]
+#     y = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["VOURLIDAS_CPA_ANG"]
+#     if len(x) > 0:
+#         ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+# label = 'SEEDS ; '+get_r(df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"])
+# #ax.errorbar(df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"], xerr=df["GCS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label=label)
+# ax.scatter(df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"], color='blue', label=label)
+# # add a tag to the plot
+# for date in date_to_tag_seeds:
+#     x = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["GCS_CPA_ANG"]
+#     y = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["SEEDS_CPA_ANG"]
+#     if len(x) > 0:
+#         ax.plot(x,y)
+#         ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+# label = 'NN ; '+get_r(df["GCS_CPA_ANG"],df["NN_CPA_ANG_MEDIAN"])
+# ax.scatter(df["GCS_CPA_ANG"], df["NN_CPA_ANG_MEDIAN"], color='red', label=label)
+# for date in date_to_tag_nn:
+#     x = df.loc[df["NN_DATE_TIME"].dt.date==date]["GCS_CPA_ANG"]
+#     y = df.loc[df["NN_DATE_TIME"].dt.date==date]["NN_CPA_ANG_MEDIAN"]
+#     if len(x) > 0:
+#         ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
 
 
-fig3, (ax3, ax4, ax5) = plt.subplots(1, 3, figsize=(18, 6))
-ax3.errorbar(df["GCS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='GCS vs VOURLIDAS')
-plot_fit(ax3,df["GCS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"])
-ax3.plot([0, 350], [0, 350], color='black', linestyle='-',linewidth=0.5)
-ax3.set_xlim(0, ax3.get_xlim()[1])
-ax3.set_xlabel('GCS')
-ax3.set_ylabel('Vourlidas')
-ax3.set_title('AW [deg]')
-ax3.legend()
-ax3.grid(True)
-ax4.errorbar( df["GCS_WIDE_ANG"], df["SEEDS_WIDE_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='GCS vs SEEDS')
-plot_fit(ax4,df["GCS_WIDE_ANG"], df["SEEDS_WIDE_ANG"])
-ax4.plot([0, 450], [0, 450], color='black', linestyle='-',linewidth=0.5)
-ax4.set_xlim(0, ax4.get_xlim()[1])
-ax4.set_ylabel('Seeds')
-ax4.set_xlabel('GCS')
-ax4.set_title('AW [deg]')
-ax4.legend()
-ax4.grid(True)
-ax5.errorbar(df["GCS_WIDE_ANG"],df["NN_WIDE_ANG_MEDIAN"], fmt='o', color='blue', ecolor='gray', capsize=5, label='GCS vs NN')
-plot_fit(ax5,df["GCS_WIDE_ANG"],df["NN_WIDE_ANG_MEDIAN"])
-ax5.plot([0, 550], [0, 550], color='black', linestyle='-',linewidth=0.5)
-ax5.set_xlim(0, ax5.get_xlim()[1])
-ax5.set_ylabel('NN')
-ax5.set_xlabel('GCS')
-ax5.set_title('AW [deg]')
-ax5.legend()
-ax5.grid(True)
-fig3.savefig(plot_dir + '/WIDE_ANG2.png', dpi=300, bbox_inches='tight')
+# ax.plot([0, 450], [0, 450], color='black', linestyle='-',linewidth=0.5)
+# ax.set_xlim(0, ax.get_xlim()[1])
+# ax.set_xlabel('GCS')
+# ax.set_title('CPA [deg]')
+# ax.legend()
+# ax.grid(True)
+# fig.savefig(plot_dir + '/CPA_ANG_all2.png', dpi=300, bbox_inches='tight')
+
+# fig2, ax2 = plt.subplots(figsize=(6, 6))
+# label = 'VOURLIDAS ; '+get_r(df["GCS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"])
+# ax2.scatter(df["GCS_WIDE_ANG"],df["VOURLIDAS_WIDE_ANG"], color='green', label=label)
+# #ax2.errorbar(df["GCS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"], xerr=df["NN_WIDE_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label=label)
+# # add a tag to the plot
+# for date in date_to_tag_vourlidas:
+#     x = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["GCS_WIDE_ANG"]
+#     y = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["VOURLIDAS_WIDE_ANG"]
+#     if len(x) > 0:
+#         ax2.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+# label = 'SEEDS ; '+get_r(df["GCS_WIDE_ANG"], df["SEEDS_WIDE_ANG"])
+# ax2.scatter(df["GCS_WIDE_ANG"], df["SEEDS_WIDE_ANG"], color='blue', label=label)
+# #ax2.errorbar(df["NN_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"], xerr=df["NN_WIDE_ANG_STD"], fmt='o', color='blue', ecolor='gray', capsize=5, label=label)
+# # add a tag to the plot
+# for date in date_to_tag_seeds:
+#     x = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["GCS_WIDE_ANG"]
+#     y = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["SEEDS_WIDE_ANG"]
+#     if len(x) > 0:
+#         ax2.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+
+# label = 'NN ; '+get_r(df["GCS_WIDE_ANG"],df["NN_WIDE_ANG_MEDIAN"])
+# ax2.scatter(df["GCS_WIDE_ANG"], df["NN_WIDE_ANG_MEDIAN"], color='red', label=label)
+# for date in date_to_tag_nn:
+#     x = df.loc[df["NN_DATE_TIME"].dt.date==date]["GCS_WIDE_ANG"]
+#     y = df.loc[df["NN_DATE_TIME"].dt.date==date]["NN_WIDE_ANG_MEDIAN"]
+#     if len(x) > 0:
+#         ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+
+# ax2.plot([0, 250], [0, 250], color='black', linestyle='-',linewidth=0.5)
+# ax2.set_xlim(0, ax2.get_xlim()[1])
+# ax2.set_xlabel('GCS')
+# ax2.set_title('AW [deg]')
+# ax2.legend()
+# ax2.grid(True)
+# fig2.savefig(plot_dir + '/WIDE_ANG_all2.png', dpi=300, bbox_inches='tight')
+
+
+# fig3, (ax3, ax4, ax5) = plt.subplots(1, 3, figsize=(18, 6))
+# ax3.errorbar(df["GCS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='GCS vs VOURLIDAS')
+# plot_fit(ax3,df["GCS_WIDE_ANG"], df["VOURLIDAS_WIDE_ANG"])
+# ax3.plot([0, 350], [0, 350], color='black', linestyle='-',linewidth=0.5)
+# ax3.set_xlim(0, ax3.get_xlim()[1])
+# ax3.set_xlabel('GCS')
+# ax3.set_ylabel('Vourlidas')
+# ax3.set_title('AW [deg]')
+# ax3.legend()
+# ax3.grid(True)
+# ax4.errorbar( df["GCS_WIDE_ANG"], df["SEEDS_WIDE_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='GCS vs SEEDS')
+# plot_fit(ax4,df["GCS_WIDE_ANG"], df["SEEDS_WIDE_ANG"])
+# ax4.plot([0, 450], [0, 450], color='black', linestyle='-',linewidth=0.5)
+# ax4.set_xlim(0, ax4.get_xlim()[1])
+# ax4.set_ylabel('Seeds')
+# ax4.set_xlabel('GCS')
+# ax4.set_title('AW [deg]')
+# ax4.legend()
+# ax4.grid(True)
+# ax5.errorbar(df["GCS_WIDE_ANG"],df["NN_WIDE_ANG_MEDIAN"], fmt='o', color='blue', ecolor='gray', capsize=5, label='GCS vs NN')
+# plot_fit(ax5,df["GCS_WIDE_ANG"],df["NN_WIDE_ANG_MEDIAN"])
+# ax5.plot([0, 550], [0, 550], color='black', linestyle='-',linewidth=0.5)
+# ax5.set_xlim(0, ax5.get_xlim()[1])
+# ax5.set_ylabel('NN')
+# ax5.set_xlabel('GCS')
+# ax5.set_title('AW [deg]')
+# ax5.legend()
+# ax5.grid(True)
+# fig3.savefig(plot_dir + '/WIDE_ANG2.png', dpi=300, bbox_inches='tight')
              
-fig4, (ax6, ax7, ax8) = plt.subplots(1, 3, figsize=(18, 6))
-ax6.errorbar(df["GCS_CPA_ANG"], df["VOURLIDAS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='GCS vs SEEDS')
-plot_fit(ax6,df["GCS_CPA_ANG"], df["VOURLIDAS_CPA_ANG"])
-ax6.plot([0, 650], [0, 650], color='black', linestyle='-',linewidth=0.5)
-ax6.set_xlim(0, ax6.get_xlim()[1])
-ax6.set_xlabel('GCS')
-ax6.set_ylabel('Vourlidas')
-ax6.set_title('CPA [deg]')
-ax6.legend()
-ax6.grid(True)
-ax7.errorbar( df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='GCS vs SEEDS')
-plot_fit(ax7,df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"])
-ax7.plot([0, 500], [0, 500], color='black', linestyle='-',linewidth=0.5)
-ax7.set_xlim(0, ax7.get_xlim()[1])
-ax7.set_ylabel('Seeds')
-ax7.set_xlabel('GCS')
-ax7.set_title('CPA [deg]')
-ax7.legend()
-ax7.grid(True)
-# print thge date of all events that have Seeds/NN CPA > 1.5
-print(f'Seeds/GCS CPA>1.5 \n',df.loc[df["SEEDS_CPA_ANG"]/df["GCS_CPA_ANG"]>1.5]["NN_DATE_TIME"])
-print(f'Seeds/GCS CPA<0.5 \n',df.loc[df["SEEDS_CPA_ANG"]/df["GCS_CPA_ANG"]<0.5]["NN_DATE_TIME"])
-ax8.errorbar(df["GCS_CPA_ANG"],df["NN_CPA_ANG_MEDIAN"], fmt='o', color='blue', ecolor='gray', capsize=8, label='GCS vs NN')
-plot_fit(ax8,df["GCS_CPA_ANG"],df["NN_CPA_ANG_MEDIAN"])
-ax8.plot([0, 500], [0, 500], color='black', linestyle='-',linewidth=0.5)
-#ax8.set_xlim(0, ax8.get_xlim()[1])
-ax8.set_ylabel('NN')
-ax8.set_xlabel('GCS')
-ax8.set_title('CPA [deg]')
-ax8.legend()
-ax8.grid(True)
-fig4.savefig(plot_dir + '/CPA_ANG2.png', dpi=300, bbox_inches='tight')
+# fig4, (ax6, ax7, ax8) = plt.subplots(1, 3, figsize=(18, 6))
+# ax6.errorbar(df["GCS_CPA_ANG"], df["VOURLIDAS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='GCS vs SEEDS')
+# plot_fit(ax6,df["GCS_CPA_ANG"], df["VOURLIDAS_CPA_ANG"])
+# ax6.plot([0, 650], [0, 650], color='black', linestyle='-',linewidth=0.5)
+# ax6.set_xlim(0, ax6.get_xlim()[1])
+# ax6.set_xlabel('GCS')
+# ax6.set_ylabel('Vourlidas')
+# ax6.set_title('CPA [deg]')
+# ax6.legend()
+# ax6.grid(True)
+# ax7.errorbar( df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=5, label='GCS vs SEEDS')
+# plot_fit(ax7,df["GCS_CPA_ANG"], df["SEEDS_CPA_ANG"])
+# ax7.plot([0, 500], [0, 500], color='black', linestyle='-',linewidth=0.5)
+# ax7.set_xlim(0, ax7.get_xlim()[1])
+# ax7.set_ylabel('Seeds')
+# ax7.set_xlabel('GCS')
+# ax7.set_title('CPA [deg]')
+# ax7.legend()
+# ax7.grid(True)
+# # print thge date of all events that have Seeds/NN CPA > 1.5
+# print(f'Seeds/GCS CPA>1.5 \n',df.loc[df["SEEDS_CPA_ANG"]/df["GCS_CPA_ANG"]>1.5]["NN_DATE_TIME"])
+# print(f'Seeds/GCS CPA<0.5 \n',df.loc[df["SEEDS_CPA_ANG"]/df["GCS_CPA_ANG"]<0.5]["NN_DATE_TIME"])
+# ax8.errorbar(df["GCS_CPA_ANG"],df["NN_CPA_ANG_MEDIAN"], fmt='o', color='blue', ecolor='gray', capsize=8, label='GCS vs NN')
+# plot_fit(ax8,df["GCS_CPA_ANG"],df["NN_CPA_ANG_MEDIAN"])
+# ax8.plot([0, 500], [0, 500], color='black', linestyle='-',linewidth=0.5)
+# #ax8.set_xlim(0, ax8.get_xlim()[1])
+# ax8.set_ylabel('NN')
+# ax8.set_xlabel('GCS')
+# ax8.set_title('CPA [deg]')
+# ax8.legend()
+# ax8.grid(True)
+# fig4.savefig(plot_dir + '/CPA_ANG2.png', dpi=300, bbox_inches='tight')
              
-plt.show()
-plt.close()
+# plt.show()
+# plt.close()
 
 
 
-#df.loc[df["SEEDS_WIDE_ANG"]>200]
+# #df.loc[df["SEEDS_WIDE_ANG"]>200]
