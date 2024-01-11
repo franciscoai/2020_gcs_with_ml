@@ -309,9 +309,10 @@ ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=fi
 
 zeros = np.zeros(np.shape(ok_orig_img[0]))
 all_idx=[]
-new_ok_dates=[datetime.utcfromtimestamp(dt.astype(int) * 1e-9) for dt in ok_dates]
+#new_ok_dates=[datetime.utcfromtimestamp(dt.astype(int) * 1e-9) for dt in ok_dates]
+
 for date in all_dates:
-    if date not in new_ok_dates:
+    if date not in ok_dates:
         idx = all_dates.index(date)
         all_idx.append(idx)
        
@@ -342,7 +343,7 @@ for m in range(len(ok_dates)):
             #h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
             #h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
             fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
-    breakpoint() 
+     
     plot_to_png2(opath+file_names[m]+"infer2.png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[m]])  
 
 
