@@ -1039,6 +1039,7 @@ class neural_cme_segmentation():
                 all_mask_prop.append([mask_prop[j] for j in ok_ind])
                 all_plate_scl.append(in_plate_scl[i])
                 all_dates.append(dates[i])
+        
         if len(all_masks)>=2:
             # keeps only one mask per img based on cpa, aw and apex radius evolution consistency
             if filter:
@@ -1046,19 +1047,22 @@ class neural_cme_segmentation():
                 # plots parameters
                 if plot_params is not None:
                      self._plot_mask_prop2(df, self.plot_params , ending='_filtered')
-                ok_dates=sorted(df['DATE_TIME'].unique())
+                #ok_dates=sorted(df['DATE_TIME'].unique())
+                ok_dates=df['DATE_TIME'].unique() #no aplico un sort ya que al hacerlo puede que el index del df no coincida con el de all_orig_img. Creo que es mas robusto asi.
                 for m in ok_dates:
                     event = df[df['DATE_TIME'] == m]
                     if event["MASK"].isnull().all():
                         idx = dates.index(m)
-                        all_orig_img.pop(idx)
-
+                        all_orig_img.pop(idx) #quita imagenes que no tengan mascaras asociadas.
+                
                 all_idx=[]
                 for date in dates:
                     if date not in ok_dates:
                         idx = dates.index(date)
+                        all_idx.append(idx) #sin esta linea el for no cummple ningun roll, ni la linea posterior
                 all_orig_img = [elemento for s, elemento in enumerate(all_orig_img) if s not in all_idx]      
                 df = df.dropna(subset=['MASK']) 
+                #breakpoint()
                 return all_orig_img,ok_dates, df
                         
 
