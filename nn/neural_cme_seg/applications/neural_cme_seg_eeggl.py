@@ -200,10 +200,11 @@ scr_threshold = 0.25 # only detections with score larger than this value are con
 
 
 #main
-gpu=0 # GPU to use
+gpu=1 # GPU to use
+#If gpu 1 is out of ram, use gpu=0 or cpu. Check gpu status using nvidia-smi command on terminal.
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
-
+#breakpoint()
 #OBS: files is a list of all files but NOT in correct temporal order.
 #loads images
 files = os.listdir(ipath)
@@ -286,7 +287,7 @@ for j in range(1,len(image_names)):
         
     #centerpix=[255,265])
     # plot the predicted mask
-        ofile = opath+"/"+os.path.basename(image_names[j])+'.png'
+        ofile = opath+"/"+os.path.basename(image_names[j])+'infer1.png'
         plot_to_png(ofile, [orig_img], [masks], scores=[scores], labels=[labels], boxes=[boxes])
     
     #----------------------------------------------------------------------------------------
@@ -341,8 +342,8 @@ for m in range(len(ok_dates)):
             #h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
             #h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
             fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
-     
-    plot_to_png2(opath+file_names[m]+".png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[m]])  
+    breakpoint() 
+    plot_to_png2(opath+file_names[m]+"infer2.png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[m]])  
 
 
 
