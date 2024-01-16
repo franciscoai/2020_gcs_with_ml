@@ -152,7 +152,6 @@ def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, pl
     cmap = mpl.colors.ListedColormap(color)
 
     error = []
-
     for i in range(IMG_SIZE[0]):
         mask_infered_sat = maskFromCloud(prediction, satpos=[satpos[i, :]], imsize=IMG_SIZE[1:3], plotranges=[plotranges[i, :]])
         masks_infered = np.zeros(IMG_SIZE)
@@ -171,8 +170,7 @@ def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, pl
         nan_mask = np.full(IMG_SIZE[1:3], np.nan)
         nan_occulter = np.full(IMG_SIZE[1:3], np.nan)
 
-        img[i, :, :][img[i, :, :] <= 0] = np.nan
-        img[i, :, :][img[i, :, :] > 0] = 0
+
         sat_mask_for_err[sat_mask_for_err <= 0] = np.nan
         sat_mask_for_err[sat_mask_for_err > 0] = 0
 
@@ -186,13 +184,12 @@ def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, pl
         non_overlapping_area = calculate_non_overlapping_area(sat_masks_for_err[i], masks_infered[i])
         
         error.append(non_overlapping_area)
-
         ax[0][i].imshow(sat_mask_for_err, vmin=0, vmax=len(color) - 1, cmap=cmap)
         ax[0][i].imshow(nan_mask, cmap=cmap, alpha=0.6, vmin=0, vmax=len(color) - 1)
         #ax[0][i].imshow(nan_occulter, cmap=cmap, alpha=0.25, vmin=0, vmax=len(color) - 1)
         ax[0][i].set_title(f'non-overlapping area: {np.around(non_overlapping_area, 3)}')
 
-        ax[1][i].imshow(img[i, :, :], cmap="gray")
+        ax[1][i].imshow(img[i, :, :], cmap="gray", vmin=0, vmax=1)
         ax[1][i].imshow(arr_cloud, cmap='Greens', alpha=0.6, vmin=0, vmax=1)
 
     masks_dir = os.path.join(opath, 'infered_masks')
@@ -253,7 +250,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
 
 def main():
     # Configuración de parámetros
-    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run5.ini"))
+    configuration = Configuration(Path("/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run4.ini"))
 
     TRAINDIR = configuration.train_dir
     OPATH = configuration.opath
