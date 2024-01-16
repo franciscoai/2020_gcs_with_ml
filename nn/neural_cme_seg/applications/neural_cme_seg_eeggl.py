@@ -47,7 +47,7 @@ def read_fits(file_path, header=False, imageSize=[512,512],smooth_kernel=[0,0]):
         print(f'WARNING. I could not find file {file_path}')
         return None
     
-def plot_to_png(ofile, orig_img, masks, scr_threshold=0.05, mask_threshold=0.55 , title=None, labels=None, boxes=None, scores=None):
+def plot_to_png(ofile, orig_img, masks, scr_threshold=0.25, mask_threshold=0.7 , title=None, labels=None, boxes=None, scores=None):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
@@ -135,7 +135,7 @@ model_version="v4"
 #----------------eeggl
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2011_02_15/eeggl_synthetic/run005/'
 
-ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/Cor2A/lvl1/'
+#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/Cor2A/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/Cor2B/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/C2/lvl1/'
 
@@ -153,13 +153,13 @@ ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/Cor2A/lvl1/'
 
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/Cor2A/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/Cor2B/lvl1/'
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/C2/lvl1/'
+ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/C2/lvl1/'
 
 #----------------
 #aux="oculter_60_250/"
 aux="occ_medida_RD_infer2/"
 
-opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/Cor2A/'+aux
+#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/Cor2A/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/Cor2B/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/C2/'+aux
 
@@ -177,7 +177,7 @@ opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/Cor2A/'+aux
 
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/Cor2A/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/Cor2B/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/C2/'+aux
+opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/C2/'+aux
 
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/'
 file_ext=".fts"
@@ -185,17 +185,18 @@ trained_model = '6000.torch'
 #-----------------------------
 base_difference = False
 running_difference = True
-instr='cor2_a'
+#instr='cor2_a'
 #instr='cor2_b'
-#instr='lascoC2'
+instr='lascoC2'
 infer_event2=True
-infer_event1=False
+infer_event1=True
 #----------------------------
-#occ_center=None
-occ_center=[[256,256],[260,247]]
+
+if instr != 'lascoC2':
+    occ_center=[[256,256],[260,247]]
 occ_size = [50,52]
 mask_threshold = 0.6 # value to consider a pixel belongs to the object
-scr_threshold = 0.25 # only detections with score larger than this value are considered
+scr_threshold = 0.4 # only detections with score larger than this value are considered
 
 
 
@@ -250,6 +251,11 @@ elif instr=="cor2_b":
         occ_center=occ_center[1]
     #else:
     #    occ_center=[hdr1["crpix1"],hdr1["crpix2"]]
+if instr=="lascoC2":
+    occ_size = 90
+    
+if infer_event2:
+    os.makedirs(opath+'mask_props/', exist_ok=True)
 
 for j in range(1,len(image_names)):
         
@@ -262,8 +268,9 @@ for j in range(1,len(image_names)):
     if running_difference:
         img0, hdr0 = read_fits(ipath+image_names[j-1],header=True)
         img1, hdr1 = read_fits(ipath+image_names[j  ],header=True)
-   
-    if not occ_center:
+    
+    #if 'occ_center' != locals():
+    if instr =="lascoC2":    
         occ_center=[hdr1["crpix1"],hdr1["crpix2"]]
         #En esta resta asumimos que ambas imagenes tienen igual centerpix1/2, y ambas son north up.
     img_diff = img1 - img0
@@ -275,26 +282,44 @@ for j in range(1,len(image_names)):
     #Cor2 con mascara original
         #orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, getmask=True,hdr=hdr1) 
     
-    #Cor2 con mascara centrada ---> Cor2B me funciona mejor con esto, usando crpix1/2
-        #orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=60,centerpix=occ_center,occulter_size_ext=255)
-    
-    #Cor2 con mascara centrada (a medida) ---> Cor2A me funciona mejor con esto
-        #orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=occ_size,centerpix=occ_center,occulter_size_ext=250)
-    
-    #C2
-    #if infer_event1:    
-        orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=90,centerpix=occ_center,occulter_size_ext=300)
+        if instr=='cor2_b':
+            #Cor2 con mascara centrada ---> Cor2B me funciona mejor con esto, usando crpix1/2
+            orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=70,centerpix=occ_center,occulter_size_ext=250)
         
-    #centerpix=[255,265])
+        if instr=='cor2_a':
+            #Cor2 con mascara centrada (a medida) ---> Cor2A me funciona mejor con esto
+            orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=occ_size,centerpix=occ_center,occulter_size_ext=250)
+    
+    
+        if instr=='lascoC2':    
+            #C2
+            orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=occ_size,centerpix=occ_center,occulter_size_ext=300)
+        
     # plot the predicted mask
         ofile = opath+"/"+os.path.basename(image_names[j])+'infer1.png'
         plot_to_png(ofile, [orig_img], [masks], scores=[scores], labels=[labels], boxes=[boxes])
-    
+        
+        
+        #contour_plot = plt.contour(asd)
+        #plt.colorbar(contour_plot, label='Matrix Values')
+        #plt.savefig('contour'+ofile)
+        #plt.close()
     #----------------------------------------------------------------------------------------
     #infer2
     if infer_event2:
         
-        date= datetime.strptime(image_names[j][0:-10],'%Y%m%d_%H%M%S')
+        if instr != 'lascoC2':    
+            date = datetime.strptime(image_names[j][0:-10],'%Y%m%d_%H%M%S')
+        else:
+            date_string = hdr1['fileorig'][:-4]
+            if int(date_string[:2]) < 94: #soho was launched in 1995
+                aux = '20'
+            else:
+                aux = '19'
+            date_string = aux + date_string
+            date = datetime.strptime(date_string,'%Y%m%d_%H%M%S')
+        #breakpoint()
+    
         plt_scl = hdr1['CDELT1']
         all_center.append(occ_center)
         all_plate_scl.append(plt_scl)                    
