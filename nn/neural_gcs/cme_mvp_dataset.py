@@ -67,12 +67,14 @@ class Cme_MVP_Dataset(Dataset):
                 else:
                     sat_imgs = [f for f in os.listdir(self.imgs[idx]) if f != 'mask']
                     sat_imgs.sort(key=lambda x: x.split('sat')[1].split('.')[0]) # Sort by satellite number
-                    for sat_img in sat_imgs:
-                        sat_img = read_image(os.path.join(self.imgs[idx], sat_img), mode=torchvision.io.image.ImageReadMode.GRAY)
+                    j=0
+                    for sat in sat_imgs:
+                        sat = read_image(os.path.join(self.imgs[idx], sat), mode=torchvision.io.image.ImageReadMode.GRAY)
                         if flag:
-                            img = torch.zeros((self.num_vp, sat_img.shape[1], sat_img.shape[2]))
+                            img = torch.zeros((self.num_vp, sat.shape[1], sat.shape[2]))
                             flag = False
-                        img[i, :, :] = sat_img
+                        img[j, :, :] = sat
+                        j+=1
                     
             img = img.float()
             img = self.__normalize(img)
@@ -139,7 +141,6 @@ class Cme_MVP_Dataset(Dataset):
             
         if torch.isnan(img).any():
             raise ValueError("NaN values found in the image tensor.")
-            
         return img
 
     def __define_transforms(self):
