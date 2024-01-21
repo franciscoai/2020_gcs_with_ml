@@ -672,7 +672,7 @@ class neural_cme_segmentation():
         else: 
             n_clusters_range = range(2, 5) 
         for n_clusters in n_clusters_range:
-            kmeans = KMeans(n_clusters=n_clusters, random_state=0)
+            kmeans = KMeans(n_clusters=n_clusters, random_state=0,n_init=10)
             km_labels = kmeans.fit_predict(data)
             #Verify if every cluster has the minimum amount of points
             cluster_counts = pd.Series(km_labels).value_counts()
@@ -685,9 +685,10 @@ class neural_cme_segmentation():
         if len(silhouette_scores)>0:
             optimal_n_clusters = n_clusters_range[np.argmax(silhouette_scores)]
             #Adjust KMEANS to optimal cluster number
-            kmeans = KMeans(n_clusters=optimal_n_clusters,random_state=0)
+            kmeans = KMeans(n_clusters=optimal_n_clusters,random_state=0,n_init=10) #n_init=10 is relevant from sklearn 1.4+
             labels = kmeans.fit_predict(data)
             df['CME_ID'] = [int(i) for i in labels]
+            breakpoint()
             clusters_median=[]
             for i in df['CME_ID'].unique():
                 median=np.median(df.loc[df['CME_ID']==i,'CPA'])

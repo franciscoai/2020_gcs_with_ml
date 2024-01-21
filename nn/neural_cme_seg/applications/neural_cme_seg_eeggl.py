@@ -129,13 +129,15 @@ def plot_to_png2(ofile, orig_img, event, all_center, mask_threshold, scr_thresho
 
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
+#aux_in = "/gehme-gpu"
+aux_in = "/gehme-gpu"
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 model_version="v4"
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2011_02_15/data/cor2b/'
 #----------------eeggl
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2011_02_15/eeggl_synthetic/run005/'
 
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/Cor2A/lvl1/'
+ipath = aux_in+'/projects/2023_eeggl_validation/data/2012-07-12/Cor2A/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/Cor2B/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/C2/lvl1/'
 
@@ -153,13 +155,13 @@ model_version="v4"
 
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/Cor2A/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/Cor2B/lvl1/'
-ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/C2/lvl1/'
+#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/C2/lvl1/'
 
 #----------------
 #aux="oculter_60_250/"
 aux="occ_medida_RD_infer2/"
-
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/Cor2A/'+aux
+aux_out='/gehme'
+opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/Cor2A/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/Cor2B/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/C2/'+aux
 
@@ -177,7 +179,7 @@ aux="occ_medida_RD_infer2/"
 
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/Cor2A/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/Cor2B/'+aux
-opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/C2/'+aux
+#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/C2/'+aux
 
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/'
 file_ext=".fts"
@@ -185,9 +187,9 @@ trained_model = '6000.torch'
 #-----------------------------
 base_difference = False
 running_difference = True
-#instr='cor2_a'
+instr='cor2_a'
 #instr='cor2_b'
-instr='lascoC2'
+#instr='lascoC2'
 infer_event2=True
 infer_event1=True
 #----------------------------
@@ -201,7 +203,7 @@ scr_threshold = 0.4 # only detections with score larger than this value are cons
 
 
 #main
-gpu=1 # GPU to use
+gpu=0 # GPU to use
 #If gpu 1 is out of ram, use gpu=0 or cpu. Check gpu status using nvidia-smi command on terminal.
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
@@ -328,7 +330,8 @@ for j in range(1,len(image_names)):
         all_occ_size.append(occ_size)
         file_names.append(image_names[j])
         all_headers.append(hdr1)
-#breakpoint()
+
+#if infer_event2:
 ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,plot_params=opath+'mask_props')
 
 
@@ -340,7 +343,7 @@ for date in all_dates:
     if date not in ok_dates:
         idx = all_dates.index(date)
         all_idx.append(idx)
-       
+    
 file_names = [file_name for h, file_name in enumerate(file_names) if h not in all_idx]
 all_center =[all_center for h,all_center in enumerate(all_center) if h not in all_idx]
 all_plate_scl =[all_plate_scl for h,all_plate_scl in enumerate(all_plate_scl) if h not in all_idx]
@@ -368,9 +371,9 @@ for m in range(len(ok_dates)):
             #h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
             #h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
             fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
-     
     plot_to_png2(opath+file_names[m]+"infer2.png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[m]])  
 
+print("Program finished without errors")
 
 
 
