@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 import glob
 from scipy.ndimage.filters import gaussian_filter
 import pickle
+from scipy.interpolate import interp2d
 
 def read_fits(file_path, header=False, imageSize=[512,512],smooth_kernel=[0,0]):
     try:       
@@ -127,6 +128,61 @@ def plot_to_png2(ofile, orig_img, event, all_center, mask_threshold, scr_thresho
     plt.savefig(ofile)
     plt.close()
 
+#specific for eeggl functions
+def rebin_interp(img,new_size=[512,512]):
+    #rebinea imagenes, por default a 512
+    x1 = np.linspace(0, img.shape[0], img.shape[0])-img.shape[0]
+    y1 = np.linspace(0, img.shape[1], img.shape[1])-img.shape[1]
+    fun = interp2d(x1, y1, img, kind='linear')
+    x = np.linspace(0, img.shape[0], new_size[0])-img.shape[0]
+    y = np.linspace(0, img.shape[1], new_size[1])-img.shape[1]
+    Z3 = fun(x, y)
+    return Z3
+
+def vec_to_matrix(vec,dim_matrix):
+    #dim_matrix 300 en el caso de eeggl sta/b
+    matrix = [vec[i:i+dim_matrix] for i in range(0, len(vec), dim_matrix)]
+    matrix = np.array(matrix)
+    matrix = matrix.T #traspongo xq la imagen se lee fila por fila desde 0,0 esquina izq arriba hacia abajo y luego fila por fila hacia la derecha.
+    matrix = matrix.astype("float32")   
+    return matrix
+
+def create_header(matrix,time):
+    header = fits.Header()
+    header['NAXIS1'] = matrix.shape[0]
+    header['NAXIS2'] = matrix.shape[1]
+    header['time'] = time
+
+def read_dat(file,path="",dim_matrix=300):
+    pos_x=[]
+    pos_y=[]
+    pos_wl=[]
+    pos_pb=[]
+    #print(path+file)
+    
+    with open(path+file, 'r') as file:
+    # Read all lines into a list
+        line0, line1, line2, line3, line4, line5, line6, line7 = [file.readline() for _ in range(8)]
+        time_event = line3
+        time_event_start = line4
+        time_seconds = line5
+
+    # Process each line
+        for line in file:            
+            x, y, wl, pb = map(float, line.split())
+            pos_x.append(x)
+            pos_y.append(y)
+            pos_wl.append(wl)
+            pos_pb.append(pb)
+    
+    x_pos  = vec_to_matrix(pos_x,dim_matrix)
+    y_pos  = vec_to_matrix(pos_y,dim_matrix)
+    wl_pos = vec_to_matrix(pos_wl,dim_matrix)
+    pb_pos = vec_to_matrix(pos_pb,dim_matrix)
+    hdr = create_header(matrix=wl_pos,time=time_event)
+    return x_pos, y_pos, wl_pos, pb_pos,hdr
+
+
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
 #aux_in = "/gehme-gpu"
@@ -182,16 +238,21 @@ opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/Cor2A/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/C2/'+aux
 
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/'
-file_ext=".fts"
+#-------------
+
+file_ext=".dat"
+#file_ext=".fts"
 trained_model = '6000.torch'
 #-----------------------------
+eeggl = 'True'
 base_difference = False
 running_difference = True
 instr='cor2_a'
 #instr='cor2_b'
 #instr='lascoC2'
-infer_event2=True
+infer_event2=False
 infer_event1=True
+
 #----------------------------
 
 if instr != 'lascoC2':
@@ -212,8 +273,9 @@ print(f'Using device:  {device}')
 #loads images
 files = os.listdir(ipath)
 files = [os.path.join(ipath, e) for e in files]
+breakpoint()
 files = [e for e in files if os.path.splitext(e)[1] == file_ext]
-
+breakpoint()
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 
@@ -228,7 +290,10 @@ os.makedirs(opath, exist_ok=True)
 #El infer debe pasar el header que se utilizara para las nuevas mascaras!! 
 
 #list of all images in temporal order.
-with open(ipath+'list.txt', 'r') as file:
+list_name = 'list.txt'
+if eeggl:
+    list_name = 'lista_sta_cor2_ordenada.txt'
+with open(ipath+list_name, 'r') as file:
     lines = file.readlines()
 image_names = [line.strip() for line in lines]
 
@@ -260,23 +325,32 @@ if infer_event2:
     os.makedirs(opath+'mask_props/', exist_ok=True)
 
 for j in range(1,len(image_names)):
-        
-    if base_difference:
-        #First image set to background
-        img0, hdr0 = read_fits(ipath+image_names[0],header=True)
-        img1, hdr1 = read_fits(ipath+image_names[j],header=True)
-#    img_diff[img_mask == 0] = 0
-        
-    if running_difference:
-        img0, hdr0 = read_fits(ipath+image_names[j-1],header=True)
-        img1, hdr1 = read_fits(ipath+image_names[j  ],header=True)
-    
-    #if 'occ_center' != locals():
-    if instr =="lascoC2":    
-        occ_center=[hdr1["crpix1"],hdr1["crpix2"]]
-        #En esta resta asumimos que ambas imagenes tienen igual centerpix1/2, y ambas son north up.
+
+    if ~eeggl:        
+        if base_difference:
+            #First image set to background
+            img0, hdr0 = read_fits(ipath+image_names[0],header=True)
+            img1, hdr1 = read_fits(ipath+image_names[j],header=True)
+        #    img_diff[img_mask == 0] = 0
+            
+        if running_difference:
+            img0, hdr0 = read_fits(ipath+image_names[j-1],header=True)
+            img1, hdr1 = read_fits(ipath+image_names[j  ],header=True)
+
+        #if 'occ_center' != locals():
+        if instr =="lascoC2":    
+            occ_center=[hdr1["crpix1"],hdr1["crpix2"]]
+            #En esta resta asumimos que ambas imagenes tienen igual centerpix1/2, y ambas son north up.
+    if eeggl:
+        if running_difference:
+            x_pos, y_pos, wl_mat0, pb_mat0,hdr0 = read_dat(image_names[j-1],path=ipath,dim_matrix=300)
+            img0 = rebin_interp(wl_mat0,new_size=[512,512])
+            x_pos, y_pos, wl_mat1, pb_mat1,hdr1 = read_dat(image_names[j  ],path=ipath,dim_matrix=300)
+            img1 = rebin_interp(wl_mat1,new_size=[512,512])
+
+
     img_diff = img1 - img0
-    
+    breakpoint()
     if infer_event1:
     #Infer1
         #orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=60,centerpix=[255,255+10],occulter_size_ext=240) 
@@ -331,47 +405,45 @@ for j in range(1,len(image_names)):
         file_names.append(image_names[j])
         all_headers.append(hdr1)
 
-#if infer_event2:
-ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,plot_params=opath+'mask_props')
+if infer_event2:
+    ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,plot_params=opath+'mask_props')
+    zeros = np.zeros(np.shape(ok_orig_img[0]))
+    all_idx=[]
+    #new_ok_dates=[datetime.utcfromtimestamp(dt.astype(int) * 1e-9) for dt in ok_dates]
 
+    for date in all_dates:
+        if date not in ok_dates:
+            idx = all_dates.index(date)
+            all_idx.append(idx)
+        
+    file_names = [file_name for h, file_name in enumerate(file_names) if h not in all_idx]
+    all_center =[all_center for h,all_center in enumerate(all_center) if h not in all_idx]
+    all_plate_scl =[all_plate_scl for h,all_plate_scl in enumerate(all_plate_scl) if h not in all_idx]
+    all_dates =[all_dates for h,all_dates in enumerate(all_dates) if h not in all_idx]
+    all_occ_size =[all_occ_size for h,all_occ_size in enumerate(all_occ_size) if h not in all_idx]
+    all_headers =[all_headers  for h,all_headers in enumerate(all_headers) if h not in all_idx]
 
-zeros = np.zeros(np.shape(ok_orig_img[0]))
-all_idx=[]
-#new_ok_dates=[datetime.utcfromtimestamp(dt.astype(int) * 1e-9) for dt in ok_dates]
-
-for date in all_dates:
-    if date not in ok_dates:
-        idx = all_dates.index(date)
-        all_idx.append(idx)
-    
-file_names = [file_name for h, file_name in enumerate(file_names) if h not in all_idx]
-all_center =[all_center for h,all_center in enumerate(all_center) if h not in all_idx]
-all_plate_scl =[all_plate_scl for h,all_plate_scl in enumerate(all_plate_scl) if h not in all_idx]
-all_dates =[all_dates for h,all_dates in enumerate(all_dates) if h not in all_idx]
-all_occ_size =[all_occ_size for h,all_occ_size in enumerate(all_occ_size) if h not in all_idx]
-all_headers =[all_headers  for h,all_headers in enumerate(all_headers) if h not in all_idx]
-
-for m in range(len(ok_dates)):
-    event = df[df['DATE_TIME'] == ok_dates[m]].reset_index(drop=True)
-    image=ok_orig_img[m]
-    for n in range(len(event['MASK'])):
-        if event['SCR'][n] > scr_threshold:             
-            masked = zeros.copy()
-            masked[:, :][(event['MASK'][n]) > mask_threshold] = 1
-            # safe fits
-            
-            ofile_fits = os.path.join(os.path.dirname(opath), file_names[m]+"_CME_ID_"+str(int(event['CME_ID'][n]))+'.fits')
-            h0 = all_headers[m]
-            # adapts hdr because we use smaller im size
-            sz_ratio = np.array(masked.shape)/np.array([h0['NAXIS1'], h0['NAXIS2']])
-            #h0['NAXIS1'] = masked.shape[0]
-            #h0['NAXIS2'] = masked.shape[1]
-            h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
-            h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
-            #h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
-            #h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
-            fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
-    plot_to_png2(opath+file_names[m]+"infer2.png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[m]])  
+    for m in range(len(ok_dates)):
+        event = df[df['DATE_TIME'] == ok_dates[m]].reset_index(drop=True)
+        image=ok_orig_img[m]
+        for n in range(len(event['MASK'])):
+            if event['SCR'][n] > scr_threshold:             
+                masked = zeros.copy()
+                masked[:, :][(event['MASK'][n]) > mask_threshold] = 1
+                # safe fits
+                
+                ofile_fits = os.path.join(os.path.dirname(opath), file_names[m]+"_CME_ID_"+str(int(event['CME_ID'][n]))+'.fits')
+                h0 = all_headers[m]
+                # adapts hdr because we use smaller im size
+                sz_ratio = np.array(masked.shape)/np.array([h0['NAXIS1'], h0['NAXIS2']])
+                #h0['NAXIS1'] = masked.shape[0]
+                #h0['NAXIS2'] = masked.shape[1]
+                h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
+                h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
+                #h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
+                #h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
+                fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
+        plot_to_png2(opath+file_names[m]+"infer2.png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[m]])  
 
 print("Program finished without errors")
 
