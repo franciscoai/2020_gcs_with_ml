@@ -89,7 +89,7 @@ train_ncases=10000 # Total no. of epochs
 random_rot = True # if True, the images are randomly rotated
 gpu=0 # GPU to use
 masks2use=[0,1] # list of masks to use, use None to use all masks found in the mask directory
-model_version='v5' # version of the model to use
+model_version='v4' # version of the model to use
 
 #main
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
