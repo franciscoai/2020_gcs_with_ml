@@ -23,6 +23,7 @@ import glob
 from scipy.ndimage.filters import gaussian_filter
 import pickle
 from scipy.interpolate import interp2d
+from scipy.interpolate import RectBivariateSpline
 
 def read_fits(file_path, header=False, imageSize=[512,512],smooth_kernel=[0,0]):
     try:       
@@ -133,25 +134,35 @@ def rebin_interp(img,new_size=[512,512]):
     #rebinea imagenes, por default a 512
     x1 = np.linspace(0, img.shape[0], img.shape[0])-img.shape[0]
     y1 = np.linspace(0, img.shape[1], img.shape[1])-img.shape[1]
-    fun = interp2d(x1, y1, img, kind='linear')
+    #fun = interp2d(x1, y1, img, kind='linear')
+    #interp2d is going to be deprecated, and replaced by RectBivariateSpline.
+    spline = RectBivariateSpline(x1, y1, img)
     x = np.linspace(0, img.shape[0], new_size[0])-img.shape[0]
     y = np.linspace(0, img.shape[1], new_size[1])-img.shape[1]
-    Z3 = fun(x, y)
-    return Z3
+    #Z3 = fun(x, y)
+    interpolated_image = spline(x, y)
+    return interpolated_image
 
 def vec_to_matrix(vec,dim_matrix):
     #dim_matrix 300 en el caso de eeggl sta/b
     matrix = [vec[i:i+dim_matrix] for i in range(0, len(vec), dim_matrix)]
     matrix = np.array(matrix)
     matrix = matrix.T #traspongo xq la imagen se lee fila por fila desde 0,0 esquina izq arriba hacia abajo y luego fila por fila hacia la derecha.
-    matrix = matrix.astype("float32")   
+    #matrix = matrix.astype("float32")   
     return matrix
 
 def create_header(matrix,time):
     header = fits.Header()
     header['NAXIS1'] = matrix.shape[0]
     header['NAXIS2'] = matrix.shape[1]
-    header['time'] = time
+    header['CRPIX1'] = matrix.shape[0]/2
+    header['CRPIX2'] = matrix.shape[1]/2
+    tiempo = time.split('"')
+    header['time'] = tiempo[1]
+    #tiene sentido los valores del CDELTX?
+    header['CDELT1']=1
+    header['CDELT2']=1
+    return header
 
 def read_dat(file,path="",dim_matrix=300):
     pos_x=[]
@@ -185,15 +196,15 @@ def read_dat(file,path="",dim_matrix=300):
 
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
+aux_in = "/gehme"
 #aux_in = "/gehme-gpu"
-aux_in = "/gehme-gpu"
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 model_version="v4"
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2011_02_15/data/cor2b/'
 #----------------eeggl
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2011_02_15/eeggl_synthetic/run005/'
 
-ipath = aux_in+'/projects/2023_eeggl_validation/data/2012-07-12/Cor2A/lvl1/'
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2012-07-12/Cor2A/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/Cor2B/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/C2/lvl1/'
 
@@ -212,12 +223,15 @@ ipath = aux_in+'/projects/2023_eeggl_validation/data/2012-07-12/Cor2A/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/Cor2A/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/Cor2B/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/C2/lvl1/'
+#--
+ipath = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15/run005/'
 
 #----------------
 #aux="oculter_60_250/"
-aux="occ_medida_RD_infer2/"
+#aux="occ_medida_RD_infer2/"
+aux = 'run005/runing_diff/'
 aux_out='/gehme'
-opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/Cor2A/'+aux
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/Cor2A/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/Cor2B/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/C2/'+aux
 
@@ -238,19 +252,20 @@ opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/Cor2A/'+aux
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/C2/'+aux
 
 #opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/'
+#---
+opath = aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/eeggl/'+aux
 #-------------
-
 file_ext=".dat"
 #file_ext=".fts"
 trained_model = '6000.torch'
 #-----------------------------
-eeggl = 'True'
+eeggl = True
 base_difference = False
 running_difference = True
 instr='cor2_a'
 #instr='cor2_b'
 #instr='lascoC2'
-infer_event2=False
+infer_event2=True
 infer_event1=True
 
 #----------------------------
@@ -259,7 +274,7 @@ if instr != 'lascoC2':
     occ_center=[[256,256],[260,247]]
 occ_size = [50,52]
 mask_threshold = 0.6 # value to consider a pixel belongs to the object
-scr_threshold = 0.4 # only detections with score larger than this value are considered
+scr_threshold = 0.1 # only detections with score larger than this value are considered
 
 
 
@@ -271,11 +286,11 @@ print(f'Using device:  {device}')
 #breakpoint()
 #OBS: files is a list of all files but NOT in correct temporal order.
 #loads images
-files = os.listdir(ipath)
-files = [os.path.join(ipath, e) for e in files]
-breakpoint()
-files = [e for e in files if os.path.splitext(e)[1] == file_ext]
-breakpoint()
+#files = os.listdir(ipath)
+#files = [os.path.join(ipath, e) for e in files]
+#breakpoint()
+#files = [e for e in files if os.path.splitext(e)[1] == file_ext]
+
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 
@@ -296,7 +311,6 @@ if eeggl:
 with open(ipath+list_name, 'r') as file:
     lines = file.readlines()
 image_names = [line.strip() for line in lines]
-
 
 if infer_event2:
     all_images=[]
@@ -326,7 +340,7 @@ if infer_event2:
 
 for j in range(1,len(image_names)):
 
-    if ~eeggl:        
+    if eeggl == False:        
         if base_difference:
             #First image set to background
             img0, hdr0 = read_fits(ipath+image_names[0],header=True)
@@ -341,16 +355,25 @@ for j in range(1,len(image_names)):
         if instr =="lascoC2":    
             occ_center=[hdr1["crpix1"],hdr1["crpix2"]]
             #En esta resta asumimos que ambas imagenes tienen igual centerpix1/2, y ambas son north up.
-    if eeggl:
+    if eeggl== True:
         if running_difference:
             x_pos, y_pos, wl_mat0, pb_mat0,hdr0 = read_dat(image_names[j-1],path=ipath,dim_matrix=300)
+            wl_mat0 = np.flip(wl_mat0, axis=0)
             img0 = rebin_interp(wl_mat0,new_size=[512,512])
             x_pos, y_pos, wl_mat1, pb_mat1,hdr1 = read_dat(image_names[j  ],path=ipath,dim_matrix=300)
+            wl_mat1 = np.flip(wl_mat1, axis=0)
             img1 = rebin_interp(wl_mat1,new_size=[512,512])
+        img_ratio = img1 / img0 #only used to calculate the occulter
 
 
     img_diff = img1 - img0
-    breakpoint()
+    
+    if eeggl== True:
+        min_value = np.min(img_diff)
+        img_diff[np.isnan(img_ratio)] = min_value
+    #openCV need astype matrix float32 or lower, does not accept float64
+    img_diff = img_diff.astype("float32")
+    
     if infer_event1:
     #Infer1
         #orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=60,centerpix=[255,255+10],occulter_size_ext=240) 
@@ -364,13 +387,16 @@ for j in range(1,len(image_names)):
         
         if instr=='cor2_a':
             #Cor2 con mascara centrada (a medida) ---> Cor2A me funciona mejor con esto
-            orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=occ_size,centerpix=occ_center,occulter_size_ext=250)
-    
-    
+            if eeggl==False:
+                orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=occ_size,
+                                                                       centerpix=occ_center,occulter_size_ext=250)
+            if eeggl==True:
+                orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=occ_size,
+                                                                       centerpix=occ_center,occulter_size_ext=250)#,repleace_value=min_value)
         if instr=='lascoC2':    
             #C2
             orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=occ_size,centerpix=occ_center,occulter_size_ext=300)
-        
+            
     # plot the predicted mask
         ofile = opath+"/"+os.path.basename(image_names[j])+'infer1.png'
         plot_to_png(ofile, [orig_img], [masks], scores=[scores], labels=[labels], boxes=[boxes])
@@ -384,18 +410,22 @@ for j in range(1,len(image_names)):
     #infer2
     if infer_event2:
         
-        if instr != 'lascoC2':    
-            date = datetime.strptime(image_names[j][0:-10],'%Y%m%d_%H%M%S')
-        else:
-            date_string = hdr1['fileorig'][:-4]
-            if int(date_string[:2]) < 94: #soho was launched in 1995
-                aux = '20'
+        if eeggl==True:
+            date_format = '%Y/%m/%dT%H:%M:%S'
+            time_string=hdr1['time']
+            date = datetime.strptime(time_string[:-4], date_format)
+        if eeggl==False:    
+            if instr != 'lascoC2':    
+                date = datetime.strptime(image_names[j][0:-10],'%Y%m%d_%H%M%S')
             else:
-                aux = '19'
-            date_string = aux + date_string
-            date = datetime.strptime(date_string,'%Y%m%d_%H%M%S')
-        #breakpoint()
-    
+                date_string = hdr1['fileorig'][:-4]
+                if int(date_string[:2]) < 94: #soho was launched in 1995
+                    aux = '20'
+                else:
+                    aux = '19'
+                date_string = aux + date_string
+                date = datetime.strptime(date_string,'%Y%m%d_%H%M%S')
+        
         plt_scl = hdr1['CDELT1']
         all_center.append(occ_center)
         all_plate_scl.append(plt_scl)                    
@@ -404,9 +434,10 @@ for j in range(1,len(image_names)):
         all_occ_size.append(occ_size)
         file_names.append(image_names[j])
         all_headers.append(hdr1)
-
+#breakpoint()
 if infer_event2:
-    ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,plot_params=opath+'mask_props')
+    ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl,resize=False,
+                                                     occulter_size=all_occ_size,centerpix=all_center,plot_params=opath+'mask_props')
     zeros = np.zeros(np.shape(ok_orig_img[0]))
     all_idx=[]
     #new_ok_dates=[datetime.utcfromtimestamp(dt.astype(int) * 1e-9) for dt in ok_dates]
