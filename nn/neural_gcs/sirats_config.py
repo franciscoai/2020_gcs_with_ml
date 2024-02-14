@@ -25,6 +25,7 @@ class Configuration:
         self.only_mask = self.config.getboolean("General Configuration", 'only_mask')
         self.do_training = self.config.getboolean("General Configuration", 'do_training')
         self.do_inference = self.config.getboolean("General Configuration", 'do_inference')
+        self.real_img_inference = self.config.getboolean("General Configuration", 'real_img_inference')
         self.images_to_infer = self.config.getint("General Configuration", 'images_to_infer')
         self.model_arq = self.config.get("General Configuration", 'model_arq')
         self.save_model = self.config.getboolean("General Configuration", 'save_model')

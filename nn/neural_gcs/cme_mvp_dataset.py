@@ -6,6 +6,7 @@ import logging
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from sirats_normalization import *
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 mpl.use('Agg')
@@ -129,15 +130,9 @@ class Cme_MVP_Dataset(Dataset):
 
     def __normalize(self, img):
         if self.only_mask:
-            img[img > 1] = 1
-            img[img < 0] = 0
+            img = binary_mask_normalization(img)
         else: # Real image
-            sd_range=1.5
-            m = torch.mean(img)
-            sd = torch.std(img)
-            img = (img - m + sd_range * sd) / (2 * sd_range * sd)
-            img[img >1]=1
-            img[img <0]=0
+            img = real_img_normalization(img)
             
         if torch.isnan(img).any():
             raise ValueError("NaN values found in the image tensor.")

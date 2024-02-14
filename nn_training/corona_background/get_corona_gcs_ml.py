@@ -20,8 +20,8 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None, cu
     Returns a measured "quiet" (with no CME) solar corona observed by satelitte sat, the implemented instruments are
 
     sat=
-        0: Stereo A Cor2
-        1: Stereo B Cor2
+        0: Stereo B Cor2
+        1: Stereo A Cor2
         2: Lasco C2
 
     OPTIONS:
