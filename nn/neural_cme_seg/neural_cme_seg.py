@@ -148,7 +148,10 @@ class neural_cme_segmentation():
         model_param: model parameters to use for inference. If None, the model parameters given at initialization are used
         resize: if True, the input image is resized to the size of the training images
         occulter_size: size of an artifitial occulter added to the image. If 0, the occulter is not masked out. Mask pix within the occulter are eliminated
-        '''    
+        '''
+
+        img = img.astype(np.float32)
+
         #loads model
         if model_param is not None:
             self.model.load_state_dict(model_param) 

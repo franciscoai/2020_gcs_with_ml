@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from nn.neural_cme_seg.neural_cme_seg import neural_cme_segmentation
 import torch
+from tqdm import tqdm
 """
 Reads pairs of LVL1 coronograph images from various instruments and saves a differential corona for each pair.
 Images are resized to 512,512 pixels.
@@ -24,7 +25,8 @@ opath = "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects"#'/gehm
 imsize=[0,0]# if 0,0 no rebin its applied 
 imsize_nn=[512,512] #for rebin befor the nn
 do_write=True # if set to True it saves the diff images
-write_png=False#if set to True it will save the images in fits and png formats else it will save only fits
+write_png=True#if set to True it will save the images in fits and png formats else it will save only fits
+amout_limit = 5
 lasco= pd.read_csv(lasco_path , sep="\t")
 lasco.name='lasco'
 
@@ -216,23 +218,94 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                     im1.close()
                     im2.close()
                     print("error on "+path_1h+"  or  "+path_2h)
-    return cor2_a,cor2_b                    
+        return cor2_a,cor2_b
+    
 
+    # Check if the name is "lasco"
+    elif name=="lasco":
+        # Create an empty DataFrame to store the paths and dates
+        lasco_df = pd.DataFrame(columns=['paths',"date"])
+
+        # Create the output directory
+        odir = opath + "/lasco/c2/test"
+        os.makedirs(odir, exist_ok=True)
+
+        # Iterate over the paths and extract the date from the headers
+        for i in tqdm(paths["paths"], desc="Preparing lasco data"):
+            basename = os.path.basename(i)
+            header = fits.getheader(i)
+            date_obs = header["DATE-OBS"]
+            time_obs = header["TIME-OBS"]
+            datetime_obs = datetime.strptime(date_obs + ' ' + time_obs, '%Y/%m/%d %H:%M:%S.%f')
+            lasco_df.loc[len(lasco_df.index)] = [i, datetime_obs]
+        
+        # Process the lasco data
+        amount_counter = 0
+        for i, date in tqdm(enumerate(lasco_df["date"]), desc="Processing lasco data"):
+            try:
+                prev_date = date - timedelta(hours=12)
+                # Delete duplicated rows
+                lasco_df = lasco_df.drop_duplicates()
+                count = ((lasco_df["date"] < date) & (lasco_df["date"] >= prev_date)).sum()
+                if count==1:
+                    # Generate the diff image
+                    file1=glob.glob(lasco_df.loc[i,"paths"][0:-10]+"*")
+                    file2=glob.glob(lasco_df.loc[i+1,"paths"][0:-10]+"*")
+                    if len(file1)!=0 or len(file2)!=0:
+                        img1= fits.open((file1[0]))[0].data
+                        img2= fits.open((file2[1]))[0].data
+                        header= fits.getheader((file1[0]))
+
+                        # Check shape
+                        if img1.shape != (1024, 1024) or img2.shape != (1024, 1024):
+                            continue    
+
+                        # Resize images if necessary
+                        if imsize[0]!=0 and imsize[1]!=0:
+                            image1 = rebin(img1,imsize_nn,operation='mean') 
+                            image2 = rebin(img2.data,imsize_nn,operation='mean')
+                            header['NAXIS1'] = imsize_nn[0]   
+                            header['NAXIS2'] = imsize_nn[1]
+                        
+                        # Calculate the difference image
+                        img_diff = img1 - img2
+                        img_diff = fits.PrimaryHDU(img_diff, header=header[0:-3])
+                        namefile = f"{date.strftime('%Y%m%d_%H%M%S.%f')}.fits"
+                        
+                        # Write the difference image
+                        if do_write==True:
+                            imgs, masks, scrs, labels, boxes  = nn_seg.infer(img_diff.data, model_param=None, resize=False, occulter_size=0)
+                            scrs = np.concatenate([scrs])
+                            if np.all(scrs < SCR_THRESHOLD):
+                                amount_counter += 1
+                                if write_png==True:
+                                    plt.imsave(odir+"/"+namefile+".png", img_diff.data, cmap='gray', vmin=0, vmax=255/2)
+                                else:
+                                    img_diff.writeto(odir+"/"+namefile,overwrite=True)
+                    else:
+                        continue
+                if amount_counter >= amout_limit:
+                    break
+            except:
+                continue
+
+
+            
 #### main
 #nn inference
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v3"
-trained_model = '3999.torch'
-SCR_THRESHOLD=0.3 # only save images with score below this threshold (i.e., No CME is present)
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/"
+trained_model = '9999.torch'
+SCR_THRESHOLD=0.2 # only save images with score below this threshold (i.e., No CME is present)
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
 model_param = torch.load(model_path + "/"+ trained_model, map_location=device)
-
+nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version="v4")
 #tasks
 #cor2 a and b
-data=prep_catalogue(cor2,cor2_downloads,do_write=do_write,model_param=model_param, device=device,write_png=write_png) # get paths of ok files
+#data=prep_catalogue(cor2,cor2_downloads,do_write=do_write,model_param=model_param, device=device,write_png=write_png) # get paths of ok files
 # lasco
-#data=prep_catalogue(lasco,lasco_downloads,do_write=do_write,model_param=model_param, device=device) # get paths of ok files ??
+data=prep_catalogue(lasco,lasco_downloads,do_write=do_write,model_param=model_param, device=device) # get paths of ok files ??
 
 # saves data to csv and plots
 # cor2_a=data[0]

@@ -308,10 +308,11 @@ def plot_real_infer(imgs, prediction, satpos, plotranges, opath, namefile, fixed
     fig, ax = plt.subplots(1, IMG_SIZE[0], figsize=(17, 10))
     fig.tight_layout()
 
-    suptitle = f'ima satpos: {np.round(satpos[0, :], 1)} -- fixed_satpos: {np.round(fixed_satpos[0, :], 1)} -- plotranges: {np.round(plotranges[0, :], 1)} -- fixed_plotranges: {np.round(fixed_plotranges[0, :], 1)}\n\n'
-    suptitle += f'imb satpos: {np.round(satpos[1, :], 1)} -- fixed_satpos: {np.round(fixed_satpos[1, :], 1)} -- plotranges: {np.round(plotranges[1, :], 1)} -- fixed_plotranges: {np.round(fixed_plotranges[1, :], 1)}\n\n'
-    suptitle += f'lasco satpos: {np.round(satpos[2, :], 1)} -- fixed_satpos: {np.round(fixed_satpos[2, :], 1)} -- plotranges: {np.round(plotranges[2, :], 1)} -- fixed_plotranges: {np.round(fixed_plotranges[2, :], 1)}\n\n'
+    suptitle = f'ima satpos: {", ".join([f"{x:.2f}" for x in satpos[0, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[0, :]])} -- plotranges: {", ".join([f"{x:.2f}" for x in plotranges[0, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[0, :]])}\n\n'
+    suptitle += f'imb satpos: {", ".join([f"{x:.2f}" for x in satpos[1, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[1, :]])} -- plotranges: {", ".join([f"{x:.2f}" for x in plotranges[1, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[1, :]])}\n\n'
+    suptitle += f'lasco satpos: {", ".join([f"{x:.2f}" for x in satpos[2, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[2, :]])} -- plotranges: {", ".join([f"{x:.2f}" for x in plotranges[2, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[2, :]])}\n\n'
     suptitle += f'Using fixed satpos = {use_fixed}'
+
     fig.suptitle(suptitle, x=0.05, y=.95, horizontalalignment='left')
 
     color = ['purple', 'k', 'r', 'b']
@@ -407,7 +408,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
             logging.info(f"Model saved at: {status}\n")
 
 
-def get_paths_cme_exp_sources():
+def get_paths_cme_exp_sources(dates=None):
     """
     Read all files for selected events of the CME exp sources project
     """
@@ -418,8 +419,9 @@ def get_paths_cme_exp_sources():
     secchipath = data_path+'/stereo/secchi/L0'
     level = 0  # set the reduction level of the images
     # events to read
-    dates = ['20101212', '20101214', '20110317', '20110605', '20130123', '20130129',
-             '20130209', '20130424', '20130502', '20130517', '20130527', '20130608']
+    if dates is None:
+        dates = ['20101212', '20101214', '20110317', '20110605', '20130123', '20130129',
+                '20130209', '20130424', '20130502', '20130517', '20130527', '20130608']
     # pre event iamges per instrument
     pre_event = ["/soho/lasco/level_1/c2/20101212/25354377.fts",
                  "/stereo/secchi/L1/a/seq/cor1/20101212/20101212_022500_1B4c1A.fts",
@@ -704,100 +706,103 @@ def main():
 
         else:
             # Get events
-            events = get_paths_cme_exp_sources()
-            img_counter = 0
+            events = get_paths_cme_exp_sources(dates=['20130209'])
             for ev in events:
-                # Get event images
-                ima = fits.getdata(ev['ima1'][1]) - fits.getdata(ev['ima0'][1])
-                imb = fits.getdata(ev['imb1'][1]) - fits.getdata(ev['imb0'][1])
-                lasco = fits.getdata(ev['lasco1'][1]) - \
-                    fits.getdata(ev['lasco0'][1])
+                # ev_date = ev['date'].split('/')[-1].split('_')[1]
+                case_counter = -1 
+                for case in range(len(ev['ima1'])):
+                    case_counter += 1
+                    # Get event images
+                    ima = fits.getdata(ev['ima1'][case]) - fits.getdata(ev['ima0'][case])
+                    imb = fits.getdata(ev['imb1'][case]) - fits.getdata(ev['imb0'][case])
+                    lasco = fits.getdata(ev['lasco1'][case]) - fits.getdata(ev['lasco0'][case])
 
-                # Get event headers
-                event_headers = []
-                # event_headers.append(fits.getheader(ev['ima0'][0]))
-                event_headers.append(fits.getheader(ev['imb1'][0]))
-                # event_headers.append(fits.getheader(ev['imb0'][0]))
-                event_headers.append(fits.getheader(ev['ima1'][0]))
-                # event_headers.append(fits.getheader(ev['lasco0'][0]))
-                event_headers.append(fits.getheader(ev['lasco1'][0]))
+                    filename = os.path.basename(ev['ima1'][case]).replace('.fts', '')
 
-                satpos, plotranges = pyGCS.processHeaders(event_headers)
+                    # Get event headers
+                    event_headers = []
+                    event_headers.append(fits.getheader(ev['imb1'][case]))
+                    event_headers.append(fits.getheader(ev['ima1'][case]))
+                    event_headers.append(fits.getheader(ev['lasco1'][case]))
 
-                # synth_img_path = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_size_100000_seed_72430'
-                # synth_img_list = os.listdir(synth_img_path)
-                # random_img = random.choice(synth_img_list)
-                # synth_img_list = os.listdir(os.path.join(synth_img_path, random_img))
-                # for img in synth_img_list:
-                #     if img.find('sat1') != -1:
-                #         ima = read_image(os.path.join(synth_img_path, random_img, img), mode=torchvision.io.image.ImageReadMode.GRAY)
-                #         ima = ima.squeeze(0)
-                #     if img.find('sat2') != -1:
-                #         imb = read_image(os.path.join(synth_img_path, random_img, img), mode=torchvision.io.image.ImageReadMode.GRAY)
-                #         imb = imb.squeeze(0)
-                #     if img.find('sat3') != -1:
-                #         lasco = read_image(os.path.join(synth_img_path, random_img, img), mode=torchvision.io.image.ImageReadMode.GRAY)
-                #         lasco = lasco.squeeze(0)
+                    satpos, plotranges = pyGCS.processHeaders(event_headers)
 
-                event_list = [imb, ima, lasco]
+                    # synth_img_path = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_size_100000_seed_72430'
+                    # synth_img_list = os.listdir(synth_img_path)
+                    # random_img = random.choice(synth_img_list)
+                    # synth_img_list = os.listdir(os.path.join(synth_img_path, random_img))
+                    # for img in synth_img_list:
+                    #     if img.find('sat1') != -1:
+                    #         ima = read_image(os.path.join(synth_img_path, random_img, img), mode=torchvision.io.image.ImageReadMode.GRAY)
+                    #         ima = ima.squeeze(0)
+                    #     if img.find('sat2') != -1:
+                    #         imb = read_image(os.path.join(synth_img_path, random_img, img), mode=torchvision.io.image.ImageReadMode.GRAY)
+                    #         imb = imb.squeeze(0)
+                    #     if img.find('sat3') != -1:
+                    #         lasco = read_image(os.path.join(synth_img_path, random_img, img), mode=torchvision.io.image.ImageReadMode.GRAY)
+                    #         lasco = lasco.squeeze(0)
 
-                # make events as tensors
-                event_list = [torch.tensor(ev, dtype=torch.float32)
-                              for ev in event_list]
+                    case_list = [imb, ima, lasco]
 
-                # Add occulter to images
-                center_idxs = [
-                    ((ev.shape[0] - 1) // 2, (ev.shape[1] - 1) // 2) for ev in event_list]
-                # Occulters size for [sat1, sat2 ,sat3] in [Rsun]
-                occulter_size = [2., 2., 4.3]
-                # occ_center=[(30,-15),(0,-5),(0,0)] # [(38,-15),(0,-5),(0,0)] # (y,x)
-                r_values = [radius_to_px(
-                    plotranges[i], event_list[i].shape, event_headers[i], i) for i in range(len(occulter_size))]
-                # event_list = [add_occulter(ev, occulter_size[i], center_idxs[i]) for i, ev in enumerate(event_list)]
-                for i in range(len(event_list)):
-                    ev = event_list[i]
-                    ev[r_values[i] <= occulter_size[i]/2] = 0
-                    event_list[i] = ev
+                    # make events as tensors
+                    case_list = [torch.tensor(case, dtype=torch.float32)
+                                  for case in case_list]
 
-                # Normalize event images
-                event_list = [real_img_normalization(ev) for ev in event_list]
+                    # Add occulter to images
+                    center_idxs = [
+                        ((case.shape[0] - 1) // 2, (case.shape[1] - 1) // 2) for case in case_list]
+                    # Occulters size for [sat1, sat2 ,sat3] in [Rsun]
+                    occulter_size = [2., 2., 4.3]
+                    # occ_center=[(30,-15),(0,-5),(0,0)] # [(38,-15),(0,-5),(0,0)] # (y,x)
+                    r_values = [radius_to_px(
+                        plotranges[i], case_list[i].shape, event_headers[i], i) for i in range(len(occulter_size))]
+                    # case_list = [add_occulter(case, occulter_size[i], center_idxs[i]) for i, case in enumerate(case_list)]
+                    for i in range(len(case_list)):
+                        case = case_list[i]
+                        case[r_values[i] <= occulter_size[i]/2] = 0
+                        case_list[i] = case
 
-                # Resize event images
-                resize = torchvision.transforms.Resize(
-                    IMG_SIZE[1:3], torchvision.transforms.InterpolationMode.BILINEAR)
-                resize_scale_factor = [
-                    event_list[i].shape[1] / IMG_SIZE[1] for i in range(len(event_list))]
-                event_list = [resize(ev.unsqueeze(0)) for ev in event_list]
-                event_list = [ev.squeeze(0) for ev in event_list]
-                for i in range(len(event_headers)):
-                    h = event_headers[i]
-                    h['CDELT1'] = resize_scale_factor[i] * h['CDELT1']
-                    h['CDELT2'] = resize_scale_factor[i] * h['CDELT2']
-                    event_headers[i] = h
+                    # Normalize event images
+                    case_list = [real_img_normalization(case) for case in case_list]
 
-                # join event images
-                event_img = torch.stack(event_list, dim=0)
+                    # Resize event images
+                    if case_list[0].shape[0] != IMG_SIZE[0] or case_list[0].shape[1] != IMG_SIZE[1]:
+                        resize = torchvision.transforms.Resize(
+                            IMG_SIZE[1:3], torchvision.transforms.InterpolationMode.BILINEAR)
+                        resize_scale_factor = [
+                            case_list[i].shape[1] / IMG_SIZE[1] for i in range(len(case_list))]
+                        case_list = [resize(case.unsqueeze(0)) for case in case_list]
+                        case_list = [case.squeeze(0) for case in case_list]
+                        for i in range(len(event_headers)):
+                            h = event_headers[i]
+                            h['CDELT1'] = resize_scale_factor[i] * h['CDELT1']
+                            h['CDELT2'] = resize_scale_factor[i] * h['CDELT2']
+                            event_headers[i] = h
 
-                # Add batch dimension
-                event_img = event_img.unsqueeze(0)
+                        satpos, plotranges = pyGCS.processHeaders(event_headers)
 
-                # Move event images to device
-                event_img = event_img.to(DEVICE)
+                    # join event images
+                    event_img = torch.stack(case_list, dim=0)
 
-                # Infer event images and save losses
-                predictions = model.infer(event_img)
-                fixed_satpos = "[[32.8937181611, 7.05123478188, 0.0], [300.081940747, 1.95463511752, 0.0], [274.2910293847356, -4.817368115630504, 0.0]]"
-                fixed_plotranges = "[[-16.6431925965469, 16.737728407985518, -16.84856349725838, 16.53235750727404], [-15.00659312775248, 15.050622251843686, -14.988981478115997, 15.068233901480168], [-6.338799715536909, 6.304081179329522, -6.388457593426707, 6.254423301439724]]"
+                    # Add batch dimension
+                    event_img = event_img.unsqueeze(0)
 
-                fixed_satpos = torch.tensor(
-                    eval(fixed_satpos), dtype=torch.float32)
-                fixed_plotranges = torch.tensor(
-                    eval(fixed_plotranges), dtype=torch.float32)
+                    # Move event images to device
+                    event_img = event_img.to(DEVICE)
 
-                # Plot infered masks
-                plot_real_infer(event_img, predictions, satpos, plotranges, OPATH,
-                                f'img_{img_counter}.png', fixed_satpos=fixed_satpos, fixed_plotranges=fixed_plotranges, use_fixed=False)
-                img_counter += 1
+                    # Infer event images and save losses
+                    predictions = model.infer(event_img)
+                    fixed_satpos = "[[32.8937181611, 7.05123478188, 0.0], [300.081940747, 1.95463511752, 0.0], [274.2910293847356, -4.817368115630504, 0.0]]"
+                    fixed_plotranges = "[[-16.6431925965469, 16.737728407985518, -16.84856349725838, 16.53235750727404], [-15.00659312775248, 15.050622251843686, -14.988981478115997, 15.068233901480168], [-6.338799715536909, 6.304081179329522, -6.388457593426707, 6.254423301439724]]"
+
+                    fixed_satpos = torch.tensor(
+                        eval(fixed_satpos), dtype=torch.float32)
+                    fixed_plotranges = torch.tensor(
+                        eval(fixed_plotranges), dtype=torch.float32)
+
+                    # Plot infered masks
+                    plot_real_infer(event_img, predictions, satpos, plotranges, OPATH,
+                                    f'{filename}.png', fixed_satpos=fixed_satpos, fixed_plotranges=fixed_plotranges, use_fixed=True)
 
 
 if __name__ == '__main__':

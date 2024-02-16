@@ -133,12 +133,12 @@ par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[3,10],[0.1,0.6],[10,60],[1e-1,1e1]] # min-max ranges of each parameter in par_names {2.5,7} heights
 par_num = int(1e5)  # total number of samples that will be generated for each param (there are nsat images per param combination)
 rnd_par=False # when true it apllies a random seed to generate the same parameters for each run
-seed = 36872 # seed to use when rnd_par is False
-same_corona=True # Set to True use a single corona back for all par_num cases
+seed = 72430 # seed to use when rnd_par is False
+same_corona=False # Set to True use a single corona back for all par_num cases
 same_position=True # Set to True to use the same set of satteite positions(not necesarly the same background image)
 
 # Syntethic image options
-synth_int_image=False # set to True to generate a synthetic image with a cme
+synth_int_image=True # set to True to generate a synthetic image with a cme
 plot_mask_rtc_only=False # set to True to plot only the mask from raytracing, synth_int_image must be True
 imsize=np.array([512, 512], dtype='int32') # output image size
 level_occ=0. #mean level of the occulter relative to the background level
@@ -147,7 +147,7 @@ occ_noise = [None,None] # occulter gaussian noise. [mean, sd] both expressed in 
 mesh=False # set to also save a png with the GCSmesh (only for otype='png')
 otype="png" # set the ouput file type: 'png' or 'fits'
 im_range=2. # range of the color scale of the output final syntethyc image in std dev around the mean
-back_rnd_rot=False # set to randomly rotate the background image around its center
+back_rnd_rot=True # set to randomly rotate the background image around its center
 inner_hole_mask=True #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
 mask_from_cloud=False #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
