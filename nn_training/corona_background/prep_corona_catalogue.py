@@ -26,10 +26,11 @@ imsize=[0,0]# if 0,0 no rebin its applied
 imsize_nn=[512,512] #for rebin befor the nn
 do_write=True # if set to True it saves the diff images
 write_png=True#if set to True it will save the images in fits and png formats else it will save only fits
-amout_limit = 5
+amout_limit = None
 lasco= pd.read_csv(lasco_path , sep="\t")
 lasco.name='lasco'
-
+drop_cases_lasco = ["20071126_052604.413000.fits", "20081102_043004.947000.fits", "20070924_133139.145000.fits", "20071114_185006.091000.fits"]
+satellite = ["cor2_a", "cor2_b", "lasco"] # 0: cor2_a, 1: cor2_b, 2: lasco
 cor2= pd.read_csv(cor2_path , sep="\t")
 cor2.name='cor2'
 
@@ -38,12 +39,13 @@ for i in range(len(cor2.index)):
         if cor2.loc[i,j] != "No data" and cor2.loc[i,j] != "*" and cor2.loc[i,j] != "No img/double data":
             cor2.at[i, j] = "/gehme/data/stereo/secchi/"+ cor2.at[i, j]
 
-def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,write_png=write_png):
+def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,write_png=write_png, sat=0):
     '''
     df=dataframe
     column_list: list of columns to use 
     '''
     paths=[]
+    sat = satellite[sat]
     name=df.name
     for i in range(len(df.index)):
         for k in range(0,2):        #repetir para evento b
@@ -63,15 +65,15 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
     paths = paths.drop_duplicates()
     paths.to_csv(exec_path+"/"+name+"_path_list.csv", index=False)
 
-    if name=="cor2":
+    if sat=="cor2_a":
         
         cor2_a=pd.DataFrame(columns=['paths',"date"])#,"header_contrast"])
-        cor2_b=pd.DataFrame(columns=['paths',"date"])#,"header_contrast"])
+        #cor2_b=pd.DataFrame(columns=['paths',"date"])#,"header_contrast"])
         #creates odir
         odir = opath+'/'+df.name+'/'+"cor2_a"
-        odirb= opath+'/'+df.name+'/'+"cor2_b"
+        #odirb= opath+'/'+df.name+'/'+"cor2_b"
         os.makedirs(odir, exist_ok=True)
-        os.makedirs(odirb, exist_ok=True)
+        #os.makedirs(odirb, exist_ok=True)
 
         for i in paths["paths"]:
             i=i.replace("L0","L1")
@@ -79,13 +81,6 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                 basename=os.path.basename(i)
                 date = datetime.strptime(basename[0:-10], formato)
                 cor2_a=pd.concat([cor2_a,pd.DataFrame({"paths":[i],"date":[date]})], ignore_index=True)
-                #cor2_a=cor2_a.append({"paths":i,"date":date}, ignore_index=True)
-               
-            elif i.endswith("b.fts") or i.endswith("B.fts"):
-                basename=os.path.basename(i)
-                date = datetime.strptime(basename[0:-10], formato)
-                cor2_b=pd.concat([cor2_b,pd.DataFrame({"paths":[i],"date":[date]})], ignore_index=True)
-                #cor2_b=cor2_b.append({"paths":i,"date":date}, ignore_index=True)
                
         for i, date in enumerate(cor2_a["date"]):
             
@@ -138,7 +133,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                         test_im=im
                         if do_write==True:
                             test_im=rebin(test_im,imsize_nn,operation='mean') 
-                            imgs, masks, scrs, labels, boxes  = neural_cme_segmentation(model_param, test_im, device)
+                            imgs, masks, scrs, labels, boxes  = nn_seg.infer(test_im, model_param=None, resize=False, occulter_size=0)
                             if np.max(scrs)<SCR_THRESHOLD:  # header_contrast<6.2 and 
                                 print("saving image "+str(i)+" from cor2_a")
                                 if write_png==True:
@@ -157,77 +152,90 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                     im1.close()
                     im2.close()                    
                     print("error on "+path_1h+"  or  "+path_2h)
+    if sat=="cor2_b":
+        cor2_b=pd.DataFrame(columns=['paths',"date"])#,"header_contrast"])
+        odirb= opath+'/'+df.name+'/'+"cor2_b/test"
+        os.makedirs(odirb, exist_ok=True)
+        
+        for i in paths["paths"]:
+            i=i.replace("L0","L1")              
+            if i.endswith("b.fts") or i.endswith("B.fts"):
+                basename=os.path.basename(i)
+                date = datetime.strptime(basename[0:-10], formato)
+                cor2_b=pd.concat([cor2_b,pd.DataFrame({"paths":[i],"date":[date]})], ignore_index=True)
 
         for i, date in enumerate(cor2_b["date"]):
             prev_date = date - timedelta(hours=12)
             count = ((cor2_b["date"] < date) & (cor2_b["date"] >= prev_date)).sum()
             if count==1:
                 #generar imagen diferencia
-                try:
-                    print("reading image "+str(i)+ " on cor2_b")
-                    file1=glob.glob(cor2_b.loc[i,"paths"][0:-10]+"*")
-                    file2=glob.glob(cor2_b.loc[i+1,"paths"][0:-10]+"*")
-                    if len(file1)!=0 or len(file2)!=0:
-                        path_1h=(file1[0])
-                        path_2h=(file2[0])
-                        im1= fits.open(path_1h)
-                        im2= fits.open(path_2h)
+                print("reading image "+str(i)+ " on cor2_b")
+                file1=glob.glob(cor2_b.loc[i,"paths"][0:-10]+"*")
+                file2=glob.glob(cor2_b.loc[i+1,"paths"][0:-10]+"*")
+
+                # sort the files
+                file1.sort()
+                file2.sort()
+                # file1 = [cor2_b.loc[i, "paths"]]
+                # file2 = [cor2_b.loc[i + 1, "paths"]]
+                if len(file1)!=0 and len(file2)!=0:
+                    try:
+                        img1 = fits.open(file1[0])[0].data
+                        img2 = fits.open(file2[0])[0].data
+                        header= fits.getheader((file1[0]))
+                    except FileNotFoundError:
+                        continue
+
+                    # Check shape
+                    if img1.shape[0] != img2.shape[0] or img1.shape[1] != img2.shape[1]:
+                        continue
+
+                    # Resize images if necessary
+                    if imsize[0]!=0 and imsize[1]!=0:
+                        img1 = rebin(img1,imsize_nn,operation='mean') 
+                        img2 = rebin(img2.data,imsize_nn,operation='mean')
+                        header['NAXIS1'] = imsize_nn[0]   
+                        header['NAXIS2'] = imsize_nn[1]
+                    
+                    # Calculate the difference image
+                    img_diff = img1 - img2
+                    img_diff = fits.PrimaryHDU(img_diff, header=header[0:-3])
                         
-                        
-                        header= fits.getheader(path_1h)
-                        if imsize[0]!=0 and imsize[1]!=0:
-                            header['NAXIS1'] = imsize_nn[0]   
-                            header['NAXIS2'] = imsize_nn[1]
-                            image1 = rebin(im1[0].data,imsize_nn,operation='mean') 
-                            image2 = rebin(im2[0].data,imsize_nn,operation='mean') 
+                    sigma=header["DATASIG"]
+                    avg=header["DATAAVG"]
+                    header_contrast= sigma/avg
+                    cor2_b.loc[i,"header_contrast"]=header_contrast   
+                    filename = os.path.basename(file1[0])
+                    if do_write==True:
+                        if img_diff.data.shape[0] != 1024:    
+                            imgs, masks, scrs, labels, boxes = nn_seg.infer(img_diff.data, model_param=None, resize=False, occulter_size=250)
+                        elif img_diff.data.shape[0] == 1024:
+                            imgs, masks, scrs, labels, boxes  = nn_seg.infer(img_diff.data, model_param=None, resize=False, occulter_size=250/2)
                         else:
-                            image1 = im1[0].data
-                            image2 = im2[0].data
-                        
-                        im=image1-image2
-                        final_img = fits.PrimaryHDU(im, header=header[0:-3])
-                        sigma=header["DATASIG"]
-                        avg=header["DATAAVG"]
-                        header_contrast= sigma/avg
-                        cor2_b.loc[i,"header_contrast"]=header_contrast   
-                        filename = os.path.basename(path_1h)
-                        fig0, ax0 = plt.subplots()
-                        mean= np.mean(im)
-                        std = np.std(im)
-                        vmin=mean-1*std
-                        vmax=mean+1*std
-                        imagen = ax0.imshow(im, cmap='gray', vmin=vmin, vmax=vmax)
-                        test_im=im
-                        if do_write==True:    
-                            test_im=rebin(test_im,imsize_nn,operation='mean') 
-                            imgs, masks, scrs, labels, boxes  = neural_cme_segmentation(model_param, test_im, device)
-                            if  np.max(scrs)<SCR_THRESHOLD: # header_contrast<4.7 and
-                                print("saving image "+str(i)+" from cor2_b")
-                                if write_png==True:
-                                    plt.savefig(odirb+"/"+filename+".png", format='png')
-                                final_img.writeto(odirb+"/"+filename+".fits",overwrite=True)                  
-                                im1.close()
-                                im2.close()
+                            continue
+                        scrs = [scrs[i] for i in range(len(labels)) if labels[i] == 2]
+                        scrs = np.concatenate([scrs])
+                        if  np.all(scrs < SCR_THRESHOLD): # header_contrast<4.7 and
+                            print("saving image "+str(i)+" from cor2_b")
+                            if write_png==True:
+                                mu = np.mean(imgs.data)
+                                sd = np.std(imgs.data)
+                                plt.imsave(odirb+"/"+filename+".png", img_diff.data, cmap='gray', vmin=mu-3*sd, vmax=mu+3*sd)
+                                print("png saved")
                             else:
-                                print("image "+str(i)+" from cor2_b has a CME")
-                                im1.close()
-                                im2.close()
-                    else:
-                        print("files not found")
-                except :
-                    im1.close()
-                    im2.close()
-                    print("error on "+path_1h+"  or  "+path_2h)
-        return cor2_a,cor2_b
+                                final_img.writeto(odirb+"/"+filename+".fits",overwrite=True)
+                else:
+                    print("files not found")
+        return cor2_b
     
 
     # Check if the name is "lasco"
-    elif name=="lasco":
+    elif sat=="lasco":
         # Create an empty DataFrame to store the paths and dates
         lasco_df = pd.DataFrame(columns=['paths',"date"])
 
         # Create the output directory
-        odir = opath + "/lasco/c2/test"
+        odir = opath + "/lasco/c2"
         os.makedirs(odir, exist_ok=True)
 
         # Iterate over the paths and extract the date from the headers
@@ -242,52 +250,64 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
         # Process the lasco data
         amount_counter = 0
         for i, date in tqdm(enumerate(lasco_df["date"]), desc="Processing lasco data"):
-            try:
-                prev_date = date - timedelta(hours=12)
-                # Delete duplicated rows
-                lasco_df = lasco_df.drop_duplicates()
-                count = ((lasco_df["date"] < date) & (lasco_df["date"] >= prev_date)).sum()
-                if count==1:
-                    # Generate the diff image
-                    file1=glob.glob(lasco_df.loc[i,"paths"][0:-10]+"*")
-                    file2=glob.glob(lasco_df.loc[i+1,"paths"][0:-10]+"*")
-                    if len(file1)!=0 or len(file2)!=0:
-                        img1= fits.open((file1[0]))[0].data
-                        img2= fits.open((file2[1]))[0].data
-                        header= fits.getheader((file1[0]))
+            # try:
+            prev_date = date - timedelta(hours=12)
+            # Delete duplicated rows
+            lasco_df = lasco_df.drop_duplicates()
+            count = ((lasco_df["date"] < date) & (lasco_df["date"] >= prev_date)).sum()
+            if count==1:
+                # Generate the diff image
+                # file1 = glob.glob(lasco_df.loc[i, "paths"][0:-10] + "*")
+                # file2 = glob.glob(lasco_df.loc[i + 1, "paths"][0:-10] + "*")
+                file1 = [lasco_df.loc[i, "paths"]]
+                file2 = [lasco_df.loc[i + 1, "paths"]]
 
-                        # Check shape
-                        if img1.shape != (1024, 1024) or img2.shape != (1024, 1024):
-                            continue    
+                if len(file1)!=0 or len(file2)!=0:
+                    # img1= fits.open((file1[0]))[0].data
+                    # img2= fits.open((file2[1]))[0].data
+                    img1 = fits.open(file1[0])[0].data
+                    img2 = fits.open(file2[0])[0].data
+                    header= fits.getheader((file1[0]))
 
-                        # Resize images if necessary
-                        if imsize[0]!=0 and imsize[1]!=0:
-                            image1 = rebin(img1,imsize_nn,operation='mean') 
-                            image2 = rebin(img2.data,imsize_nn,operation='mean')
-                            header['NAXIS1'] = imsize_nn[0]   
-                            header['NAXIS2'] = imsize_nn[1]
-                        
-                        # Calculate the difference image
-                        img_diff = img1 - img2
-                        img_diff = fits.PrimaryHDU(img_diff, header=header[0:-3])
-                        namefile = f"{date.strftime('%Y%m%d_%H%M%S.%f')}.fits"
-                        
-                        # Write the difference image
-                        if do_write==True:
-                            imgs, masks, scrs, labels, boxes  = nn_seg.infer(img_diff.data, model_param=None, resize=False, occulter_size=0)
-                            scrs = np.concatenate([scrs])
-                            if np.all(scrs < SCR_THRESHOLD):
-                                amount_counter += 1
-                                if write_png==True:
-                                    plt.imsave(odir+"/"+namefile+".png", img_diff.data, cmap='gray', vmin=0, vmax=255/2)
-                                else:
-                                    img_diff.writeto(odir+"/"+namefile,overwrite=True)
-                    else:
-                        continue
+                    # Check shape
+                    if img1.shape != (1024, 1024) or img2.shape != (1024, 1024):
+                        continue    
+
+                    # Resize images if necessary
+                    if imsize[0]!=0 and imsize[1]!=0:
+                        img1 = rebin(img1,imsize_nn,operation='mean') 
+                        img2 = rebin(img2.data,imsize_nn,operation='mean')
+                        header['NAXIS1'] = imsize_nn[0]   
+                        header['NAXIS2'] = imsize_nn[1]
+                    
+                    # Calculate the difference image
+                    img_diff = img1 - img2
+                    img_diff = fits.PrimaryHDU(img_diff, header=header[0:-3])
+                    
+                    # Write the difference image
+                    if do_write==True:
+                        imgs, masks, scrs, labels, boxes  = nn_seg.infer(img_diff.data, model_param=None, resize=False, occulter_size=0)
+                        scrs = [scrs[i] for i in range(len(labels)) if labels[i] == 2]
+                        scrs = np.concatenate([scrs])
+                        if np.all(scrs < SCR_THRESHOLD):
+                            namefile = f"{date.strftime('%Y%m%d_%H%M%S.%f')}.fits"
+                            # Check if the namefile is in the drop_cases_lasco list
+                            if namefile in drop_cases_lasco:
+                                continue
+                            amount_counter += 1
+                            if write_png==True:
+                                mu = np.mean(img_diff.data)
+                                sd = np.std(img_diff.data)
+                                plt.imsave(odir+"/"+namefile+".png", img_diff.data, cmap='gray', vmin=mu-3*sd, vmax=mu+3*sd)
+                            else:
+                                img_diff.writeto(odir+"/"+namefile,overwrite=True)
+                else:
+                    continue
+            if amout_limit is not None:
                 if amount_counter >= amout_limit:
                     break
-            except:
-                continue
+            # except:
+            #     continue
 
 
             
@@ -295,7 +315,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
 #nn inference
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/"
 trained_model = '9999.torch'
-SCR_THRESHOLD=0.2 # only save images with score below this threshold (i.e., No CME is present)
+SCR_THRESHOLD = 0.4 #0.3 # only save images with score below this threshold (i.e., No CME is present)
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
@@ -303,9 +323,9 @@ model_param = torch.load(model_path + "/"+ trained_model, map_location=device)
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version="v4")
 #tasks
 #cor2 a and b
-#data=prep_catalogue(cor2,cor2_downloads,do_write=do_write,model_param=model_param, device=device,write_png=write_png) # get paths of ok files
+data=prep_catalogue(cor2,cor2_downloads,do_write=do_write,model_param=model_param, device=device,write_png=write_png, sat=1) # sat 0: cor2_a, 1: cor2_b, 2: lasco
 # lasco
-data=prep_catalogue(lasco,lasco_downloads,do_write=do_write,model_param=model_param, device=device) # get paths of ok files ??
+#data=prep_catalogue(lasco,lasco_downloads,do_write=do_write,model_param=model_param, device=device, sat=2) # get paths of ok files ??
 
 # saves data to csv and plots
 # cor2_a=data[0]
