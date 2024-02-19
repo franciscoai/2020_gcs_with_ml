@@ -174,10 +174,6 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                 file2=glob.glob(cor2_b.loc[i+1,"paths"][0:-10]+"*")
 
                 # sort the files
-                file1.sort()
-                file2.sort()
-                # file1 = [cor2_b.loc[i, "paths"]]
-                # file2 = [cor2_b.loc[i + 1, "paths"]]
                 if len(file1)!=0 and len(file2)!=0:
                     try:
                         img1 = fits.open(file1[0])[0].data
@@ -206,8 +202,9 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                     header_contrast= sigma/avg
                     cor2_b.loc[i,"header_contrast"]=header_contrast   
                     filename = os.path.basename(file1[0])
+                    filename = filename[0:-5]
                     if do_write==True:
-                        if img_diff.data.shape[0] != 1024:    
+                        if img_diff.data.shape[0] == 2048:    
                             imgs, masks, scrs, labels, boxes = nn_seg.infer(img_diff.data, model_param=None, resize=False, occulter_size=250)
                         elif img_diff.data.shape[0] == 1024:
                             imgs, masks, scrs, labels, boxes  = nn_seg.infer(img_diff.data, model_param=None, resize=False, occulter_size=250/2)
@@ -218,12 +215,12 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                         if  np.all(scrs < SCR_THRESHOLD): # header_contrast<4.7 and
                             print("saving image "+str(i)+" from cor2_b")
                             if write_png==True:
-                                mu = np.mean(imgs.data)
-                                sd = np.std(imgs.data)
+                                mu = np.mean(img_diff.data)
+                                sd = np.std(img_diff.data)
                                 plt.imsave(odirb+"/"+filename+".png", img_diff.data, cmap='gray', vmin=mu-3*sd, vmax=mu+3*sd)
                                 print("png saved")
                             else:
-                                final_img.writeto(odirb+"/"+filename+".fits",overwrite=True)
+                                img_diff.writeto(odirb+"/"+filename+".fits",overwrite=True)
                 else:
                     print("files not found")
         return cor2_b
@@ -315,7 +312,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
 #nn inference
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/"
 trained_model = '9999.torch'
-SCR_THRESHOLD = 0.4 #0.3 # only save images with score below this threshold (i.e., No CME is present)
+SCR_THRESHOLD = 0.3165 #0.3 # only save images with score below this threshold (i.e., No CME is present)
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
