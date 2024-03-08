@@ -24,6 +24,7 @@ from scipy.ndimage.filters import gaussian_filter
 import pickle
 from scipy.interpolate import interp2d
 from scipy.interpolate import RectBivariateSpline
+from btot_file_sorted import btot_file_sorted
 
 def read_fits(file_path, header=False, imageSize=[512,512],smooth_kernel=[0,0]):
     try:       
@@ -49,7 +50,7 @@ def read_fits(file_path, header=False, imageSize=[512,512],smooth_kernel=[0,0]):
         print(f'WARNING. I could not find file {file_path}')
         return None
     
-def plot_to_png(ofile, orig_img, masks, scr_threshold=0.25, mask_threshold=0.7 , title=None, labels=None, boxes=None, scores=None):
+def plot_to_png(ofile, orig_img, masks, scr_threshold=0.15, mask_threshold=0.6 , title=None, labels=None, boxes=None, scores=None):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
@@ -196,70 +197,17 @@ def read_dat(file,path="",dim_matrix=300):
 
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
-aux_in = "/gehme"
+aux_in = "/gehme-gpu"
 #aux_in = "/gehme-gpu"
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
-model_version="v4"
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2011_02_15/data/cor2b/'
-#----------------eeggl
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2011_02_15/eeggl_synthetic/run005/'
-
-#ipath = aux_in+'/projects/2023_eeggl_validation/data/2012-07-12/Cor2A/lvl1/'
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/Cor2B/lvl1/'
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/C2/lvl1/'
-
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2011-02-14/Cor2A/lvl1/'
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2011-02-14/Cor2B/lvl1/'
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2011-02-15/C2/lvl1/'
-
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2013-03-15/Cor2A/lvl1/'
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2013-03-15/Cor2B/lvl1/'
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2013-03-15/C2/lvl1/'
-
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2013-09-29/Cor2A/lvl1/'
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2013-09-29/Cor2B/lvl1/'
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2013-09-29/C2/lvl1/'
-
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/Cor2A/lvl1/'
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/Cor2B/lvl1/'
-#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2010-04-03/C2/lvl1/'
-#--
-ipath = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15/run005/'
-
-#----------------
-#aux="oculter_60_250/"
-#aux="occ_medida_RD_infer2/"
-aux = 'run005/runing_diff/'
-aux_out='/gehme'
-#opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/Cor2A/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/Cor2B/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2012-07-12/C2/'+aux
-
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2011-02-15/Cor2A/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2011-02-15/Cor2B/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2011-02-15/C2/'+aux
-
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-03-15/Cor2A/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-03-15/Cor2B/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-03-15/C2/'+aux
-
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-09-29/Cor2A/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-09-29/Cor2B/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2013-09-29/C2/'+aux
-
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/Cor2A/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/Cor2B/'+aux
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/C2/'+aux
-
-#opath= '/gehme-gpu/projects/2023_eeggl_validation/output/2010-04-03/'
-#---
-opath = aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/eeggl/'+aux
-#-------------
-file_ext=".dat"
-#file_ext=".fts"
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4" #no contiene oculter externo
+#model_version="v4"
 trained_model = '6000.torch'
-#-----------------------------
-eeggl = True
+#model_path= "/gehme/projects/2020_gcs_with_ml/output/neural_cme_seg_v5" #contiene oculter externo
+model_version="v4"
+#trained_model = '66666.torch'
+#--------------------------
+eeggl = False
+btot  = True    #Synthetic images created using pyGCS.
 base_difference = False
 running_difference = True
 instr='cor2_a'
@@ -268,15 +216,72 @@ instr='cor2_a'
 infer_event2=True
 infer_event1=True
 
+#----------------eeggl
+run = '/run005'
+ipath = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15/run005/'
+ipath = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15'+run+'/'
+
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2012-07-12/Cor2A/lvl1/'
+#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/Cor2B/lvl1/'
+#ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/C2/lvl1/'
+
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2011-02-14/Cor2A/lvl1/'
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2011-02-14/Cor2B/lvl1/'
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2011-02-15/C2/lvl1/'
+
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2013-03-15/Cor2A/lvl1/'
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2013-03-15/Cor2B/lvl1/'
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2013-03-15/C2/lvl1/'
+
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2013-09-29/Cor2A/lvl1/'
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2013-09-29/Cor2B/lvl1/'
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2013-09-29/C2/lvl1/'
+
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2010-04-03/Cor2A/lvl1/'
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2010-04-03/Cor2B/lvl1/'
+#ipath = aux_in+'/projects/2023_eeggl_validation/data/2010-04-03/C2/lvl1/'
+
+#----------------
+#aux="oculter_60_250/"
+aux="occ_medida_RD_infer2/model_v5/"
+if eeggl:
+    aux = run+'/runing_diff/neural_cme_seg_v5/'
+    if infer_event2:
+        aux = run+'/runing_diff/neural_cme_seg_v5/infer2/'
+aux_out='/gehme'
+#----------------------------
+#eeggl
+opath = aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/eeggl'+aux
+
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/Cor2A/'+aux
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/Cor2B/'+aux
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/C2/'+aux
+
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/Cor2A/'+aux
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/Cor2B/'+aux
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/C2/'+aux
+
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2013-03-15/Cor2A/'+aux
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2013-03-15/Cor2B/'+aux
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2013-03-15/C2/'+aux
+
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2013-09-29/Cor2A/'+aux
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2013-09-29/Cor2B/'+aux
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2013-09-29/C2/'+aux
+
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2010-04-03/Cor2A/'+aux
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2010-04-03/Cor2B/'+aux
+#opath= aux_out+'/projects/2023_eeggl_validation/output/2010-04-03/C2/'+aux
+
+opath = aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/gcs/cor2a/'
+
 #----------------------------
 
 if instr != 'lascoC2':
     occ_center=[[256,256],[260,247]]
 occ_size = [50,52]
 mask_threshold = 0.6 # value to consider a pixel belongs to the object
-scr_threshold = 0.1 # only detections with score larger than this value are considered
-
-
+scr_threshold  = 0.15 # only detections with score larger than this value are considered
 
 #main
 gpu=0 # GPU to use
@@ -305,12 +310,24 @@ os.makedirs(opath, exist_ok=True)
 #El infer debe pasar el header que se utilizara para las nuevas mascaras!! 
 
 #list of all images in temporal order.
-list_name = 'list.txt'
+if not eeggl and not btot:
+    init_range = 1
+    list_name = 'list.txt'
+    with open(ipath+list_name, 'r') as file:
+        lines = file.readlines()
+    image_names = [line.strip() for line in lines]
+
 if eeggl:
+    init_range = 1
     list_name = 'lista_sta_cor2_ordenada.txt'
-with open(ipath+list_name, 'r') as file:
-    lines = file.readlines()
-image_names = [line.strip() for line in lines]
+    with open(ipath+list_name, 'r') as file:
+        lines = file.readlines()
+    image_names = [line.strip() for line in lines]
+
+if btot:
+    init_range = 0
+    ipath = "/gehme/projects/2023_eeggl_validation/btot_pyGCS/2011-02-15/"
+    image_names = btot_file_sorted(ipath,instr)
 
 if infer_event2:
     all_images=[]
@@ -320,27 +337,29 @@ if infer_event2:
     file_names=[]
     all_headers=[]
     all_center=[]
-
+    all_occulter_size_ext=[]
 
 if instr=="cor2_a":
     occ_center=occ_center[0]
     if occ_center:
         occ_size= occ_size[0]
+    occulter_size_ext = 250
 elif instr=="cor2_b":
     occ_size= occ_size[1]
     if occ_center:
         occ_center=occ_center[1]
+    occulter_size_ext = 250
     #else:
     #    occ_center=[hdr1["crpix1"],hdr1["crpix2"]]
 if instr=="lascoC2":
     occ_size = 90
-    
+    occulter_size_ext = 300
 if infer_event2:
     os.makedirs(opath+'mask_props/', exist_ok=True)
 
-for j in range(1,len(image_names)):
+for j in range(init_range,len(image_names)):
 
-    if eeggl == False:        
+    if eeggl == False and btot == False:        
         if base_difference:
             #First image set to background
             img0, hdr0 = read_fits(ipath+image_names[0],header=True)
@@ -355,6 +374,13 @@ for j in range(1,len(image_names)):
         if instr =="lascoC2":    
             occ_center=[hdr1["crpix1"],hdr1["crpix2"]]
             #En esta resta asumimos que ambas imagenes tienen igual centerpix1/2, y ambas son north up.
+
+    if btot == True:
+        #sin running difference.
+        img0       = np.zeros((512, 512))
+        img1, hdr1 = read_fits(ipath+image_names[j],header=True)
+        
+
     if eeggl== True:
         if running_difference:
             x_pos, y_pos, wl_mat0, pb_mat0,hdr0 = read_dat(image_names[j-1],path=ipath,dim_matrix=300)
@@ -383,23 +409,26 @@ for j in range(1,len(image_names)):
     
         if instr=='cor2_b':
             #Cor2 con mascara centrada ---> Cor2B me funciona mejor con esto, usando crpix1/2
-            orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=70,centerpix=occ_center,occulter_size_ext=250)
+            orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=70,
+                                                                    centerpix=occ_center,occulter_size_ext=occulter_size_ext)
         
         if instr=='cor2_a':
             #Cor2 con mascara centrada (a medida) ---> Cor2A me funciona mejor con esto
             if eeggl==False:
                 orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=occ_size,
-                                                                       centerpix=occ_center,occulter_size_ext=250)
+                                                                        centerpix=occ_center,occulter_size_ext=occulter_size_ext)
             if eeggl==True:
                 orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=occ_size,
-                                                                       centerpix=occ_center,occulter_size_ext=250)#,repleace_value=min_value)
+                                                                        centerpix=occ_center,occulter_size_ext=occulter_size_ext)#,repleace_value=min_value)
         if instr=='lascoC2':    
             #C2
-            orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=occ_size,centerpix=occ_center,occulter_size_ext=300)
+            orig_img, masks, scores, labels, boxes  = nn_seg.infer(img_diff, model_param=None, resize=False, occulter_size=occ_size,
+                                                                    centerpix=occ_center,occulter_size_ext=occulter_size_ext)
             
     # plot the predicted mask
         ofile = opath+"/"+os.path.basename(image_names[j])+'infer1.png'
-        plot_to_png(ofile, [orig_img], [masks], scores=[scores], labels=[labels], boxes=[boxes])
+        if not infer_event2:
+            plot_to_png(ofile, [orig_img], [masks], scores=[scores], labels=[labels], boxes=[boxes])
         
         
         #contour_plot = plt.contour(asd)
@@ -414,10 +443,11 @@ for j in range(1,len(image_names)):
             date_format = '%Y/%m/%dT%H:%M:%S'
             time_string=hdr1['time']
             date = datetime.strptime(time_string[:-4], date_format)
-        if eeggl==False:    
+
+        if eeggl==False and btot == False:    
             if instr != 'lascoC2':    
                 date = datetime.strptime(image_names[j][0:-10],'%Y%m%d_%H%M%S')
-            else:
+            if instr == 'lascoC2':
                 date_string = hdr1['fileorig'][:-4]
                 if int(date_string[:2]) < 94: #soho was launched in 1995
                     aux = '20'
@@ -425,7 +455,14 @@ for j in range(1,len(image_names)):
                     aux = '19'
                 date_string = aux + date_string
                 date = datetime.strptime(date_string,'%Y%m%d_%H%M%S')
-        
+
+        if btot ==True:
+            if instr != 'lascoC2':
+                name_file = hdr1["filename"]
+                date = datetime.strptime(name_file[0:-10],'%Y%m%d_%H%M%S')
+            if instr == 'lascoC2': 
+                breakpoint()
+
         plt_scl = hdr1['CDELT1']
         all_center.append(occ_center)
         all_plate_scl.append(plt_scl)                    
@@ -434,10 +471,14 @@ for j in range(1,len(image_names)):
         all_occ_size.append(occ_size)
         file_names.append(image_names[j])
         all_headers.append(hdr1)
+        all_occulter_size_ext.append(occulter_size_ext)
+
 #breakpoint()
 if infer_event2:
     ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl,resize=False,
-                                                     occulter_size=all_occ_size,centerpix=all_center,plot_params=opath+'mask_props')
+                                                    occulter_size=all_occ_size,occulter_size_ext=all_occulter_size_ext,
+                                                    centerpix=all_center,plot_params=opath+'mask_props')
+    
     zeros = np.zeros(np.shape(ok_orig_img[0]))
     all_idx=[]
     #new_ok_dates=[datetime.utcfromtimestamp(dt.astype(int) * 1e-9) for dt in ok_dates]
@@ -474,7 +515,15 @@ if infer_event2:
                 #h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
                 #h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
                 fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
-        plot_to_png2(opath+file_names[m]+"infer2.png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[m]])  
+        plot_to_png2(opath+file_names[m]+"infer2.png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,
+                    scr_threshold=scr_threshold, title=[file_names[m]])  
+    breakpoint()
+    with open(opath+'mask_props/save_all_data.pkl', 'wb') as write_file:
+        data_dict={}
+        data_dict["df"]=df
+        data_dict["ok_orig_img"]=ok_orig_img
+        data_dict["ok_dates"]=ok_dates
+        pickle.dump(data_dict,write_file)    
 
 print("Program finished without errors")
 

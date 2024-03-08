@@ -15,6 +15,7 @@ import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 import matplotlib.dates as mdates
+import pickle
 
 mpl.use('Agg')
 from astropy.io import fits
@@ -76,7 +77,7 @@ class neural_cme_segmentation():
             self.num_classes = 3 # background, CME, occulter
             self.trainable_backbone_layers = 4
             self.mask_threshold = 0.60 # value to consider a pixel belongs to the object
-            self.scr_threshold = 0.1#0.25 # only detections with score larger than this value are considered
+            self.scr_threshold = 0.51#0.25 # only detections with score larger than this value are considered
         # innitializes the model
         self.model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True, trainable_backbone_layers=self.trainable_backbone_layers) 
         self.in_features = self.model.roi_heads.box_predictor.cls_score.in_features 
@@ -215,8 +216,6 @@ class neural_cme_segmentation():
         
         return img
 
-               
-
     
     def mask_occulter(self, img, occulter_size,centerpix,repleace_value=None):
         '''
@@ -230,7 +229,7 @@ class neural_cme_segmentation():
             h,w = img.shape[:2]
             h=int(h/2)
             w=int(w/2)
-       
+
         mask = np.zeros((img.shape[0],img.shape[0]), dtype=np.uint8)
         cv2.circle(mask, (w,h), occulter_size, 1, -1)
         
@@ -252,7 +251,7 @@ class neural_cme_segmentation():
             h,w = img.shape[:2]
             h=int(h/2)
             w=int(w/2)
-       
+        
         mask = np.zeros((img.shape[0],img.shape[0]), dtype=np.uint8)
         cv2.circle(mask, (w,h), occulter_size, 1, -1)
         if repleace_value is None:
@@ -438,7 +437,7 @@ class neural_cme_segmentation():
             
             if self.labels[labels[i]]=='CME' and scores[i]>self.scr_threshold and halo_flag: 
                 pol_mask=self._rec2pol(masks[i])
-                #breakpoint()
+                
                 if (pol_mask is not None):            
                     #takes the min and max angles and calculates cpa and wide angles
                     angles = [s[1] for s in pol_mask]
@@ -455,7 +454,7 @@ class neural_cme_segmentation():
                         distance_abs= max(distance, key=abs)
                         idx_dist = distance.index(distance_abs)
                         apex_dist= distance[idx_dist] * plate_scl
-                                                              
+                        breakpoint()
                         if filter_halos:
                             if wide_ang < self.max_wide_ang:
                                 prop_list.append([i,float(scores[i]),cpa_ang, wide_ang, apex_dist])  
@@ -467,6 +466,10 @@ class neural_cme_segmentation():
                     prop_list.append([i,np.nan, np.nan, np.nan, np.nan])
             else:
                 prop_list.append([i,np.nan, np.nan, np.nan, np.nan])  
+        
+        if len(masks) == 0:
+            print('Warning, no masks found in the image')
+            prop_list.append([0,np.nan, np.nan, np.nan, np.nan]) 
         return prop_list         
 
     def _plot_mask_prop(self, dates, param, opath, ending='_filtered', x_title='Date and hour', style='*', save=True):
@@ -524,8 +527,10 @@ class neural_cme_segmentation():
             '''
             parameters= ['CPA', 'MASK_ID', 'SCR', 'WA', 'APEX', 'CME_ID']
             colors=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w'] 
-      
-            df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"])
+        
+            df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"], format='%H:%M')
+            dict={}
+            #df["DATE_TIME"]=df["DATE_TIME"].dt.strftime('%H:%M')
             optimal_n_clusters=int(df["CME_ID"].max())+1
             for par in parameters:
                 fig, ax = plt.subplots()
@@ -537,19 +542,28 @@ class neural_cme_segmentation():
                     y_title = par
                     dt_list.extend(x_points)
                     ax.plot(x_points, y_points, style,color=colors[k])
+                dict['x_points'+par]=x_points
+                dict['y_points'+par]=y_points
+                
                 hours = [str(timestamp.time()) for timestamp in dt_list]
+                hours1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in hours]
+                hours2 = [timestamp.strftime("%H:%M") for timestamp in hours1]
+
                 ax.set_title(y_title)    
                 ax.set_xlabel(x_title)
-                plt.xticks(dt_list,hours,rotation=90)
+                plt.xticks(dt_list,hours2,rotation=90)
                 plt.grid()
                 plt.tight_layout()
+                
                 if save:
                     os.makedirs(opath, exist_ok=True)
                     fig.savefig(opath+'/'+str.lower(y_title)+ending+".png")
                     plt.close()
                 else:
                     return fig, ax 
-               
+            dict['df']=df
+            with open(opath+'/'+str.lower("parametros")+ending+'.pkl', 'wb') as write_file:
+                pickle.dump(dict, write_file)
             
             
         
@@ -604,7 +618,7 @@ class neural_cme_segmentation():
         criterion: maximum distance from the fit to consider a point as ok
         percentual: if True, the criterion is a percentage of the y value
         weights: data points weights for the fit. Must be a cevtor of len len(in_x) or int. 
-                 If It's a scalar int gives more weight to the last weights dates bcause CME is supoused to be larger and better defined
+                If It's a scalar int gives more weight to the last weights dates bcause CME is supoused to be larger and better defined
         Returns the distance (in an array form), parabola (indacates the concavity, beeing this negative=True and positive=False) and axis(plots the fit function)
         '''
         colors=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
@@ -639,7 +653,7 @@ class neural_cme_segmentation():
 
         label = f"y={fit.x[0]:.2f}x+{fit.x[1]:.2f}\nR={np.corrcoef(x, y)[0,1]:.2f}"
         axis.plot(x, fit_func(x-x[0], *fit.x), color=colors[k], linestyle='--', label=label, linewidth=1.5)
-       
+        
         return dist,parabola,average_velocity,axis
     
     
@@ -733,7 +747,7 @@ class neural_cme_segmentation():
                 for i in range(len(filtered_df)):
                     min_error.append(filtered_df.iloc[i])
                 min_error_df = pd.DataFrame(min_error)
-               
+            
             else:
                 x_points =np.array([i.timestamp() for i in filtered_df["DATE_TIME"]])
                 y_cpa=np.array(filtered_df["CPA"])
@@ -796,10 +810,11 @@ class neural_cme_segmentation():
                 min_error_df = pd.DataFrame(min_error)
         min_error_df = min_error_df.reset_index(drop=True)
         
-       
-        axs[0].set_xticks(dt_list,hours,rotation=45)
-        axs[1].set_xticks(dt_list,hours,rotation=45)
-        axs[2].set_xticks(dt_list,hours,rotation=45)
+        hours1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in hours]
+        hours2 = [timestamp.strftime("%H:%M") for timestamp in hours1]
+        axs[0].set_xticks(dt_list,hours2,rotation=45)
+        axs[1].set_xticks(dt_list,hours2,rotation=45)
+        axs[2].set_xticks(dt_list,hours2,rotation=45)
         axs[0].grid()
         axs[1].grid()
         axs[2].grid()
@@ -822,9 +837,11 @@ class neural_cme_segmentation():
             ax[0].scatter(x, filtered_event["CPA"], color=colors[l])
             ax[1].scatter(x, filtered_event["WA"], color=colors[l])
             ax[2].scatter(x, filtered_event["APEX"], color=colors[l])
-        ax[0].set_xticks(x_ax,time,rotation=45)
-        ax[1].set_xticks(x_ax,time,rotation=45)
-        ax[2].set_xticks(x_ax,time,rotation=45)
+        time1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in time]
+        time2 = [timestamp.strftime("%H:%M") for timestamp in time1]
+        ax[0].set_xticks(x_ax,time2,rotation=45)
+        ax[1].set_xticks(x_ax,time2,rotation=45)
+        ax[2].set_xticks(x_ax,time2,rotation=45)
         ax[0].grid()
         ax[1].grid()
         ax[2].grid()
@@ -978,10 +995,11 @@ class neural_cme_segmentation():
         all_boxes = [all_boxes[i,:] for i in range(len(all_dates))]
         all_mask_prop = [all_mask_prop[i,:] for i in range(len(all_dates))]
         all_dates = [all_dates[i] for i in range(len(all_dates))]
-                   
+        
         return all_dates,all_masks, all_scores, all_lbl, all_boxes,all_mask_prop
         
-    def infer_event2(self, imgs, dates, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None,centerpix=None, mask_threshold=None, 
+    def infer_event2(self, imgs, dates, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None,occulter_size_ext=None,
+                    centerpix=None, mask_threshold=None, 
                     scr_threshold=None, plot_params=None, filter_halos=True):
         '''
         Updated version of infer_event, it recognices more than one CME per event.
@@ -1022,6 +1040,10 @@ class neural_cme_segmentation():
             in_occulter_size = [occulter_size[i] for i in idx]
         else:
             in_occulter_size = [0 for i in idx]
+
+        if occulter_size_ext is not None:
+            in_occulter_size_ext = [occulter_size_ext[i] for i in idx]
+
         if plate_scl is not None:
             in_plate_scl = [plate_scl[i] for i in idx]
         else:
@@ -1039,7 +1061,7 @@ class neural_cme_segmentation():
         for i in range(len(in_imgs)):
             #infer masks
             orig_img, mask, score, lbl, box = self.infer(in_imgs[i], model_param=model_param, resize=resize, 
-                                                         occulter_size=in_occulter_size[i],centerpix=centerpix[i])
+                                                        occulter_size=in_occulter_size[i],occulter_size_ext=in_occulter_size_ext[i],centerpix=centerpix[i])
             
             all_orig_img.append(orig_img)
             # compute cpa, aw and apex. Already filters by score and other aspects
@@ -1047,9 +1069,10 @@ class neural_cme_segmentation():
             mask_prop = self._compute_mask_prop(mask, score, lbl, box, plate_scl=in_plate_scl[i]/in_plate_scl[0], 
                                                 filter_halos=filter_halos, occulter_size=in_occulter_size[i],centerpix=centerpix[i])
             # appends results only if mask_prop[1] is not NaN, i.e., if it fulfills the filters in compute_mask_prop
-            #breakpoint()
-            ok_ind = np.where(~np.isnan(np.array(mask_prop)[:,1]))[0]
             
+            #print(mask_prop)
+            ok_ind_tmp = np.where(~np.isnan(np.array(mask_prop)[:,1]))
+            ok_ind = ok_ind_tmp[0]
             if len(ok_ind) >0:
                 all_masks.append([mask[j] for j in ok_ind])
                 all_scores.append([score[j] for j in ok_ind])
@@ -1063,10 +1086,11 @@ class neural_cme_segmentation():
             # keeps only one mask per img based on cpa, aw and apex radius evolution consistency
             if filter:
                 df = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,
-                                         all_plate_scl,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS)
+                                        all_plate_scl,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS)
                 # plots parameters
                 if plot_params is not None:
-                     self._plot_mask_prop2(df, self.plot_params , ending='_filtered')
+                    self._plot_mask_prop2(df, self.plot_params , ending='_filtered')
+                #save df, all_orig_img, all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop using pickle
                 #ok_dates=sorted(df['DATE_TIME'].unique())
                 ok_dates=df['DATE_TIME'].unique() 
                 #no aplico un sort ya que al hacerlo puede que el index del df no coincida con el de all_orig_img. Creo que es mas robusto asi.
