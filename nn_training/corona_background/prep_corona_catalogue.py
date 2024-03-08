@@ -30,6 +30,13 @@ amout_limit = None
 lasco= pd.read_csv(lasco_path , sep="\t")
 lasco.name='lasco'
 drop_cases_lasco = ["20071126_052604.413000.fits", "20081102_043004.947000.fits", "20070924_133139.145000.fits", "20071114_185006.091000.fits"]
+drop_cases_cor2b = [
+                    "20090113_020730_14c2", "20080325_183754_14c2", "20081026_210754_14c2", "20090104_230754_14c2", "20080227_090754_14c2", "20070602_003730_14c2", 
+                    "20070603_093730_14c2", "20070607_200730_14c2", "20070610_093730_14c2", "20070619_150730_14c2", "20070627_113730_14c2", "20070629_230730_14c2", 
+                    "20070704_120730_14c2", "20070730_043730_14c2", "20070821_093730_14c2", "20070831_213730_14c2", "20080317_113754_14c2", "20080325_030754_14c2",
+                    "20090515_110730_14c2", "20090804_170730_14c2", "20100207_060800_14c2", "20111219_125400_14c2"
+                    ]
+cor2b_std = []
 satellite = ["cor2_a", "cor2_b", "lasco"] # 0: cor2_a, 1: cor2_b, 2: lasco
 cor2= pd.read_csv(cor2_path , sep="\t")
 cor2.name='cor2'
@@ -38,6 +45,53 @@ for i in range(len(cor2.index)):
     for j in cor2_downloads:
         if cor2.loc[i,j] != "No data" and cor2.loc[i,j] != "*" and cor2.loc[i,j] != "No img/double data":
             cor2.at[i, j] = "/gehme/data/stereo/secchi/"+ cor2.at[i, j]
+
+def std_of_square(image, square_size=768):
+    """
+    Calculates the standard deviation of a square area in an image.
+
+    Args:
+        image: A 2D numpy array representing the image.
+        side_length: The side length of the square area in pixels.
+
+    Returns:
+        The standard deviation of the pixel intensities in the square area.
+    """
+
+    # Get image height and width
+    image_height, image_width = image.shape
+
+    # Check if square fits within image bounds
+    if square_size > image_height or square_size > image_width:
+        raise ValueError("Square size is larger than image dimensions")
+
+    # Calculate center coordinates of the image
+    center_x = int(image_width / 2)
+    center_y = int(image_height / 2)
+
+    # Calculate top-left corner coordinates of the square
+    top_left_x = center_x - int(square_size / 2)
+    top_left_y = center_y - int(square_size / 2)
+
+    # Extract the square area from the image
+    square_area = image[top_left_y:top_left_y + square_size, top_left_x:top_left_x + square_size]
+
+    # Calculate the standard deviation of the pixel intensities
+    standard_deviation = np.std(square_area)
+
+    return standard_deviation
+
+
+def plot_std(std_list, opath):
+    plt.title('Standard deviation of the images')
+    plt.xlabel('Image number')
+    plt.yscale('log')
+    plt.ylabel('Standard deviation')
+    plt.plot(std_list)
+    plt.savefig(opath + '/std_plot.png')
+    plt.close()
+
+
 
 def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,write_png=write_png, sat=0):
     '''
@@ -213,16 +267,23 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                         scrs = [scrs[i] for i in range(len(labels)) if labels[i] == 2]
                         scrs = np.concatenate([scrs])
                         if  np.all(scrs < SCR_THRESHOLD): # header_contrast<4.7 and
+                            if filename in drop_cases_cor2b:
+                                continue
                             print("saving image "+str(i)+" from cor2_b")
                             if write_png==True:
                                 mu = np.mean(img_diff.data)
-                                sd = np.std(img_diff.data)
-                                plt.imsave(odirb+"/"+filename+".png", img_diff.data, cmap='gray', vmin=mu-3*sd, vmax=mu+3*sd)
+                                std = np.std(img_diff.data)
+                                square_std = std_of_square(img_diff.data, square_size=768)
+                                if square_std > 1e-10:
+                                    continue
+                                cor2b_std.append(square_std)
+                                plt.imsave(odirb+"/"+filename+".png", img_diff.data, cmap='gray', vmin=mu-3*std, vmax=mu+3*std)
                                 print("png saved")
                             else:
                                 img_diff.writeto(odirb+"/"+filename+".fits",overwrite=True)
                 else:
                     print("files not found")
+        plot_std(cor2b_std, odirb)
         return cor2_b
     
 
