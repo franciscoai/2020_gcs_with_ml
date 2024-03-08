@@ -89,9 +89,9 @@ kincat_col_names=["DATE_TIME","MASK","SCORE","CPA_ANG","WIDE_ANG","APEX_DIST"]
 imsize=[0,0]# if 0,0 no rebin its applied 
 imsize_nn=[512,512] #for rebin befor the nn
 smooth_kernel=[2,2] #changes the gaussian filter size
-occ_size = [50,52] # occulter radius in pixels. An artifitial occulter with constant value equal to the mean of the image is added before inference. Use 0 to avoid
+occ_size = [50,55] # occulter radius in pixels. An artifitial occulter with constant value equal to the mean of the image is added before inference. Use 0 to avoid
 occ_center=[[256,256],[260,247]]
-sat="cor2_a"#"cor2_b"
+sat="cor2_b"#"cor2_b"
 
 if sat=="cor2_a":
     downloaded_files_list = repo_dir + '/nn_training/kincat/helcatslist_20160601_sta_downloaded.csv' # list of downloaded files
@@ -101,6 +101,8 @@ elif sat=="cor2_b":
     downloaded_files_list = repo_dir + '/nn_training/kincat/helcatslist_20160601_stb_downloaded.csv' # list of downloaded files
     occ_center=occ_center[1]
     occ_size= occ_size[1]
+    avoid_dates=['2007-06-04','2007-06-07','2007-07-08','2007-08-21','2007-10-08','2007-11-04','2007-12-31','2008-02-23','2008-05-17','2008-06-01','2008-10-26','2008-12-27','2009-01-14','2009-02-11','2009-02-18','2009-04-23','2010-02-24','2010-03-30','2011-01-30','2011-03-03','2013-06-20','2013-07-18','2013-10-20','2013-10-25']
+
 
 #nn model parameters
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
@@ -129,7 +131,9 @@ downloaded = downloaded.reset_index(drop=True)
 catalogue = pd.read_csv(helcat_db, sep = "\t")
 catalogue=catalogue.drop([0,1])
 catalogue.columns=col_names
+catalogue = catalogue[~catalogue['PRE_DATE'].isin(avoid_dates)]
 catalogue = catalogue.reset_index(drop=True)
+
 
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
@@ -175,6 +179,11 @@ for i in range(15,len(catalogue.index)):
                 filename=f[49:-4]
                 folder_name=files[0][49:-17]
                 final_path=opath+"/"+folder_name+"/filtered/"
+                props_path=final_path+'mask_props'
+                if not os.path.exists(final_path):
+                    os.makedirs(final_path)
+                if not os.path.exists(props_path):
+                    os.makedirs(props_path)
                 date= datetime.strptime(filename[0:-6],'%Y%m%d_%H%M%S')
                 os.makedirs(os.path.join(opath, str(folder_name)),exist_ok=True)
                 ofile = os.path.join(opath, str(folder_name), filename )
@@ -201,7 +210,7 @@ for i in range(15,len(catalogue.index)):
                 all_headers.append(header)
                 
         if len(all_images)>=2:
-            ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=final_path+'mask_props')
+            ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=props_path)
 
             zeros = np.zeros(np.shape(ok_orig_img[0]))
             all_idx=[]
