@@ -130,14 +130,15 @@ def shellSkeleton(alpha, h, nleg, ncirc, k):
     return axisPTS, crossrads, betas
 
 
-def getGCS(CMElon, CMElat, CMEtilt, height, k, ang, satpos, do_rotate_lat, nleg=5, ncirc=20, ncross=30):
+def getGCS(CMElon, CMElat, CMEtilt, height, k, ang, satpos, do_rotate_lat=None, nleg=5, ncirc=20, ncross=30):
     cloud = cmecloud(ang*dtor, height, nleg, ncirc, k, ncross)
     # in order (of parens) rotx to tilt, roty by -lat, rotz by lon
     # cloud = np.transpose(rotz(roty(rotx(np.transpose(cloud), CMEtilt),-CMElat),CMElon))
 
     clouds = []
     # dSat = 213. # was assuming L1 for sat projections which no longer use
-
+    if do_rotate_lat is None:
+        do_rotate_lat = [False]*len(satpos)
     #for sat in satpos:
     #Modified 28/02/2024 by D.Lloveras to obtain a better match with IDL in Lasco C2 (satpos[1])
     #do_rotate_lat list of boolean values to rotate or not the cloud in latitude. Should be True in case of Lasco-C2, False in any other case.
