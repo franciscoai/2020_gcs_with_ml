@@ -5,17 +5,42 @@
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-import numpy as np
-import sunpy
-import pandas as pd
-from ext_libs.rebin import rebin
 import scipy
+import numpy as np
+import pandas as pd
+from datetime import datetime, timedelta
+from ext_libs.rebin import rebin
 from astropy.io import fits
 
-import datetime
 
+def find_matches(paths, tolerance):
+    """
+    Finds matches of dates and times in the files of the comparison paths
+    """
+    matches = []
+    # listir all paths
+    cor2b_path, cor2a_path, lasco_path = paths
+    # list all files in the paths
+    cor2b_files = os.listdir(cor2b_path)
+    cor2a_files = os.listdir(cor2a_path)
+    lasco_files = os.listdir(lasco_path)
 
-def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None, custom_headers=False):
+    for cor2b_file in cor2b_files:
+        # Gets the date and time of the file
+        cor2b_timestamp = datetime.strptime(cor2b_file.split("_")[0] + "_" + cor2b_file.split("_")[1], "%Y%m%d_%H%M%S")
+        # Check for matches
+        cor2a_timestamps = [datetime.strptime(cor2a_file.split("_")[0] + "_" + cor2a_file.split("_")[1], "%Y%m%d_%H%M%S") for cor2a_file in cor2a_files]
+        cor2a_timestamps_diff = [abs(cor2b_timestamp - cor2a_timestamp) for cor2a_timestamp in cor2a_timestamps]
+        cor2a_file = cor2a_files[np.argmin(cor2a_timestamps_diff)] if min(cor2a_timestamps_diff) <= tolerance else None
+        if cor2a_file is not None:
+            lasco_timestamps = [datetime.strptime(lasco_file.split(".")[0], "%Y%m%d_%H%M%S") for lasco_file in lasco_files]
+            lasco_timestamps_diff = [abs(cor2b_timestamp - lasco_timestamp) for lasco_timestamp in lasco_timestamps]
+            lasco_file = lasco_files[np.argmin(lasco_timestamps_diff)] if min(lasco_timestamps_diff) <= tolerance else None
+            if lasco_file is not None:
+                matches.append((cor2b_file, cor2a_file, lasco_file))
+    return matches
+
+def get_corona(imsize=None, rnd_rot=False, custom_headers=False):
     '''
     Returns a measured "quiet" (with no CME) solar corona observed by satelitte sat, the implemented instruments are
 
@@ -30,133 +55,81 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False, obs_datetime=None, cu
         rnd_rot: Set to rotate the ouput image by a random angle around the central pixel
 
     '''
-    # CONSTANTS
-    #files
-    
-    
-    cor2_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2"
-    lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/lasco"
-    h_cor2b="/gehme/data/stereo/secchi/L1/b/img/cor2/20130209/20130209_062400_14c2B.fts"
-    h_cor2a="/gehme/data/stereo/secchi/L1/a/img/cor2/20130209/20130209_062400_14c2A.fts" 
-    h_lasco="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/lasco/c2/20130224_055918.fts"
-    size_occ=[3.3, 3.3, 2.2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun]
-    occ_center=[(30,-15),(0,-5),(0,0)] # [(38,-15),(0,-5),(0,0)] # (y,x)
+    # CONSTANTS  
+    COR2B_PATH = "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2/cor2_b"
+    COR2A_PATH = "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2/cor2_a"
+    LASCO_PATH = "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/lasco/c2/3VP"
+    H_COR2B = "/gehme/data/stereo/secchi/L1/b/img/cor2/20130209/20130209_062400_14c2B.fts"
+    H_COR2A = "/gehme/data/stereo/secchi/L1/a/img/cor2/20130209/20130209_062400_14c2A.fts" 
+    H_LASCO = "/gehme/data/soho/lasco/level_1/c2/20130209/25447666.fts" 
+    SIZE_OCC = [3.3, 3.3, 2.2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun]
+    OCC_CENTER = [(30,-15),(0,-5),(0,0)] # [(38,-15),(0,-5),(0,0)] # (y,x)
     # size_occ=[1.4, 1.4, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun] 
-    max_time_diff= datetime.timedelta(hours=2)
+    TIME_DIFF_THRESHOLD = timedelta(hours=24)
 
-    # main
-     # STEREO A
-    if sat==0:
-        path=cor2_path+"/cor2_b"
-    # STEREO B
-    elif sat==1:
-        path=cor2_path+"/cor2_a"
-    # LASCO    
-    elif sat==2:
-        path=lasco_path+"/c2"
-        # p0 = '/gehme/data/soho/lasco/level_1/c2/20130424/25456651.fts'
-        # p1 = '/gehme/data/soho/lasco/level_1/c2/20130424/25456652.fts'
-        # p0img = fits.open(p0)[0].data
-        # p1img = fits.open(p1)[0].data
-        # h0 = fits.getheader(p0)
-        # oimg = p1img - p0img
-        # namefile = '20130424_055918.fts'
-        # # Save oimage in namefile
-        # pp = fits.PrimaryHDU(oimg, header=h0[0:-3])
-        # pp.writeto(path+'/'+namefile, output_verify='ignore', overwrite=True)
-
-    else:
-        os.error('Input instrument not recognized, check value of sat')
-
-    files=[f for f in os.listdir(path) if f.endswith('.fits') or f.endswith('.fts')]
     
-    if obs_datetime is not None:
-        # get the closest file to the input datetime
-        files_datetime = [pd.to_datetime(f.split('_')[0] + '_' + f.split('_')[1].split('.')[0], format='%Y%m%d_%H%M%S') for f in files]
-        time_diff = [np.abs(fdt - obs_datetime) for fdt in files_datetime]
-        if np.min(time_diff) > max_time_diff:
-            print('WARNING: No file found within ', max_time_diff, ' of the input datetime')
-        p0 = files[np.argmin(time_diff)]
-    else:
-        p0= np.random.choice(files)
-    # get full datetime with hours, minutes, seconds
-    day = p0.split('_')[0]
-    time = p0.split('_')[1]
-    obs_datetime = pd.to_datetime(day + '_' + time.split('.')[0], format='%Y%m%d_%H%M%S')
-
-    p0=path+"/"+p0
+    # Generate list of triplets
+    matches = find_matches([COR2B_PATH, COR2A_PATH, LASCO_PATH], TIME_DIFF_THRESHOLD)
     
-    oimg= fits.open(p0)[0].data
+    # Get random triplet
+    triplet = np.random.randint(0, len(matches)-1)
+    triplet = matches[triplet]
+
+    cor2b_file, cor2a_file, lasco_file = triplet
+    cor2b_path = COR2B_PATH + "/" + cor2b_file
+    cor2a_path = COR2A_PATH + "/" + cor2a_file
+    lasco_path = LASCO_PATH + "/" + lasco_file
+
+    # Get date of triplet
+    cor2b_date = datetime.strptime(cor2b_file.split("_")[0] + "_" + cor2b_file.split("_")[1], "%Y%m%d_%H%M%S")
+    cor2a_date = datetime.strptime(cor2a_file.split("_")[0] + "_" + cor2a_file.split("_")[1], "%Y%m%d_%H%M%S")
+    lasco_date = datetime.strptime(lasco_file.split(".")[0], "%Y%m%d_%H%M%S")
+
+    # Read images
+    cor2b_img = fits.open(cor2b_path)[0].data
+    cor2a_img = fits.open(cor2a_path)[0].data
+    lasco_img = fits.open(lasco_path)[0].data
+
+    # Read headers
     if custom_headers:
-        if sat == 0:
-            h0= fits.getheader(h_cor2b)
-        elif sat == 1:
-            h0= fits.getheader(h_cor2a)
-        else:
-            h0= fits.getheader(h_lasco)
+        h_cor2b= fits.getheader(H_COR2B)
+        h_cor2a= fits.getheader(H_COR2A)
+        h_lasco= fits.getheader(H_LASCO)
     else:
-        h0= fits.getheader(p0)
+        h_cor2b = fits.open(cor2b_path)[0].header
+        h_cor2a = fits.open(cor2a_path)[0].header
+        h_lasco = fits.open(lasco_path)[0].header
 
+    # rotate images
     if rnd_rot:
-        oimg = scipy.ndimage.rotate(oimg, np.random.randint(low=0, high=360), reshape=False)
- 
-    # shift oimg
-    if sat == 0:
-        shift_values = occ_center[0]
-        oimg = np.roll(oimg, shift_values[0], axis=0)
-        oimg = np.roll(oimg, shift_values[1], axis=1)
-    elif sat == 1:
-        shift_values = occ_center[1]
-        oimg = np.roll(oimg, shift_values[0], axis=0)
-        oimg = np.roll(oimg, shift_values[1], axis=1)
-    elif sat == 2:
-        shift_values = occ_center[2]
-        oimg = np.roll(oimg, shift_values[0], axis=0)
-        oimg = np.roll(oimg, shift_values[1], axis=1)
+        cor2b_img = scipy.ndimage.rotate(cor2b_img, np.random.randint(low=0, high=360), reshape=False)
+        cor2a_img = scipy.ndimage.rotate(cor2a_img, np.random.randint(low=0, high=360), reshape=False)
+        lasco_img = scipy.ndimage.rotate(lasco_img, np.random.randint(low=0, high=360), reshape=False)
 
+ 
+    # shift images
+    shift_values = OCC_CENTER[0]
+    cor2b_img = np.roll(cor2b_img, shift_values[0], axis=0)
+    cor2b_img = np.roll(cor2b_img, shift_values[1], axis=1)
+
+    shift_values = OCC_CENTER[1]
+    cor2a_img = np.roll(cor2a_img, shift_values[0], axis=0)
+    cor2a_img = np.roll(cor2a_img, shift_values[1], axis=1)
+
+    shift_values = OCC_CENTER[2]
+    lasco_img = np.roll(lasco_img, shift_values[0], axis=0)
+    lasco_img = np.roll(lasco_img, shift_values[1], axis=1)
+
+    # rebin images
     if imsize is not None:
-        oimg = rebin(oimg,imsize,operation='mean')
+        cor2b_img = rebin(cor2b_img,imsize,operation='mean')
+        cor2a_img = rebin(cor2a_img,imsize,operation='mean')
+        lasco_img = rebin(lasco_img,imsize,operation='mean')
+    
+    # stack data
+    imgs_data = [cor2b_img, cor2a_img, lasco_img]
+    headers = [h_cor2b, h_cor2a, h_lasco]
+    size_occ = SIZE_OCC
+    dates = [cor2b_date, cor2a_date, lasco_date]
 
-    return oimg, h0, size_occ[sat], obs_datetime
-
-    # STEREO A C1
-    # if sat==0:
-    #     p0 = '/gehme/data/stereo/secchi/L1/a/seq/cor1/20130424/20130424_051500_1B4c1A.fts'
-    #     p1 =  '/gehme/data/stereo/secchi/L1/a/seq/cor1/20130424/20130424_052000_1B4c1A.fts'
-    #     p0img,h0 = sunpy.io._fits.read(p0)[0]
-    #     p1img, _ = sunpy.io._fits.read(p1)[0]
-    #     oimg = p1img - p0img
-    # # STEREO B C1
-    # elif sat==1:
-    #     p0 = '/gehme/data/stereo/secchi/L1/b/seq/cor1/20130424/20130424_051500_1B4c1B.fts'
-    #     p1 = '/gehme/data/stereo/secchi/L1/b/seq/cor1/20130424/20130424_052000_1B4c1B.fts'
-    #     p0img,h0 = sunpy.io._fits.read(p0)[0]
-    #     p1img, _ = sunpy.io._fits.read(p1)[0]
-    #     oimg = p1img - p0img        
-    # # lasco C1
-    # elif sat==2:
-    #     p0 = '/gehme/data/soho/lasco/level_1/c2/20130424/25456651.fts'
-    #     p1 = '/gehme/data/soho/lasco/level_1/c2/20130424/25456652.fts'
-    #     p0img,h0 = sunpy.io._fits.read(p0)[0]
-    #     p1img, _ = sunpy.io._fits.read(p1)[0]
-    #     oimg = p1img - p0img
-    # else:
-    #     os.error('Input instrument not recognized, check value of sat')
-
-    # if rnd_rot:
-    #     oimg = scipy.ndimage.rotate(oimg, np.random.randint(low=0, high=360), reshape=False)
- 
-    # if imsize is not None:
-    #     sz_ratio = np.array(oimg.shape)/np.array(imsize)
-    #     oimg = rebin(oimg,imsize,operation='mean') 
-    #     h0['NAXIS1'] = imsize[0]
-    #     h0['NAXIS2'] = imsize[1]
-    #     h0['CDELT1'] = h0['CDELT1']*sz_ratio[0]
-    #     h0['CDELT2'] = h0['CDELT2']*sz_ratio[1]
-    #     h0['CRPIX2'] = int(h0['CRPIX2']/sz_ratio[1])
-    #     h0['CRPIX1'] = int(h0['CRPIX1']/sz_ratio[1]) 
-    #     size_occ[sat] = size_occ[sat]*np.mean(sz_ratio)
-
-    # if sat == 2:
-    #     breakpoint()
-    # return oimg, h0, size_occ[sat]
+    return imgs_data, headers, size_occ, dates

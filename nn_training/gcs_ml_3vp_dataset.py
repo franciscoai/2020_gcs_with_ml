@@ -120,7 +120,7 @@ def raytracewcsWrapper(header, params, imsize, occrad, in_sig, out_sig, nel):
 # CONSTANTS
 #files
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_onlyMask_anothertest'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_V3'
 OVERWRITE = False # set to True to overwrite existing files
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 min_nviews = 3 # minimum number succesful views 
@@ -162,7 +162,7 @@ else:
     random_driver = np.random.RandomState(seed)
     
 
-OPATH = OPATH + "_size_" + str(par_num) + "_seed_" + str(seed)
+#OPATH = OPATH + "_size_" + str(par_num) + "_seed_" + str(seed)
 
 # Save configuration to .CSV
 date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
@@ -179,6 +179,7 @@ if os.path.exists(OPATH) and OVERWRITE:
 elif os.path.exists(OPATH) and not OVERWRITE:
     #check if the csv file exists
     list_files = os.listdir(OPATH)
+    breakpoint()
     csv_file = [s for s in list_files if "Set_Parameters.csv" in s][0]
     failed_csv_file = [s for s in list_files if "Failed_Parameters.csv" in s][0]
     configfile_name = OPATH + '/' + csv_file
@@ -221,14 +222,8 @@ while iter_counter != par_num:
 
     #get background corona,headers and occulter size
     if same_corona==False or len(back_corona)==0:
-        for sat in range(n_sat):
-            if sat == 0:
-                a,b,c,obs_datetime=get_corona(sat,imsize=imsize, custom_headers=same_position)
-            else:
-                a,b,c,_=get_corona(sat,imsize=imsize, obs_datetime=obs_datetime, custom_headers=same_position)
-            back_corona.append(a)
-            headers.append(b)
-            size_occ.append(c)
+        back_corona, headers, size_occ, _ = get_corona(imsize=imsize, custom_headers=same_position)
+        
     
     # Get the location of sats and gcs:
     satpos, plotranges = pyGCS.processHeaders(headers)

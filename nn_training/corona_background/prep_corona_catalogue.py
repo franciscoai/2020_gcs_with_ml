@@ -25,7 +25,7 @@ opath = "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects"#'/gehm
 imsize=[0,0]# if 0,0 no rebin its applied 
 imsize_nn=[512,512] #for rebin befor the nn
 do_write=True # if set to True it saves the diff images
-write_png=True#if set to True it will save the images in fits and png formats else it will save only fits
+write_png=False#if set to True it will save the images in fits and png formats else it will save only fits
 amout_limit = None
 lasco= pd.read_csv(lasco_path , sep="\t")
 lasco.name='lasco'
@@ -208,7 +208,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                     print("error on "+path_1h+"  or  "+path_2h)
     if sat=="cor2_b":
         cor2_b=pd.DataFrame(columns=['paths',"date"])#,"header_contrast"])
-        odirb= opath+'/'+df.name+'/'+"cor2_b/test"
+        odirb= opath+'/'+df.name+'/'+"cor2_b"
         os.makedirs(odirb, exist_ok=True)
         
         for i in paths["paths"]:
@@ -283,7 +283,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                                 img_diff.writeto(odirb+"/"+filename+".fits",overwrite=True)
                 else:
                     print("files not found")
-        plot_std(cor2b_std, odirb)
+        #plot_std(cor2b_std, odirb)
         return cor2_b
     
 
@@ -293,7 +293,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
         lasco_df = pd.DataFrame(columns=['paths',"date"])
 
         # Create the output directory
-        odir = opath + "/lasco/c2"
+        odir = opath + "/lasco/c2/3VP"
         os.makedirs(odir, exist_ok=True)
 
         # Iterate over the paths and extract the date from the headers
@@ -373,7 +373,7 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
 #nn inference
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/"
 trained_model = '9999.torch'
-SCR_THRESHOLD = 0.3165 #0.3 # only save images with score below this threshold (i.e., No CME is present)
+SCR_THRESHOLD = 0.85# 0.3165 #for cor2b
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
@@ -381,9 +381,9 @@ model_param = torch.load(model_path + "/"+ trained_model, map_location=device)
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version="v4")
 #tasks
 #cor2 a and b
-data=prep_catalogue(cor2,cor2_downloads,do_write=do_write,model_param=model_param, device=device,write_png=write_png, sat=1) # sat 0: cor2_a, 1: cor2_b, 2: lasco
+#data=prep_catalogue(cor2,cor2_downloads,do_write=do_write,model_param=model_param, device=device,write_png=write_png, sat=1) # sat 0: cor2_a, 1: cor2_b, 2: lasco
 # lasco
-#data=prep_catalogue(lasco,lasco_downloads,do_write=do_write,model_param=model_param, device=device, sat=2) # get paths of ok files ??
+data=prep_catalogue(lasco,lasco_downloads,do_write=do_write,model_param=model_param, device=device, sat=2) # get paths of ok files ??
 
 # saves data to csv and plots
 # cor2_a=data[0]
