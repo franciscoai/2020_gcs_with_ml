@@ -151,26 +151,33 @@ def get_cdaw(folder,sat):
 def get_cactus(folder,sat):
     general_path= folder+'/cactus_catalogue/'
     if sat=='lasco_c2':
-        path= general_path+'cmecat_combo.sav'
+        columns=['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s']
+        columns=['CME_ID','DATE','TIME','UNKNOWN','UNKNOWN_1','DATE_2','TIME_2','UNKNOWN_2','CPA','WA','MEDIAN_VEL','VEL_VARIATION','MIN_VEL','MAX_VEL','UNKNOWN_3','UNKNOWN_4','SATELITE','INSTRUMENT','DETECTOR']
+        path = general_path+'cmecat_combo.sav'
         data_dict= readsav(path, idict=None)
-        #df = pd.DataFrame(data_dict['combined'])
-        #df = pd.DataFrame({field: data_dict['combined'][field] for field in data_dict['combined'].dtype.names})
-        breakpoint()
+        df_list=[]
+        for c in range(len(data_dict['combined'][0])):
+            for b in range(len(data_dict['combined'][0][0][0])):
+                for a in range(len(data_dict['combined'][0][0][0][0])):
+                    data_row = data_dict['combined'][0][0][0][0][a]
+                    expanded_records = [item for item in data_row]
+                    df_list.append(expanded_records)
+        df = pd.DataFrame(df_list, columns=columns)
     else:
         path= general_path+'secchi_cmecat_combo.sav'
         data_dict = readsav(path, python_dict=True)
         if sat == 'cor2_a':
             df = pd.DataFrame(data_dict['secchia_combo'])
-            for col in df.columns:
-                # Verificar si la columna contiene bytes
-                if df[col].dtype == 'O' and any(isinstance(val, bytes) for val in df[col]):
-                    # Eliminar el prefijo 'b' de las celdas que contienen bytes
-                    df[col] = df[col].apply(lambda x: x.decode('utf-8').strip('b') if isinstance(x, bytes) else x)
-
-            breakpoint()
         elif sat=='cor2_b':
             df = pd.DataFrame(data_dict['secchib_combo'])
 
+    for col in df.columns:
+                if df[col].dtype == 'O' and any(isinstance(val, bytes) for val in df[col]):
+                    df[col] = df[col].apply(lambda x: x.decode('utf-8').strip('b') if isinstance(x, bytes) else x)
+    df['DATE'] = pd.to_datetime(df['DATE'])
+    df_sorted = df.sort_values(by='DATE')
+
+    return df_sorted
 
 def comparator(NN,seeds,vourlidas,gcs):
     columns=["NN_DATE_TIME","SEEDS_DATE_TIME","VOURLIDAS_DATE_TIME","NN_CPA_ANG_MEDIAN","NN_CPA_ANG_STD","SEEDS_CPA_ANG","VOURLIDAS_CPA_ANG","NN_WIDE_ANG_MEDIAN","NN_WIDE_ANG_STD","SEEDS_WIDE_ANG","VOURLIDAS_WIDE_ANG","GCS_CPA_ANG","GCS_WIDE_ANG"]
@@ -189,6 +196,7 @@ def comparator(NN,seeds,vourlidas,gcs):
     NN['TIME'] = pd.to_datetime(NN['DATE_TIME']).dt.time
     gcs['DATE_TIME'] = pd.to_datetime(gcs['DATE_TIME'])
     gcs = gcs.sort_values(by='DATE_TIME')
+    
     
     #adjust the 0 degree to the nort
     for i in NN_ang_col:
@@ -367,21 +375,22 @@ def plot_one_per_one(x_axis,y_axis):
 ################################################################################### MAIN ######################################################################################
 odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1"
 folder="/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications"
-sat="cor2_a"#cor2_a/cor2_b/lasco_c2
+sat="lasco_c2"#cor2_a/cor2_b/lasco_c2
 
 #-----------------
 plot_dir=odir+'/'+sat+'_comparison'
 os.makedirs(plot_dir, exist_ok=True)
-cactus= get_cactus(folder,sat)
-breakpoint()
-NN=get_NN(odir,sat)
-seeds=get_seeds(folder,sat)
-vourlidas= get_vourlidas(folder,sat)
-gcs=get_GCS(odir,sat)
-cdaw=get_cdaw(folder,sat)
-
-
-df=comparator(NN,seeds,vourlidas,gcs)
+if sat=='lasco_c2':
+    cdaw =get_cdaw(folder,sat)
+    cactus = get_cactus(folder,sat)
+    breakpoint()
+else:
+    cactus = get_cactus(folder,sat)
+    NN = get_NN(odir,sat)
+    seeds = get_seeds(folder,sat)
+    vourlidas = get_vourlidas(folder,sat)
+    gcs = get_GCS(odir,sat)
+    df=comparator(NN,seeds,vourlidas,gcs)
 
 plot_all_in_one("GCS_CPA_ANG",["VOURLIDAS","SEEDS","NN"])
 plot_all_in_one("GCS_WIDE_ANG",["VOURLIDAS","SEEDS","NN"])

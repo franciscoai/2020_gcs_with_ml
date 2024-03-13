@@ -138,7 +138,7 @@ catalogue = catalogue.reset_index(drop=True)
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 
-for i in range(15,len(catalogue.index)):
+for i in range(len(catalogue.index)):
     print("Reading date range nª "+str(i))
     date_helcat = datetime.strptime((catalogue["PRE_DATE"][i]+" "+catalogue["PRE_TIME"][i]),'%Y-%m-%d %H:%M') #forms datetime object
     start_date = date_helcat 
