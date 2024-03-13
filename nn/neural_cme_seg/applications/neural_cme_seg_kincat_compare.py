@@ -176,10 +176,10 @@ def get_cactus(folder,sat):
                     df[col] = df[col].apply(lambda x: x.decode('utf-8').strip('b') if isinstance(x, bytes) else x)
     df['DATE'] = pd.to_datetime(df['DATE'])
     df_sorted = df.sort_values(by='DATE')
-
+    
     return df_sorted
 
-def comparator(NN,seeds,vourlidas,gcs):
+def comparator(NN,seeds,vourlidas,gcs,cactus):
     columns=["NN_DATE_TIME","SEEDS_DATE_TIME","VOURLIDAS_DATE_TIME","NN_CPA_ANG_MEDIAN","NN_CPA_ANG_STD","SEEDS_CPA_ANG","VOURLIDAS_CPA_ANG","NN_WIDE_ANG_MEDIAN","NN_WIDE_ANG_STD","SEEDS_WIDE_ANG","VOURLIDAS_WIDE_ANG","GCS_CPA_ANG","GCS_WIDE_ANG"]
     NN_ang_col=['CPA_ANG', 'WIDE_ANG']
     
@@ -196,7 +196,8 @@ def comparator(NN,seeds,vourlidas,gcs):
     NN['TIME'] = pd.to_datetime(NN['DATE_TIME']).dt.time
     gcs['DATE_TIME'] = pd.to_datetime(gcs['DATE_TIME'])
     gcs = gcs.sort_values(by='DATE_TIME')
-    
+    cactus['DATE_TIME'] = pd.to_datetime(cactus['DATE_TIME'])
+    breakpoint()
     
     #adjust the 0 degree to the nort
     for i in NN_ang_col:
@@ -375,7 +376,7 @@ def plot_one_per_one(x_axis,y_axis):
 ################################################################################### MAIN ######################################################################################
 odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1"
 folder="/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications"
-sat="lasco_c2"#cor2_a/cor2_b/lasco_c2
+sat="cor2_a"#cor2_a/cor2_b/lasco_c2
 
 #-----------------
 plot_dir=odir+'/'+sat+'_comparison'
@@ -390,7 +391,7 @@ else:
     seeds = get_seeds(folder,sat)
     vourlidas = get_vourlidas(folder,sat)
     gcs = get_GCS(odir,sat)
-    df=comparator(NN,seeds,vourlidas,gcs)
+    df=comparator(NN,seeds,vourlidas,gcs,cactus)
 
 plot_all_in_one("GCS_CPA_ANG",["VOURLIDAS","SEEDS","NN"])
 plot_all_in_one("GCS_WIDE_ANG",["VOURLIDAS","SEEDS","NN"])

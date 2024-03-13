@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 import glob
 from scipy.ndimage import gaussian_filter
 import pickle
-
+from tqdm import tqdm
 
 __author__ = "Francisco Iglesias"
 __copyright__ = "Grupo de Estudios en Heliofisica de Mendoza - https://sites.google.com/um.edu.ar/gehme"
@@ -28,7 +28,7 @@ __email__ = "franciscoaiglesias@gmail.com"
 
 def img_download():
     dfs = []
-    doc_list=['19960131.065213.w047n.v0158.p272g.yht','19960126.091619.w027n.v0262.p090g.yht', '19960122.031101.w037n.v0267.p103g.yht','19960115.070110.w043n.v0525.p272s.yht','19960113.220830.w016n.v0290.p266s.yht','19960111.001436.w018n.v0499.p272s.yht']
+    doc_list=['20080503.185404.w018n.v0267.p245g.yht','20080503.103358.w007n.v0205.p198g.yht', '20080503.043004.w015n.v0346.p234g.yht','20080502.193138.w028n.v0191.p085g.yht','20080502.100604.w047n.v0176.p235g.yht','20080502.063004.w021n.v0124.p291g.yht','20080501.193137.w049n.v0130.p089g.yht','20080501.163005.w018n.v0178.p091g.yht','20080501.061804.w024n.v0369.p094g.yht']
     for h in doc_list:    
         df = pd.read_csv('/home/cisterna/Downloads/'+h, header=None, names=['COL'])
         col_list = df['COL'].tolist()
@@ -44,13 +44,17 @@ def img_download():
 
         for j in range(0, dismiss_rows):
             line=col_list[j]
-            if line != '#COMMENT:':
-                line = line.strip().replace('#', '')
+            line = line.strip().replace('#', '')
+            try:
+                nombre, valor = line.split(': ')
+            except:
                 try:
-                    nombre, valor = line.split(': ')
-                except:
                     nombre, valor = line.split('=')
-                df_fixed[nombre]=valor
+                except:
+                    line = line.strip().replace(':', '')
+                    nombre == line
+                    valor == '-'
+            df_fixed[nombre]=valor
         dfs.append(df_fixed)
     df_full = pd.concat(dfs, ignore_index=True)
     df_full['DATE_TIME'] = pd.to_datetime(df_full['DATE'] + ' ' + df_full['TIME'])
@@ -94,15 +98,91 @@ results = []
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 
 catalogue=img_download()
-
+breakpoint()
 for i in range(len(catalogue.index)):
     print("Reading date range nª "+str(i))
-    path='/gehme/data/soho/lasco/'
-    breakpoint()
-    date= pd.to_datetime(catalogue['DATE'])
-    date= date.dt.strftime('%Y%m%d')
-    img_path=path+catalogue['TEL'][i].lower()+'/'+date+'/'+
-    # for j in range(len(files)-1):print(f'Processing {j} of {len(files)-1}')
-    #         #read fits
-    #         image1=read_fits(files[j],smooth_kernel=smooth_kernel)
-    #         image2=read_fits(files[j+1],smooth_kernel=smooth_kernel)
+    # path='/gehme/data/soho/lasco/'
+    # breakpoint()
+    # date= pd.to_datetime(catalogue['DATE'])
+    # date= date.dt.strftime('%Y%m%d')
+    # img_path=path+catalogue['TEL'][i].lower()+'/'+date+'/'
+    
+    
+    # Create an empty DataFrame to store the paths and dates
+    lasco_df = pd.DataFrame(columns=['paths',"date"])
+    # Create the output directory
+    odir = opath + "/c2"
+    os.makedirs(odir, exist_ok=True)
+
+    # Iterate over the paths and extract the date from the headers
+    for i in tqdm(paths["paths"], desc="Preparing lasco data"):
+        basename = os.path.basename(i)
+        header = fits.getheader(i)
+        date_obs = header["DATE-OBS"]
+        time_obs = header["TIME-OBS"]
+        datetime_obs = datetime.strptime(date_obs + ' ' + time_obs, '%Y/%m/%d %H:%M:%S.%f')
+        lasco_df.loc[len(lasco_df.index)] = [i, datetime_obs]
+    
+    # Process the lasco data
+    amount_counter = 0
+    for i, date in tqdm(enumerate(lasco_df["date"]), desc="Processing lasco data"):
+        # try:
+        prev_date = date - timedelta(hours=12)
+        # Delete duplicated rows
+        lasco_df = lasco_df.drop_duplicates()
+        count = ((lasco_df["date"] < date) & (lasco_df["date"] >= prev_date)).sum()
+        if count==1:
+            # Generate the diff image
+            # file1 = glob.glob(lasco_df.loc[i, "paths"][0:-10] + "*")
+            # file2 = glob.glob(lasco_df.loc[i + 1, "paths"][0:-10] + "*")
+            file1 = [lasco_df.loc[i, "paths"]]
+            file2 = [lasco_df.loc[i + 1, "paths"]]
+
+            if len(file1)!=0 or len(file2)!=0:
+                # img1= fits.open((file1[0]))[0].data
+                # img2= fits.open((file2[1]))[0].data
+                img1 = fits.open(file1[0])[0].data
+                img2 = fits.open(file2[0])[0].data
+                header= fits.getheader((file1[0]))
+
+                # Check shape
+                if img1.shape != (1024, 1024) or img2.shape != (1024, 1024):
+                    continue    
+
+                # Resize images if necessary
+                if imsize[0]!=0 and imsize[1]!=0:
+                    img1 = rebin(img1,imsize_nn,operation='mean') 
+                    img2 = rebin(img2.data,imsize_nn,operation='mean')
+                    header['NAXIS1'] = imsize_nn[0]   
+                    header['NAXIS2'] = imsize_nn[1]
+                
+                # Calculate the difference image
+                img_diff = img1 - img2
+                img_diff = fits.PrimaryHDU(img_diff, header=header[0:-3])
+                
+                # Write the difference image
+                if do_write==True:
+                    imgs, masks, scrs, labels, boxes  = nn_seg.infer(img_diff.data, model_param=None, resize=False, occulter_size=0)
+                    scrs = [scrs[i] for i in range(len(labels)) if labels[i] == 2]
+                    scrs = np.concatenate([scrs])
+                    if np.all(scrs < SCR_THRESHOLD):
+                        namefile = f"{date.strftime('%Y%m%d_%H%M%S.%f')}.fits"
+                        # Check if the namefile is in the drop_cases_lasco list
+                        if namefile in drop_cases_lasco:
+                            continue
+                        amount_counter += 1
+                        if write_png==True:
+                            mu = np.mean(img_diff.data)
+                            sd = np.std(img_diff.data)
+                            plt.imsave(odir+"/"+namefile+".png", img_diff.data, cmap='gray', vmin=mu-3*sd, vmax=mu+3*sd)
+                        else:
+                            img_diff.writeto(odir+"/"+namefile,overwrite=True)
+            else:
+                continue
+        if amout_limit is not None:
+            if amount_counter >= amout_limit:
+                break
+# for j in range(len(files)-1):print(f'Processing {j} of {len(files)-1}')
+#         #read fits
+#         image1=read_fits(files[j],smooth_kernel=smooth_kernel)
+#         image2=read_fits(files[j+1],smooth_kernel=smooth_kernel)
