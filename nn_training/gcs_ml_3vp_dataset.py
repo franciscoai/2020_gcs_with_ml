@@ -147,7 +147,7 @@ occ_noise = [None,None] # occulter gaussian noise. [mean, sd] both expressed in 
 mesh=False # set to also save a png with the GCSmesh (only for otype='png')
 otype="png" # set the ouput file type: 'png' or 'fits'
 im_range=2. # range of the color scale of the output final syntethyc image in std dev around the mean
-back_rnd_rot=True # set to randomly rotate the background image around its center
+back_rnd_rot=False # set to randomly rotate the background image around its center
 inner_hole_mask=True #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
 mask_from_cloud=False #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
@@ -162,7 +162,7 @@ else:
     random_driver = np.random.RandomState(seed)
     
 
-#OPATH = OPATH + "_size_" + str(par_num) + "_seed_" + str(seed)
+OPATH = OPATH + "_seed_" + str(seed)
 
 # Save configuration to .CSV
 date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
@@ -179,7 +179,6 @@ if os.path.exists(OPATH) and OVERWRITE:
 elif os.path.exists(OPATH) and not OVERWRITE:
     #check if the csv file exists
     list_files = os.listdir(OPATH)
-    breakpoint()
     csv_file = [s for s in list_files if "Set_Parameters.csv" in s][0]
     failed_csv_file = [s for s in list_files if "Failed_Parameters.csv" in s][0]
     configfile_name = OPATH + '/' + csv_file
