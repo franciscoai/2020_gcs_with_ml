@@ -25,6 +25,9 @@ import pickle
 from scipy.interpolate import interp2d
 from scipy.interpolate import RectBivariateSpline
 from btot_file_sorted import btot_file_sorted
+#wrapper_eeggl is a file create in the local computer to run pyGCS_raytrace_eeggl.py
+#This file should be copied and be updated on gehme server.
+from wrapper_eeggl import *
 
 def read_fits(file_path, header=False, imageSize=[512,512],smooth_kernel=[0,0]):
     try:       
@@ -35,11 +38,14 @@ def read_fits(file_path, header=False, imageSize=[512,512],smooth_kernel=[0,0]):
             img = rebin(img, imageSize, operation='mean')  
             if header:
                 hdr = fits.open(file_path)[0].header
-                naxis_original = hdr["naxis1"]
+                naxis_original1 = hdr["naxis1"]
+                naxis_original2 = hdr["naxis2"]
                 hdr["naxis1"]=imageSize[0]
                 hdr["naxis2"]=imageSize[1]
-                hdr["crpix1"]=hdr["crpix1"]/(naxis_original/imageSize[0])
-                hdr["crpix2"]=hdr["crpix2"]/(naxis_original/imageSize[0])
+                hdr["crpix1"]=hdr["crpix1"]/(naxis_original1/imageSize[0])
+                hdr["crpix2"]=hdr["crpix2"]/(naxis_original2/imageSize[1])
+                hdr["CDELT1"]=hdr["CDELT1"]*(naxis_original1/imageSize[0])
+                hdr["CDELT2"]=hdr["CDELT2"]*(naxis_original2/imageSize[1])
         # flips y axis to match the orientation of the images
         img = np.flip(img, axis=0) 
         if header:
@@ -55,7 +61,7 @@ def plot_to_png(ofile, orig_img, masks, scr_threshold=0.15, mask_threshold=0.6 ,
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
     """    
-     # only detections with score larger than this value are considered
+    # only detections with score larger than this value are considered
     color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w','w','w','w','w','w','w','w','w','w','w','w','w','w','w']
     obj_labels = ['Back', 'Occ','CME','N/A']
     #
@@ -96,7 +102,7 @@ def plot_to_png(ofile, orig_img, masks, scr_threshold=0.15, mask_threshold=0.6 ,
 
 #--------------------------------------------------------------------------------------------------------------------
 
-def plot_to_png2(ofile, orig_img, event, all_center, mask_threshold, scr_threshold, title=None):
+def plot_to_png2(ofile, orig_img, event, all_center, mask_threshold, scr_threshold, title=None, plate_scl=1):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
@@ -112,6 +118,9 @@ def plot_to_png2(ofile, orig_img, event, all_center, mask_threshold, scr_thresho
     for i in range(len(orig_img)):
         axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
         axs[i].axis('off')
+        axs[i].annotate( str(event["DATE_TIME"][i]),xy=[10,500], fontsize=15, color='w')
+
+        #Incluir event date time
         axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
         axs[i+1].axis('off') 
         for b in range(len(event['LABEL'])):
@@ -125,7 +134,30 @@ def plot_to_png2(ofile, orig_img, event, all_center, mask_threshold, scr_thresho
                 axs[i+1].add_patch(box)
                 axs[i+1].scatter(round(all_center[0][0]), round(all_center[0][1]), color='red', marker='x', s=100)
                 axs[i+1].annotate(obj_labels[event['LABEL'][b]]+':'+'{:.2f}'.format(scr),xy=event['BOX'][b][0:2], fontsize=15, color=color[int(event['CME_ID'][b])])
-     
+                
+                # draw a line on top of orig_img[i] (np array) from the center of the image to the image border at an angle event['AW_MIN'] given in radians
+                im_half_size = int(orig_img[i].shape[0]/2)
+                pt1 = (round(all_center[0][0]), round(all_center[0][1]))
+                pt2 = (round(all_center[0][0] + im_half_size*np.cos(event['AW_MIN'][i])), round(all_center[0][1] + im_half_size*np.sin(event['AW_MIN'][i])))
+                axs[i+1].plot([pt1[0], pt2[0]], [pt1[1], pt2[1]], color='b', linewidth=2)
+                # same for  event['AW_MAX']
+                pt2 = (round(all_center[0][0] + im_half_size*np.cos(event['AW_MAX'][i])), round(all_center[0][1] + im_half_size*np.sin(event['AW_MAX'][i])))
+                axs[i+1].plot([pt1[0], pt2[0]], [pt1[1], pt2[1]], color='b', linewidth=2)
+                # same for  event['CPA'] (this is a weighted average of angles)
+                pt2 = (round(all_center[0][0] + im_half_size*np.cos(event['CPA'][i])), round(all_center[0][1] + im_half_size*np.sin(event['CPA'][i])))
+                axs[i+1].plot([pt1[0], pt2[0]], [pt1[1], pt2[1]], color='r', linewidth=2)
+                #same for event['CPA'] calculated as AW_MIN+AW_MAX/2
+                pt2 = (round(all_center[0][0] + im_half_size*np.cos(event['AW_MIN'][i]+(event['AW_MAX'][i]-event['AW_MIN'][i])/2)), round(all_center[0][1] + im_half_size*np.sin(event['AW_MIN'][i]+(event['AW_MAX'][i]-event['AW_MIN'][i])/2)))
+                axs[i+1].plot([pt1[0], pt2[0]], [pt1[1], pt2[1]], color='b', linewidth=2)
+
+                # same for  event['APEX_ANGL']
+                #apex in pixels
+                apex_pixel = event['APEX'][i]/plate_scl
+                pt2 = (round(all_center[0][0] + apex_pixel*np.cos(event['APEX_ANGL'][i])), round(all_center[0][1] + apex_pixel*np.sin(event['APEX_ANGL'][i])))
+                # draw pt2 as a cross
+                axs[i+1].scatter(pt2[0], pt2[1], color='g', marker='x', s=300)
+                #axs[i+1].plot([pt1[0], pt2[0]], [pt1[1], pt2[1]], color='g', linewidth=2)
+        #breakpoint()
     plt.tight_layout()
     plt.savefig(ofile)
     plt.close()
@@ -152,20 +184,73 @@ def vec_to_matrix(vec,dim_matrix):
     #matrix = matrix.astype("float32")   
     return matrix
 
-def create_header(matrix,time):
+def get_eeggl_header_correction(event,imsize=[512,512]):
+    #This code will read the wrapper of a specific event (wrapper_YYYYMMDD), considering all the frames. It read each triplet of images and
+    #calculate the average of hdr.CDELT1, hdr.CDELT2, and hdr.Rsun for each instrument of the triplet. 
+    #This average is used to correct the header of the eeggl synth images. This is needed to correctly calculate the apex distance in Rsun units.
+    #For each instrument it returns a list of mean values of [instr_cdel1, instr_cdelt2, instr_rsuns].
+    #Esto deberia llamarse 1 sola vez!!! TODO, Cambiar.
+    base_images    = ["","",""]
+    cme_images     = ["","",""]
+    cor2a_cdelt1    = []
+    cor2a_cdelt2   = []
+    cor2a_rsuns    = []
+    cor2b_cdelt1   = []
+    cor2b_cdelt2   = []
+    cor2b_rsuns    = []
+    lascoc2_cdelt1 = []
+    lascoc2_cdelt2 = []
+    lascoc2_rsuns  = []
+    if event == 20110215:
+        for frame in range(10):
+            base,cme = wrapper_20110215(frame)
+            #continue if the frame exists
+            if cme != 0:
+                for index, img_dir in enumerate(cme):
+                    #breakpoint()
+                    img, hdr = read_fits(img_dir,header=True)
+                    if index+1 ==1:
+                        cor2a_rsuns.append(hdr['rsun'])
+                        cor2a_cdelt1.append(hdr['cdelt1']) #suele ser 58.7999992372
+                        cor2a_cdelt2.append(hdr['cdelt2']) #suele ser 58.7999992372
+                    if index+1 ==2:
+                        cor2b_rsuns.append(hdr['rsun'])
+                        cor2b_cdelt1.append(hdr['cdelt1']) #suele ser 58.7999992372
+                        cor2b_cdelt2.append(hdr['cdelt2']) #suele ser 58.7999992372
+                    if index+1 ==3:
+                        lascoc2_rsuns.append(hdr['rsun'])
+                        lascoc2_cdelt1.append(hdr['cdelt1']) #suele ser 23.8
+                        lascoc2_cdelt2.append(hdr['cdelt2']) #suele ser 23.8
+    
+    return [np.mean(cor2a_cdelt1),np.mean(cor2a_cdelt2),np.mean(cor2a_rsuns)],[np.mean(cor2b_cdelt1),np.mean(cor2b_cdelt2),np.mean(cor2b_rsuns)],[np.mean(lascoc2_cdelt1),np.mean(lascoc2_cdelt2),np.mean(lascoc2_rsuns)]
+
+def create_header(matrix,time,instrument="",imsize=[512,512]):
     header = fits.Header()
-    header['NAXIS1'] = matrix.shape[0]
-    header['NAXIS2'] = matrix.shape[1]
-    header['CRPIX1'] = matrix.shape[0]/2
-    header['CRPIX2'] = matrix.shape[1]/2
+    header['NAXIS1'] = imsize[0]
+    header['NAXIS2'] = imsize[1]
+    header['CRPIX1'] = imsize[0]/2
+    header['CRPIX2'] = imsize[1]/2
     tiempo = time.split('"')
     header['time'] = tiempo[1]
-    #tiene sentido los valores del CDELTX?
-    header['CDELT1']=1
-    header['CDELT2']=1
+    #c2a, c2b, c2 = get_eeggl_header_correction(20110215)
+    #if instrument == 'cor2_a':
+    #    header['CDELT1']=c2a[0]
+    #    header['CDELT2']=c2a[1]
+    #    header['RSUN']  =c2a[2]
+    #elif instrument == 'cor2_b':
+    #    header['CDELT1']=c2b[0]
+    #    header['CDELT2']=c2b[1]
+    #    header['RSUN']  =c2b[2]
+    #elif instrument == 'lascoC2':
+    #    header['CDELT1']=c2[0]
+    #    header['CDELT2']=c2[1]
+    #    header['RSUN']  =c2[2]
+    #else:
+    #    print("Instrument not recognized")
     return header
 
-def read_dat(file,path="",dim_matrix=300):
+def read_dat(file,path="",dim_matrix=300,instrument=""):
+    #instrument variable is required to read real hedears and create cdelt1/2 and rsun.
     pos_x=[]
     pos_y=[]
     pos_wl=[]
@@ -191,7 +276,7 @@ def read_dat(file,path="",dim_matrix=300):
     y_pos  = vec_to_matrix(pos_y,dim_matrix)
     wl_pos = vec_to_matrix(pos_wl,dim_matrix)
     pb_pos = vec_to_matrix(pos_pb,dim_matrix)
-    hdr = create_header(matrix=wl_pos,time=time_event)
+    hdr = create_header(matrix=wl_pos,time=time_event,instrument=instrument)
     return x_pos, y_pos, wl_pos, pb_pos,hdr
 
 
@@ -205,27 +290,30 @@ trained_model = '6000.torch'
 #model_path= "/gehme/projects/2020_gcs_with_ml/output/neural_cme_seg_v5" #contiene oculter externo
 model_version="v4"
 #trained_model = '66666.torch'
+
 #--------------------------
 eeggl = False
-btot  = True    #Synthetic images created using pyGCS.
+btot  = False    #Synthetic images created using pyGCS.
+real_img = True
 base_difference = False
 running_difference = True
 instr='cor2_a'
 #instr='cor2_b'
 #instr='lascoC2'
-infer_event2=True
+infer_event2=False
 infer_event1=True
 
 #----------------eeggl
-run = '/run005'
-ipath = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15/run005/'
+#run = '/run005'
+run = '/run016'
+#ipath = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15/run005/'
 ipath = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15'+run+'/'
 
 #ipath = aux_in+'/projects/2023_eeggl_validation/data/2012-07-12/Cor2A/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/Cor2B/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/C2/lvl1/'
 
-#ipath = aux_in+'/projects/2023_eeggl_validation/data/2011-02-14/Cor2A/lvl1/'
+ipath = aux_in+'/projects/2023_eeggl_validation/data/2011-02-14/Cor2A/lvl1/'
 #ipath = aux_in+'/projects/2023_eeggl_validation/data/2011-02-14/Cor2B/lvl1/'
 #ipath = aux_in+'/projects/2023_eeggl_validation/data/2011-02-15/C2/lvl1/'
 
@@ -245,9 +333,9 @@ ipath = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15'+run
 #aux="oculter_60_250/"
 aux="occ_medida_RD_infer2/model_v5/"
 if eeggl:
-    aux = run+'/runing_diff/neural_cme_seg_v5/'
+    aux = run+'/'+instr+'/runing_diff/neural_cme_seg_v5/'
     if infer_event2:
-        aux = run+'/runing_diff/neural_cme_seg_v5/infer2/'
+        aux = run+'/'+instr+'/runing_diff/neural_cme_seg_v5/infer2/'
 aux_out='/gehme'
 #----------------------------
 #eeggl
@@ -257,7 +345,7 @@ opath = aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/eeggl'+aux
 #opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/Cor2B/'+aux
 #opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/C2/'+aux
 
-#opath= aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/Cor2A/'+aux
+opath= aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/Cor2A/'+aux
 #opath= aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/Cor2B/'+aux
 #opath= aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/C2/'+aux
 
@@ -273,7 +361,8 @@ opath = aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/eeggl'+aux
 #opath= aux_out+'/projects/2023_eeggl_validation/output/2010-04-03/Cor2B/'+aux
 #opath= aux_out+'/projects/2023_eeggl_validation/output/2010-04-03/C2/'+aux
 
-opath = aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/gcs/cor2a/'
+#btot - GCS
+#opath = aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/gcs/cor2a/'
 
 #----------------------------
 
@@ -281,7 +370,7 @@ if instr != 'lascoC2':
     occ_center=[[256,256],[260,247]]
 occ_size = [50,52]
 mask_threshold = 0.6 # value to consider a pixel belongs to the object
-scr_threshold  = 0.15 # only detections with score larger than this value are considered
+scr_threshold  = 0.56 # only detections with score larger than this value are considered
 
 #main
 gpu=0 # GPU to use
@@ -310,7 +399,7 @@ os.makedirs(opath, exist_ok=True)
 #El infer debe pasar el header que se utilizara para las nuevas mascaras!! 
 
 #list of all images in temporal order.
-if not eeggl and not btot:
+if real_img:
     init_range = 1
     list_name = 'list.txt'
     with open(ipath+list_name, 'r') as file:
@@ -323,6 +412,9 @@ if eeggl:
     with open(ipath+list_name, 'r') as file:
         lines = file.readlines()
     image_names = [line.strip() for line in lines]
+    #promedios de cdelt1, cdelt2, rsun para cor2a, cor2b, c2 obtenido leyendo las imagenes reales.
+    #TODO: make 20010215 a variable.
+    c2a, c2b, c2 = get_eeggl_header_correction(20110215)
 
 if btot:
     init_range = 0
@@ -359,7 +451,7 @@ if infer_event2:
 
 for j in range(init_range,len(image_names)):
 
-    if eeggl == False and btot == False:        
+    if real_img == True:        
         if base_difference:
             #First image set to background
             img0, hdr0 = read_fits(ipath+image_names[0],header=True)
@@ -379,7 +471,7 @@ for j in range(init_range,len(image_names)):
         #sin running difference.
         img0       = np.zeros((512, 512))
         img1, hdr1 = read_fits(ipath+image_names[j],header=True)
-        
+        opath = '/gehme/projects/2023_eeggl_validation/output/2011-02-15/gcs/cor2a/'
 
     if eeggl== True:
         if running_difference:
@@ -389,6 +481,19 @@ for j in range(init_range,len(image_names)):
             x_pos, y_pos, wl_mat1, pb_mat1,hdr1 = read_dat(image_names[j  ],path=ipath,dim_matrix=300)
             wl_mat1 = np.flip(wl_mat1, axis=0)
             img1 = rebin_interp(wl_mat1,new_size=[512,512])
+            if instr == 'cor2_a':
+                hdr1['CDELT1']=c2a[0]
+                hdr1['CDELT2']=c2a[1]
+                hdr1['RSUN']  =c2a[2]
+            elif instr == 'cor2_b':
+                hdr1['CDELT1']=c2b[0]
+                hdr1['CDELT2']=c2b[1]
+                hdr1['RSUN']  =c2b[2]
+            elif instr == 'lascoC2':
+                hdr1['CDELT1']=c2[0]
+                hdr1['CDELT2']=c2[1]
+                hdr1['RSUN']  =c2[2]
+
         img_ratio = img1 / img0 #only used to calculate the occulter
 
 
@@ -443,10 +548,12 @@ for j in range(init_range,len(image_names)):
             date_format = '%Y/%m/%dT%H:%M:%S'
             time_string=hdr1['time']
             date = datetime.strptime(time_string[:-4], date_format)
+            percentiles = [1,99]
 
-        if eeggl==False and btot == False:    
+        if real_img==True:    
             if instr != 'lascoC2':    
                 date = datetime.strptime(image_names[j][0:-10],'%Y%m%d_%H%M%S')
+                percentiles = [1,99]
             if instr == 'lascoC2':
                 date_string = hdr1['fileorig'][:-4]
                 if int(date_string[:2]) < 94: #soho was launched in 1995
@@ -460,10 +567,16 @@ for j in range(init_range,len(image_names)):
             if instr != 'lascoC2':
                 name_file = hdr1["filename"]
                 date = datetime.strptime(name_file[0:-10],'%Y%m%d_%H%M%S')
+                percentiles = [0.1,99.9]
             if instr == 'lascoC2': 
                 breakpoint()
+        
+        #Calculate pixel size in Rsun units.
+        #cdelt = pixel size in arsec
+        #Rsun = Rsun in arcsec
+        plt_scl = hdr1['CDELT1']/hdr1['Rsun']
 
-        plt_scl = hdr1['CDELT1']
+
         all_center.append(occ_center)
         all_plate_scl.append(plt_scl)                    
         all_images.append(img_diff)
@@ -473,11 +586,10 @@ for j in range(init_range,len(image_names)):
         all_headers.append(hdr1)
         all_occulter_size_ext.append(occulter_size_ext)
 
-#breakpoint()
 if infer_event2:
     ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl,resize=False,
                                                     occulter_size=all_occ_size,occulter_size_ext=all_occulter_size_ext,
-                                                    centerpix=all_center,plot_params=opath+'mask_props')
+                                                    centerpix=all_center,plot_params=opath+'mask_props',filter_halos=False,percentiles=percentiles)
     
     zeros = np.zeros(np.shape(ok_orig_img[0]))
     all_idx=[]
@@ -506,24 +618,19 @@ if infer_event2:
                 
                 ofile_fits = os.path.join(os.path.dirname(opath), file_names[m]+"_CME_ID_"+str(int(event['CME_ID'][n]))+'.fits')
                 h0 = all_headers[m]
-                # adapts hdr because we use smaller im size
-                sz_ratio = np.array(masked.shape)/np.array([h0['NAXIS1'], h0['NAXIS2']])
-                #h0['NAXIS1'] = masked.shape[0]
-                #h0['NAXIS2'] = masked.shape[1]
-                h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
-                h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
-                #h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
-                #h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
                 fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
+                print("Saving fits: "+ofile_fits)
+        #breakpoint()
         plot_to_png2(opath+file_names[m]+"infer2.png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,
-                    scr_threshold=scr_threshold, title=[file_names[m]])  
-    breakpoint()
-    with open(opath+'mask_props/save_all_data.pkl', 'wb') as write_file:
-        data_dict={}
-        data_dict["df"]=df
-        data_dict["ok_orig_img"]=ok_orig_img
-        data_dict["ok_dates"]=ok_dates
-        pickle.dump(data_dict,write_file)    
+                    scr_threshold=scr_threshold, title=[file_names[m]], plate_scl=all_plate_scl[m])
+        print("Imagenes creadas en:" + opath)
+    #breakpoint()
+    #with open(opath+'mask_props/save_all_data.pkl', 'wb') as write_file:
+    #    data_dict={}
+    #    data_dict["df"]=df
+    #    data_dict["ok_orig_img"]=ok_orig_img
+    #    data_dict["ok_dates"]=ok_dates
+    #    pickle.dump(data_dict,write_file)    
 
 print("Program finished without errors")
 

@@ -391,9 +391,9 @@ class neural_cme_segmentation():
         masked[:, :][mask > self.mask_threshold] = 0   
         #calculates geometric center of the image
         height, width = masked.shape
-        center_x = width // 2
-        center_y = height // 2
-        #calculates distance to the point and the angle for the positive x axis
+        center_x = width / 2
+        center_y = height / 2
+        #calculates distance to the point and the angle for the positive y axis
         for x in range(width):
             for y in range(height):
                 value=masked[x,y]
@@ -401,21 +401,42 @@ class neural_cme_segmentation():
                     x_dist = (x-center_x)
                     y_dist = (y-center_y)
                     distance= np.sqrt(x_dist**2 + y_dist**2)
+                    #Si y es vertical y x es horizontal, entonces angle positivo calculado con respecto a y positivo, en forma antihoraria.
                     angle = np.arctan2(x_dist,y_dist)
                     if angle<0:
                         angle+=2*np.pi
                     pol_mask.append([distance,angle])
-        #if len(pol_mask)==0:
-        #    breakpoint()
         return pol_mask
 
-    def _compute_mask_prop(self, masks, scores, labels, boxes, plate_scl=1, filter_halos=False, occulter_size=0,centerpix=None):    
+    def _area_score(self, mask):
+        '''
+        Similar to rec2pol, but returns the area of the mask related to the total images size.
+        '''
+        area_score=0.
+        nans = np.full(self.imsize, np.nan)
+        pol_mask=[]
+        #creates an array with zero value inside the mask and Nan value outside             
+        masked = nans.copy()
+        masked[:, :][mask > self.mask_threshold] = 0   
+        #calculates geometric center of the image
+        height, width = masked.shape
+        #calculates the amount of pixels corresponding to the mask
+        for x in range(width):
+            for y in range(height):
+                value=masked[x,y]
+                if not np.isnan(value):
+                    area_score = area_score + 1.
+        #breakpoint()
+        area_score = area_score/(height*width)
+        return area_score
+
+    def _compute_mask_prop(self, masks, scores, labels, boxes, plate_scl=1, filter_halos=False, occulter_size=0,centerpix=None, percentiles=[5,95]):    
         '''
         Computes the CPA, AW and apex radius for the given 'CME' masks.
         If the mask label is not "CME" and if is not a Halo and filter_halos=True, it returns None
-        plate_scl: if defined the apex radius is scaled based on the plate scale of the image. If 0, no filter is applied
+        plate_scl: if defined the apex radius is scaled based on the plate scale units of the image. If 0, no filter is applied
+                    if plate scale = hdr['cdelt1']/hdr['rsun'] then apex is in units of rsun.
         filter_halos: if True, filters the masks with boxes center within the occulter size, and wide_ angle > MAX_WIDE_ANG
-        TODO: Compute apex in Rs; Use generic image center
         '''
         self.max_wide_ang = np.radians(270.) # maximum angular width [deg]
 
@@ -445,32 +466,41 @@ class neural_cme_segmentation():
                         # checks for the case where the cpa is close to 0 or 2pi
                         if np.max(angles)-np.min(angles) >= 0.9*2*np.pi:
                             angles = [s-2*np.pi if s>np.pi else s for s in angles]
-                        cpa_ang= np.median(angles)
+                        aw_min = np.percentile(angles, percentiles[0])
+                        aw_max = np.percentile(angles, percentiles[1])
+                        #cut list of values (angles) between two values, aw_min and aw_max
+                        angles_between_percentiles = [s for s in angles if s >= aw_min and s <= aw_max]
+                        cpa_ang= np.median(angles_between_percentiles)
                         if cpa_ang < 0:
                             cpa_ang += 2*np.pi
-                        wide_ang=np.abs(np.percentile(angles, 95)-np.percentile(angles, 5))
+                        wide_ang=np.abs(aw_max-aw_min)
                         #calculates diferent angles an parameters
                         distance = [s[0] for s in pol_mask]
                         distance_abs= max(distance, key=abs)
                         idx_dist = distance.index(distance_abs)
-                        apex_dist= distance[idx_dist] * plate_scl
-                        breakpoint()
+                        angulos = [s[1] for s in pol_mask]
+                        #angulo que le corresponde al apex
+                        apex_angl = angulos[idx_dist] 
+                        apex_dist = distance[idx_dist] * plate_scl
+                        area_score = self._area_score(masks[i])
+                        #breakpoint()
                         if filter_halos:
+                            breakpoint()
                             if wide_ang < self.max_wide_ang:
-                                prop_list.append([i,float(scores[i]),cpa_ang, wide_ang, apex_dist])  
+                                prop_list.append([i,float(scores[i]),cpa_ang, wide_ang, apex_dist, apex_angl, aw_min, aw_max, area_score])  
                             else:
-                                prop_list.append([i,np.nan, np.nan, np.nan, np.nan])
+                                prop_list.append([i,np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan])
                         else:
-                            prop_list.append([i,float(scores[i]),cpa_ang, wide_ang, apex_dist])
+                            prop_list.append([i,float(scores[i]),cpa_ang, wide_ang, apex_dist, apex_angl, aw_min, aw_max, area_score])
                 else:
-                    prop_list.append([i,np.nan, np.nan, np.nan, np.nan])
+                    prop_list.append([i,np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan])
             else:
-                prop_list.append([i,np.nan, np.nan, np.nan, np.nan])  
+                prop_list.append([i,np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan])
         
         if len(masks) == 0:
             print('Warning, no masks found in the image')
-            prop_list.append([0,np.nan, np.nan, np.nan, np.nan]) 
-        return prop_list         
+            prop_list.append([0,np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan])
+        return prop_list
 
     def _plot_mask_prop(self, dates, param, opath, ending='_filtered', x_title='Date and hour', style='*', save=True):
             '''
@@ -518,14 +548,14 @@ class neural_cme_segmentation():
 
 
 
-    def _plot_mask_prop2(self, df, opath, ending='_filtered', x_title='Date and hour', style='*', save=True):
+    def _plot_mask_prop2(self, df, opath, ending='_filtered', x_title='Date and hour', style='*', save=True,save_pickle=False):
             '''
             plots the evolution of the cpa, aw and apex radius for all the masks found and the filtered ones
             dates: list of datetime objects with the date of each event
             param: 3d list with the mask properties for all masks found in each image. 
             Each maks's has the following prop: [id,float(scores[i]),cpa_ang, wide_ang, apex_dist]
             '''
-            parameters= ['CPA', 'MASK_ID', 'SCR', 'WA', 'APEX', 'CME_ID']
+            parameters= ['CPA', 'MASK_ID', 'SCR', 'AW', 'APEX', 'CME_ID','AW_MAX','AW_MIN','APEX_ANGL','AREA_SCORE']
             colors=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w'] 
         
             df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"], format='%H:%M')
@@ -562,8 +592,10 @@ class neural_cme_segmentation():
                 else:
                     return fig, ax 
             dict['df']=df
-            with open(opath+'/'+str.lower("parametros")+ending+'.pkl', 'wb') as write_file:
-                pickle.dump(dict, write_file)
+            if save_pickle:
+                with open(opath+'/'+str.lower("parametros")+ending+'.pkl', 'wb') as write_file:
+                    pickle.dump(dict, write_file)
+                    print("Archivo pickle guardado en: ", opath+'/'+str.lower("parametros")+ending+'.pkl')
             
             
         
@@ -578,7 +610,7 @@ class neural_cme_segmentation():
         criterion: maximum distance from the fit to consider a point as ok
         percentual: if True, the criterion is a percentage of the y value
         weights: data points weights for the fit. Must be a cevtor of len len(in_x) or int. 
-                 If It's a scalar int gives more weight to the last weights dates bcause CME is supoused to be larger and better defined
+        If It's a scalar int gives more weight to the last weights dates bcause CME is supoused to be larger and better defined
         '''
         #deletes points with y is nan
         ok_ind = np.where(~np.isnan(in_y))[0]
@@ -661,7 +693,7 @@ class neural_cme_segmentation():
     def _filter_masks2(self, dates, masks, scores, labels, boxes, mask_prop,plate_scl,opath,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS):
         '''
         Filters the masks by creating clusters based on the cpa and fitting functions to every cluster found, according to cpa, wa and apex_dist.
-        The filter criterion is based on the minimal distances from the mask properties(cpa, wa and apex_dist)
+        The filter criterion is based on the minimal distances from the mask properties(cpa, aw and apex_dist)
         to the fitted functions, from wich the euclidian distance its calculated. 
         Also keeps only one mask per date per cluster.
         It returns min_error dataframe, containing all the filtered masks and their properties, including the CME_ID.
@@ -680,14 +712,14 @@ class neural_cme_segmentation():
                 label=labels[i][j]
                 box=boxes[i][j]
                 mask=masks[i][j]
-                #Transform apex in pixels to Km
-                apex=((mask_prop[i][j][4])*plate_scl[i])* (math.pi / (180 * 3600)) #apex in pixels to apex in radians
-                mean_dist= sun_const.get("mean distance").value #mean distance to the sun
-                apex=(apex*mean_dist)/1000 # apex in Km
-                data.append((date,mask_id,scr,cpa,wa,apex,label,box,mask))
-        df = pd.DataFrame(data, columns=["DATE_TIME","MASK_ID","SCR","CPA","WA","APEX","LABEL","BOX","MASK"])
+                apex = mask_prop[i][j][4]  #apex in same Units as calculated in compute_mask_prop (based on plate_scl)
+                apex_angl = mask_prop[i][j][5]
+                aw_min    = mask_prop[i][j][6]
+                aw_max    = mask_prop[i][j][7]
+                area_score= mask_prop[i][j][8]
+                data.append((date,mask_id,scr,cpa,wa,apex,label,box,mask,apex_angl,aw_min,aw_max,area_score))
+        df = pd.DataFrame(data, columns=["DATE_TIME","MASK_ID","SCR","CPA","AW","APEX","LABEL","BOX","MASK","APEX_ANGL","AW_MIN","AW_MAX", "AREA_SCORE"])
         df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"])
-
         
         #Gets the optimal number of clusters for the data
         data= df["CPA"].values.reshape(-1, 1)
@@ -751,7 +783,7 @@ class neural_cme_segmentation():
             else:
                 x_points =np.array([i.timestamp() for i in filtered_df["DATE_TIME"]])
                 y_cpa=np.array(filtered_df["CPA"])
-                y_wa=np.array(filtered_df["WA"])
+                y_wa=np.array(filtered_df["AW"])
                 y_apex=np.array(filtered_df["APEX"])
 
                 #Fits the corresponding function type and calculates the distance from the masks
@@ -766,7 +798,7 @@ class neural_cme_segmentation():
                 hours.extend([str(i.time()) for i in filtered_df["DATE_TIME"]])
                 dt_list.extend(x_points)
                 axs[0].scatter(x_points, filtered_df["CPA"], color=colors[k])
-                axs[1].scatter(x_points, filtered_df["WA"], color=colors[k])
+                axs[1].scatter(x_points, filtered_df["AW"], color=colors[k])
                 axs[2].scatter(x_points, filtered_df["APEX"], color=colors[k])    
 
         if len(filtered_df["CME_ID"])>=3:        
@@ -791,7 +823,7 @@ class neural_cme_segmentation():
 
                     else:
                         filtered_df["CPA_DIST"] = dist[r][0]
-                        filtered_df["WA_DIST"] = dist[r][1]
+                        filtered_df["AW_DIST"] = dist[r][1]
                         filtered_df["APEX_DIST"] = dist[r][2]
                         error=np.sqrt(dist[r][0]**2+dist[r][1]**2+dist[r][2]**2)
                         filtered_df["ERROR"] = error
@@ -819,7 +851,7 @@ class neural_cme_segmentation():
         axs[1].grid()
         axs[2].grid()
         axs[0].set_title("CPA")
-        axs[1].set_title("WA")
+        axs[1].set_title("AW")
         axs[2].set_title("APEX")
         plt.tight_layout()
         fig.savefig(opath+"/fitted_data.png")
@@ -835,7 +867,7 @@ class neural_cme_segmentation():
             x_ax.extend(x)
             time.extend([str(i.time()) for i in filtered_event["DATE_TIME"]])
             ax[0].scatter(x, filtered_event["CPA"], color=colors[l])
-            ax[1].scatter(x, filtered_event["WA"], color=colors[l])
+            ax[1].scatter(x, filtered_event["AW"], color=colors[l])
             ax[2].scatter(x, filtered_event["APEX"], color=colors[l])
         time1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in time]
         time2 = [timestamp.strftime("%H:%M") for timestamp in time1]
@@ -846,7 +878,7 @@ class neural_cme_segmentation():
         ax[1].grid()
         ax[2].grid()
         ax[0].set_title("CPA")
-        ax[1].set_title("WA")
+        ax[1].set_title("AW")
         ax[2].set_title("APEX")
 
         plt.tight_layout()
@@ -1000,7 +1032,7 @@ class neural_cme_segmentation():
         
     def infer_event2(self, imgs, dates, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None,occulter_size_ext=None,
                     centerpix=None, mask_threshold=None, 
-                    scr_threshold=None, plot_params=None, filter_halos=True):
+                    scr_threshold=None, plot_params=None, filter_halos=True,percentiles=[5,95]):
         '''
         Updated version of infer_event, it recognices more than one CME per event.
         Infers masks for a temporal series of images belonging to the same event. It filters the masks found in the
@@ -1015,7 +1047,7 @@ class neural_cme_segmentation():
         mask_threshold: threshold for the predicted box pixels to be considered as part of the mask
         scr_threshold: only detections with score larger than this value are considered    
         plot_params: if dedined to an output dir path, plots the evolution of the cpa, aw and apex radius for all the masks found and the filtered ones
-        plate_scl: plate scale [arcsec/px] for each input image to scale the apex radius accordingly
+        plate_scl: plate scale [Unit/px] for each input image to scale the apex radius accordingly
         filter_halos: if True, filters the masks which boxes center is within the occulter size
 
         returns the filtered original images and a dataframe with the parameters of the CME including the CME ID.  
@@ -1066,8 +1098,8 @@ class neural_cme_segmentation():
             all_orig_img.append(orig_img)
             # compute cpa, aw and apex. Already filters by score and other aspects
             self.debug_flag = i
-            mask_prop = self._compute_mask_prop(mask, score, lbl, box, plate_scl=in_plate_scl[i]/in_plate_scl[0], 
-                                                filter_halos=filter_halos, occulter_size=in_occulter_size[i],centerpix=centerpix[i])
+            mask_prop = self._compute_mask_prop(mask, score, lbl, box, plate_scl=in_plate_scl[i], 
+                                                filter_halos=filter_halos, occulter_size=in_occulter_size[i],centerpix=centerpix[i],percentiles=percentiles)
             # appends results only if mask_prop[1] is not NaN, i.e., if it fulfills the filters in compute_mask_prop
             
             #print(mask_prop)
@@ -1089,7 +1121,7 @@ class neural_cme_segmentation():
                                         all_plate_scl,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS)
                 # plots parameters
                 if plot_params is not None:
-                    self._plot_mask_prop2(df, self.plot_params , ending='_filtered')
+                    self._plot_mask_prop2(df, self.plot_params , ending='_filtered',save_pickle=True)
                 #save df, all_orig_img, all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop using pickle
                 #ok_dates=sorted(df['DATE_TIME'].unique())
                 ok_dates=df['DATE_TIME'].unique() 
