@@ -107,6 +107,7 @@ def plot_to_png2(ofile, orig_img, event, all_center, mask_threshold, scr_thresho
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
     """    
+    #mpl.use('TkAgg')
     color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
     obj_labels = ['Back', 'Occ','CME','N/A']
     masks=event['MASK']
@@ -156,6 +157,11 @@ def plot_to_png2(ofile, orig_img, event, all_center, mask_threshold, scr_thresho
                 pt2 = (round(all_center[0][0] + apex_pixel*np.cos(event['APEX_ANGL'][i])), round(all_center[0][1] + apex_pixel*np.sin(event['APEX_ANGL'][i])))
                 # draw pt2 as a cross
                 axs[i+1].scatter(pt2[0], pt2[1], color='g', marker='x', s=300)
+                #Use a for loop to draw a point for each element corresponding to distance=event['APEX_DIST_PER'] and angle=event['APEX_ANGL_PER']
+                for j in range(len(event['APEX_DIST_PER'][i])):
+                    apex_pixel = event['APEX_DIST_PER'][i][j]/plate_scl
+                    pt2 = (round(all_center[0][0] + apex_pixel*np.cos(event['APEX_ANGL_PER'][i][j])), round(all_center[0][1] + apex_pixel*np.sin(event['APEX_ANGL_PER'][i][j])))
+                    axs[i+1].scatter(pt2[0], pt2[1], color='r', marker='x', s=100)
                 #axs[i+1].plot([pt1[0], pt2[0]], [pt1[1], pt2[1]], color='g', linewidth=2)
         #breakpoint()
     plt.tight_layout()
@@ -292,27 +298,30 @@ model_version="v4"
 #trained_model = '66666.torch'
 
 #--------------------------
-eeggl = False
-btot  = False    #Synthetic images created using pyGCS.
-real_img = True
+#Select only one of the folllowing image types
+eeggl = False        #Synthetic images created using eeggl.
+btot  = False       #Synthetic images created using pyGCS.
+real_img = True    #Real images from cor2a, cor2b, lascoC2, level1.
+#---------------------------
 base_difference = False
 running_difference = True
 instr='cor2_a'
 #instr='cor2_b'
 #instr='lascoC2'
-infer_event2=False
+infer_event2=True
 infer_event1=True
 
 #----------------eeggl
 #run = '/run005'
 run = '/run016'
 #ipath = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15/run005/'
-ipath = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15'+run+'/'
+#path = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15'+run+'/'
 
 #ipath = aux_in+'/projects/2023_eeggl_validation/data/2012-07-12/Cor2A/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/Cor2B/lvl1/'
 #ipath = '/gehme-gpu/projects/2023_eeggl_validation/data/2012-07-12/C2/lvl1/'
 
+#---------------real images
 ipath = aux_in+'/projects/2023_eeggl_validation/data/2011-02-14/Cor2A/lvl1/'
 #ipath = aux_in+'/projects/2023_eeggl_validation/data/2011-02-14/Cor2B/lvl1/'
 #ipath = aux_in+'/projects/2023_eeggl_validation/data/2011-02-15/C2/lvl1/'
@@ -345,6 +354,7 @@ opath = aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/eeggl'+aux
 #opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/Cor2B/'+aux
 #opath= aux_out+'/projects/2023_eeggl_validation/output/2012-07-12/C2/'+aux
 
+#---------------real images
 opath= aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/Cor2A/'+aux
 #opath= aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/Cor2B/'+aux
 #opath= aux_out+'/projects/2023_eeggl_validation/output/2011-02-15/C2/'+aux
