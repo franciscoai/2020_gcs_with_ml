@@ -3,6 +3,9 @@ import sys
 import datetime
 import logging
 import scipy
+import random
+import time
+import concurrent.futures
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,6 +18,7 @@ from nn_training.corona_background.get_corona_gcs_ml import get_corona
 from astropy.io import fits
 from nn_training.low_freq_map import low_freq_map
 from nn.utils.coord_transformation import deg2px, center_rSun_pixel, pnt2arr
+import cv2
 
 
 def get_params(par_names, par_rng, random_driver): #par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
@@ -126,15 +130,11 @@ def generate_mask_from_raytracing(sat, params, satpos, plotranges, imsize, heade
     cme_npix= len(btot_mask[btot_mask>0].flatten())
     if cme_npix<=0:
         print(f'WARNING: CME raytracing did not work')
-        failure_counter += 1
-        checkFailure(failure_counter, n_sat, min_nviews)
         return None, None
     mask = get_cme_mask(btot_mask,inner_cme=inner_hole_mask)          
     mask_npix= len(mask[mask>0].flatten())
     if mask_npix/cme_npix<0.8:
         print(f'WARNING: CME mask is too small compared to cme brigthness image')
-        failure_counter += 1
-        checkFailure(failure_counter, n_sat, min_nviews)
         return None, None
     return btot_mask, mask
 
@@ -195,7 +195,7 @@ def process_intensity_figure(headers, sat, params, size_occ, back_corona, mask, 
     return btot
 
 def main():
-    global OPATH, successful_cases, success_counter, failure_counter, too_many_failures
+    global OPATH, random_driver, succesful_df, configfile_name, is_writing
     
 
     # initialize random driver and iteration counter
@@ -214,6 +214,7 @@ def main():
     faileddf_name = OPATH + '/' + date_str+'Failed_Parameters.csv'
     succesful_df = pd.DataFrame(columns=par_names)
     failed_df = pd.DataFrame(columns=par_names)
+    is_writing = False
     check_df = succesful_df.iloc[:, :-2]
     used_params = set()
 
@@ -251,61 +252,62 @@ def main():
     size_occ=[]
 
     # MAIN LOOP
-    while iter_counter != par_num:
 
-        
-        # loop vars
-        successful_cases = []
-        success_counter = 0
-        failure_counter = 0
-        too_many_failures = False
+    # loop vars
+    successful_cases = []
+    success_counter = 0
+    failure_counter = 0
+    too_many_failures = False
+    cases_buffer = [(i, False) for i in range(par_num)] # (idx, failed)
+    original_buffer_size = len(cases_buffer)
+    buffer_size = len(cases_buffer)
 
+    with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
+        while True:
+            futures = [executor.submit(process_img, cases_buffer.pop(0), original_buffer_size) for i in range(buffer_size)]
 
-        # get parameters
-        params = get_params(par_names, par_rng, random_driver)
-
-        #get background corona,headers and occulter size
-        if same_corona==False or len(back_corona)==0:
-            back_corona, headers, size_occ, _ = get_corona(imsize=imsize, custom_headers=same_position)
-        
-        # Get the location of sats and gcs:
-        satpos, plotranges = pyGCS.processHeaders(headers)
-
-        if not mask_from_cloud:
-            # Computes with mask from cloud just to see if there is any failure
-            for sat in range(n_sat):
-
-                if too_many_failures:
-                    break
-
-                #defining ranges and radius of the occulter
-                x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
-                y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
-                xx, yy = np.meshgrid(x, y)
-                x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)  
-                r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
-
-                #mask for cme outer envelope
-                clouds = pygcsWrapper(params, satpos)             
-                x = clouds[sat, :, 1]
-                y = clouds[0, :, 2]
-                p_x,p_y=deg2px(x,y,plotranges,imsize, sat)
-                mask=get_mask_cloud(p_x,p_y,imsize)
-                #check for null mask
-
-                mask[r <= size_occ[sat]] = 0
-
-                if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
-                    print(f'WARNING: CME mask is null because it is probably behind the occulter')
-                    failure_counter += 1
-                    checkFailure(failure_counter, n_sat, min_nviews)
-                    break
-
-        for sat in range(n_sat):
-            print(f'Generating image {sat+1} of {n_sat} for iteration {iter_counter} of {par_num}')
-            if too_many_failures:
+            results = [future.result() for future in concurrent.futures.as_completed(futures)]
+            # create a list with indices of failed cases
+            failed_cases = [(result, True) for result in results if result != True]
+            # append failed cases to the buffer
+            cases_buffer.extend(failed_cases)
+            buffer_size = len(cases_buffer)
+            if len(cases_buffer) == 0:
                 break
 
+    # When all finished, make backup of the csv file
+    os.system("cp " + configfile_name + " " + configfile_name + ".back")
+
+
+def process_img(idx_tuple, org_buffer_size):
+    global random_driver, succesful_df, configfile_name, is_writing
+
+    # initialize vars
+    idx, failed = idx_tuple
+    success_counter = 0
+    successful_cases = []
+    
+    # setup random state
+    if not failed:
+        for i in range(idx):
+            random_driver.uniform()
+    else: # if failed, generate a new random state (not the best solution, but it works for now)
+        rnd_seed = np.random.randint(0, int(1e5))
+        random_driver = np.random.RandomState(seed=rnd_seed)
+
+    # get parameters
+    params = get_params(par_names, par_rng, random_driver)
+
+    #get background corona,headers and occulter size
+    if same_corona==False or len(back_corona)==0:
+        back_corona, headers, size_occ, _ = get_corona(imsize=imsize, custom_headers=same_position)
+    
+    # Get the location of sats and gcs:
+    satpos, plotranges = pyGCS.processHeaders(headers)
+
+    if not mask_from_cloud:
+        # Computes with mask from cloud just to see if there is any failure
+        for sat in range(n_sat):
             #defining ranges and radius of the occulter
             x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
             y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
@@ -313,84 +315,93 @@ def main():
             x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)  
             r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
 
-            if mask_from_cloud:
-                clouds, x, y, p_x, p_y, mask = generate_mask_from_clouds(sat, params, satpos, plotranges, imsize)
-                if too_many_failures:
-                    break
-            else:
-                btot_mask, mask = generate_mask_from_raytracing(sat, params, satpos, plotranges, imsize, headers, size_occ)
-                if too_many_failures:
-                    break
+            #mask for cme outer envelope
+            clouds = pygcsWrapper(params, satpos)             
+            x = clouds[sat, :, 1]
+            y = clouds[0, :, 2]
+            p_x,p_y=deg2px(x,y,plotranges,imsize, sat)
+            mask=get_mask_cloud(p_x,p_y,imsize)
+            #check for null mask
 
-            # check for null mask
             mask[r <= size_occ[sat]] = 0
+
             if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
-                logging.warning(f'WARNING: CME mask is null because it is probably behind the occulter')
-                failure_counter += 1
-                checkFailure(failure_counter, n_sat, min_nviews)
-                if too_many_failures:
-                    break
+                print(f'WARNING: CME mask is null because it is probably behind the occulter')
+                return idx
 
-            #mask for occulter
-            occ_mask = np.zeros(xx.shape)
-            occ_mask[r <= size_occ[sat]] = 1
+    for sat in range(n_sat):
 
-            if synth_int_image:
-                btot = process_intensity_figure(headers, sat, params, size_occ, back_corona, mask, btot_mask, r)
+        #defining ranges and radius of the occulter
+        x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
+        y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
+        xx, yy = np.meshgrid(x, y)
+        x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)  
+        r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
 
-            case_stuff =[]
-            if otype=="fits":
-                cme_mask = fits.PrimaryHDU(mask)
-                case_stuff.append(cme_mask)
-                if synth_int_image:
-                    cme = fits.PrimaryHDU(btot)
-                    case_stuff.append(cme)
-                occ = fits.PrimaryHDU(occ_mask)
-                case_stuff.append(occ)
-            elif not mesh and otype == "png":
-                case_stuff.append(mask)
-                case_stuff.append(occ_mask)
-                if synth_int_image:
-                    case_stuff.append(btot)
-            elif mesh and otype=='png':
-                clouds = pygcsWrapper(params, satpos)             
-                x = clouds[sat, :, 1]
-                y = clouds[0, :, 2]    
-                arr_cloud=pnt2arr(x,y,plotranges,imsize, sat)
-                case_stuff.append(mask)
-                case_stuff.append(arr_cloud)
-                case_stuff.append(occ_mask)
-            
-            successful_cases.append(case_stuff)
-            success_counter += 1
-
-        if success_counter >= min_nviews:
-            # save cases
-            save_cases(params, successful_cases, otype, iter_counter)
-
-            params.append(satpos)
-            params.append(plotranges)
-            succesful_df.loc[iter_counter] = params
-
-            # save to csv
-            save_to_csv(succesful_df, configfile_name)
-
-            iter_counter += 1
-
+        if mask_from_cloud:
+            clouds, x, y, p_x, p_y, mask = generate_mask_from_clouds(sat, params, satpos, plotranges, imsize)
         else:
-            params.append(satpos)
-            params.append(plotranges)
-            try:
-                failed_df.loc[iter_counter] = params
-            except:
-                array_of_objects = np.asarray(params, dtype="object") # Fix a weird pandas bug
-                failed_df.loc[iter_counter] = array_of_objects
+            btot_mask, mask = generate_mask_from_raytracing(sat, params, satpos, plotranges, imsize, headers, size_occ)
+            if btot_mask is None:
+                return idx
 
-            save_to_csv(failed_df, faileddf_name)
+        # check for null mask
+        mask[r <= size_occ[sat]] = 0
+        if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
+            logging.warning(f'WARNING: CME mask is null because it is probably behind the occulter')
+            return idx
 
-    # When all finished, make backup of the csv file
-    os.system("cp " + configfile_name + " " + configfile_name + ".back")
-    os.system("cp " + faileddf_name + " " + faileddf_name + ".back")
+        #mask for occulter
+        occ_mask = np.zeros(xx.shape)
+        occ_mask[r <= size_occ[sat]] = 1
+
+        if synth_int_image:
+            btot = process_intensity_figure(headers, sat, params, size_occ, back_corona, mask, btot_mask, r)
+
+        case_stuff =[]
+        if otype=="fits":
+            cme_mask = fits.PrimaryHDU(mask)
+            case_stuff.append(cme_mask)
+            if synth_int_image:
+                cme = fits.PrimaryHDU(btot)
+                case_stuff.append(cme)
+            occ = fits.PrimaryHDU(occ_mask)
+            case_stuff.append(occ)
+        elif not mesh and otype == "png":
+            case_stuff.append(mask)
+            case_stuff.append(occ_mask)
+            if synth_int_image:
+                case_stuff.append(btot)
+        elif mesh and otype=='png':
+            clouds = pygcsWrapper(params, satpos)             
+            x = clouds[sat, :, 1]
+            y = clouds[0, :, 2]    
+            arr_cloud=pnt2arr(x,y,plotranges,imsize, sat)
+            case_stuff.append(mask)
+            case_stuff.append(arr_cloud)
+            case_stuff.append(occ_mask)
+        
+        successful_cases.append(case_stuff)
+        success_counter += 1
+
+    if success_counter >= min_nviews:
+        while True:
+            if is_writing:
+                time.sleep(random_driver.uniform(0, 0.5))
+            else:
+                break
+        is_writing = True
+        # save cases
+        save_cases(params, successful_cases, otype, idx)
+
+        params.append(satpos)
+        params.append(plotranges)
+        succesful_df.loc[idx] = params 
+
+        # save to csv
+        save_to_csv(succesful_df, configfile_name)
+        is_writing = False
+        return True
 
 
 if __name__ == "__main__":
@@ -408,7 +419,7 @@ if __name__ == "__main__":
     par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme', 'satpos', 'plotranges'] # par names
     par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
     par_rng = [[-180,180],[-70,70],[-90,90],[3,10],[0.1,0.6],[10,60],[1e-1,1e1]] # min-max ranges of each parameter in par_names {2.5,7} heights
-    par_num = int(30)  # total number of samples that will be generated for each param (there are nsat images per param combination)
+    par_num = int(10)  # total number of samples that will be generated for each param (there are nsat images per param combination)
     rnd_par=False # when true it apllies a random seed to generate the same parameters for each run
     SEED = 72430 # seed to use when rnd_par is False
     same_corona=False # Set to True use a single corona back for all par_num cases

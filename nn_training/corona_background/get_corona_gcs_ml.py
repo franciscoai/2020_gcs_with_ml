@@ -40,7 +40,7 @@ def find_matches(paths, tolerance):
                 matches.append((cor2b_file, cor2a_file, lasco_file))
     return matches
 
-def get_corona(imsize=None, rnd_rot=False, custom_headers=False):
+def get_corona(imsize=None, rnd_rot=False, custom_headers=False, random_state=None):
     '''
     Returns a measured "quiet" (with no CME) solar corona observed by satelitte sat, the implemented instruments are
 
@@ -72,7 +72,10 @@ def get_corona(imsize=None, rnd_rot=False, custom_headers=False):
     matches = find_matches([COR2B_PATH, COR2A_PATH, LASCO_PATH], TIME_DIFF_THRESHOLD)
     
     # Get random triplet
-    triplet = np.random.randint(0, len(matches)-1)
+    if random_state is None:
+        triplet = np.random.randint(0, len(matches)-1)
+    else:
+        triplet = random_state.randint(0, len(matches)-1)
     triplet = matches[triplet]
 
     cor2b_file, cor2a_file, lasco_file = triplet
