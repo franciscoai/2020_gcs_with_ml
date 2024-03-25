@@ -262,20 +262,26 @@ def main():
     original_buffer_size = len(cases_buffer)
     buffer_size = len(cases_buffer)
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=20) as executor:
         while True:
             futures = [executor.submit(process_img, cases_buffer.pop(0), original_buffer_size) for i in range(buffer_size)]
 
-            results = [future.result() for future in concurrent.futures.as_completed(futures)]
-            # create a list with indices of failed cases
-            failed_cases = [(result, True) for result in results if result != True]
-            # append failed cases to the buffer
-            cases_buffer.extend(failed_cases)
+            for future in concurrent.futures.as_completed(futures):
+                idx, params = future.result()
+                if params is None:
+                    # append failed case to the buffer
+                    cases_buffer.append((idx, True))
+                else:
+                    succesful_df.loc[idx] = params
+                    save_to_csv(succesful_df, configfile_name)
+
             buffer_size = len(cases_buffer)
             if len(cases_buffer) == 0:
                 break
 
-    # When all finished, make backup of the csv file
+    # When all finished, sort and make backup of the csv file
+    succesful_df = succesful_df.sort_index()
+    save_to_csv(succesful_df, configfile_name)
     os.system("cp " + configfile_name + " " + configfile_name + ".back")
 
 
@@ -327,7 +333,7 @@ def process_img(idx_tuple, org_buffer_size):
 
             if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
                 print(f'WARNING: CME mask is null because it is probably behind the occulter')
-                return idx
+                return idx, None
 
     for sat in range(n_sat):
 
@@ -343,13 +349,13 @@ def process_img(idx_tuple, org_buffer_size):
         else:
             btot_mask, mask = generate_mask_from_raytracing(sat, params, satpos, plotranges, imsize, headers, size_occ)
             if btot_mask is None:
-                return idx
+                return idx, None
 
         # check for null mask
         mask[r <= size_occ[sat]] = 0
         if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
             logging.warning(f'WARNING: CME mask is null because it is probably behind the occulter')
-            return idx
+            return idx, None
 
         #mask for occulter
         occ_mask = np.zeros(xx.shape)
@@ -385,23 +391,16 @@ def process_img(idx_tuple, org_buffer_size):
         success_counter += 1
 
     if success_counter >= min_nviews:
-        while True:
-            if is_writing:
-                time.sleep(random_driver.uniform(0, 0.5))
-            else:
-                break
-        is_writing = True
         # save cases
         save_cases(params, successful_cases, otype, idx)
 
         params.append(satpos)
         params.append(plotranges)
-        succesful_df.loc[idx] = params 
+        #success_df = pd.DataFrame([params], columns=par_names)
 
         # save to csv
-        save_to_csv(succesful_df, configfile_name)
-        is_writing = False
-        return True
+        #save_to_csv(succesful_df, configfile_name)
+        return idx, params
 
 
 if __name__ == "__main__":
@@ -419,7 +418,7 @@ if __name__ == "__main__":
     par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme', 'satpos', 'plotranges'] # par names
     par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
     par_rng = [[-180,180],[-70,70],[-90,90],[3,10],[0.1,0.6],[10,60],[1e-1,1e1]] # min-max ranges of each parameter in par_names {2.5,7} heights
-    par_num = int(10)  # total number of samples that will be generated for each param (there are nsat images per param combination)
+    par_num = int(100)  # total number of samples that will be generated for each param (there are nsat images per param combination)
     rnd_par=False # when true it apllies a random seed to generate the same parameters for each run
     SEED = 72430 # seed to use when rnd_par is False
     same_corona=False # Set to True use a single corona back for all par_num cases
