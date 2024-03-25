@@ -222,12 +222,12 @@ def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, pl
     # Assuming you have IMG_SIZE defined
     IMG_SIZE = (img.shape[0], img.shape[1], img.shape[2])
 
-    fig, ax = plt.subplots(2, IMG_SIZE[0], figsize=(13, 10))
+    fig, ax = plt.subplots(2, IMG_SIZE[0], figsize=(13, 11))
     fig.tight_layout()
     fig.suptitle(
         f'target: {np.around(target, 3)}\nPrediction: {np.around(prediction, 3)}')
 
-    color = ['purple', 'k', 'r', 'b']
+    color = ['purple', 'k', 'r', 'b', 'g']
     cmap = mpl.colors.ListedColormap(color)
 
     error = []
@@ -273,8 +273,14 @@ def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, pl
         ax[0][i].set_title(
             f'non-overlapping area: {np.around(non_overlapping_area, 3)}')
 
-        ax[1][i].imshow(img[i, :, :], cmap="gray", vmin=0, vmax=1)
-        ax[1][i].imshow(arr_cloud, cmap='Greens', alpha=0.6, vmin=0, vmax=1)
+        img_mean = np.mean(img[i, :, :])
+        img_std = np.std(img[i, :, :])
+        ax[1][i].imshow(img[i, :, :], cmap="gray", vmin=img_mean - 3 * img_std, vmax=img_mean + 3 * img_std)
+        #replace 0 for np.nan in arr_cloud
+        arr_cloud[arr_cloud == 0] = np.nan
+        arr_cloud[arr_cloud == 1] = img[i, :, :].max() + 1
+        ax[1][i].imshow(arr_cloud, cmap='Greens', alpha=0.6, vmin=0, vmax=1, interpolation='nearest')
+
 
     masks_dir = os.path.join(opath, 'infered_masks')
     os.makedirs(masks_dir, exist_ok=True)
