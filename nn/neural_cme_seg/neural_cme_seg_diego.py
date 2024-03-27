@@ -1111,6 +1111,10 @@ class neural_cme_segmentation():
                                                         occulter_size=in_occulter_size[i],occulter_size_ext=in_occulter_size_ext[i],centerpix=centerpix[i])
             print(i,dates[i])
             all_orig_img.append(orig_img)
+            #OBSERVATION:
+            #HERE WE SHOULD PUT AS INPUT THE NEW_MASKS TUNED BY MYSELF INSTEAD OF THE MASKS OBTAINED BY THE MODEL
+            #NECCESARY IN THE CASE OF REAL IMAGES!
+
             # compute cpa, aw and apex. Already filters by score and other aspects
             self.debug_flag = i
             mask_prop = self._compute_mask_prop(mask, score, lbl, box, plate_scl=in_plate_scl[i], 

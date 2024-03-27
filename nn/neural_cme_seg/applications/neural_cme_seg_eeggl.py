@@ -617,6 +617,25 @@ if infer_event2:
     all_occ_size =[all_occ_size for h,all_occ_size in enumerate(all_occ_size) if h not in all_idx]
     all_headers =[all_headers  for h,all_headers in enumerate(all_headers) if h not in all_idx]
 
+    save_full_pickle = True
+    if save_full_pickle:
+        dict={}
+        dict["df"]=df
+        dict["ok_orig_img"]=ok_orig_img
+        dict["ok_dates"]=ok_dates
+        dict["file_names"]=file_names
+        dict["all_center"]=all_center
+        dict["all_plate_scl"]=all_plate_scl
+        dict["all_dates"]=all_dates
+        dict["all_occ_size"]=all_occ_size
+        dict["all_headers"]=all_headers
+        dict['scr_threshold']=scr_threshold
+        dict['mask_threshold']=mask_threshold
+        breakpoint()
+        with open(opath+'/full_parametros_pre_plot2.pkl', 'wb') as write_file:
+            pickle.dump(dict, write_file)
+            print("Archivo pickle guardado en: ", opath+'/full_parametros_pre_plot2.pkl') 
+
     for m in range(len(ok_dates)):
         event = df[df['DATE_TIME'] == ok_dates[m]].reset_index(drop=True)
         image=ok_orig_img[m]
