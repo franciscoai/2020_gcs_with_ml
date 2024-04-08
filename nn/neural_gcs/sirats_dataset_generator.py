@@ -143,6 +143,7 @@ def generate_mask_from_raytracing(sat, params, satpos, plotranges, imsize, heade
         return None, None
     return btot_mask, mask
 
+
 def process_intensity_figure(headers, sat, params, size_occ, back_corona, mask, btot_mask, r):
     btot0 = raytracewcsWrapper(headers[sat], params, imsize=imsize, occrad=size_occ[sat], in_sig=0.5, out_sig=0.25, nel=1e5)                   
     
@@ -199,6 +200,30 @@ def process_intensity_figure(headers, sat, params, size_occ, back_corona, mask, 
 
     return btot
 
+def thread_maneger():
+    try:
+        sucess_num_path = OPATH + '/succes_num.pkl'
+        if os.path.exists(sucess_num_path) and not OVERWRITE:
+            success_num = load_state(sucess_num_path)
+        else:
+            success_num = 0
+        futures = []
+        with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            while success_num != par_num:
+                while len(futures) != MAX_WORKERS: # Task loader
+                    futures.append(executor.submit(process_img, success_num))
+                    success_num += 1
+                for future in concurrent.futures.as_completed(futures):
+                    idx, params = future.result()
+                    succesful_df.loc[idx] = params
+                    save_to_csv(succesful_df, configfile_name)
+                    save_state(success_num, sucess_num_path)
+                    futures.remove(future)
+
+    except:
+        logging.warning(f'WARNING: Exception occurred inside thread_maneger, restarting...')
+        thread_maneger()
+
 def main():
     global OPATH, random_driver, succesful_df, configfile_name, is_writing
     
@@ -216,7 +241,6 @@ def main():
     # Save configuration to .CSV
     date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
     configfile_name = OPATH + '/' + date_str+'Set_Parameters.csv'
-    #faileddf_name = OPATH + '/' + date_str+'Failed_Parameters.csv'
     succesful_df = pd.DataFrame(columns=par_names)
     is_writing = False
 
@@ -237,26 +261,8 @@ def main():
     os.makedirs(OPATH, exist_ok=True)
 
     # MAIN LOOP
-    sucess_num_path = OPATH + '/succes_num.pkl'
-    if os.path.exists(sucess_num_path) and not OVERWRITE:
-        success_num = load_state(sucess_num_path)
-    else:
-        success_num = 0
-    futures = []
+    thread_maneger()
     
-    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        while success_num != par_num:
-            # futures = [executor.submit(process_img, cases_buffer.pop(0), original_buffer_size) for i in range(buffer_size)]
-            while len(futures) != MAX_WORKERS: # Task loader
-                futures.append(executor.submit(process_img, success_num))
-                success_num += 1
-            for future in concurrent.futures.as_completed(futures):
-                idx, params = future.result()
-                succesful_df.loc[idx] = params
-                save_to_csv(succesful_df, configfile_name)
-                save_state(success_num, sucess_num_path)
-                futures.remove(future)
-
     # When all finished, sort and make backup of the csv file
     succesful_df = succesful_df.sort_index()
     save_to_csv(succesful_df, configfile_name)
