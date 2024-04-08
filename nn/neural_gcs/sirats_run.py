@@ -188,6 +188,7 @@ def center_rSun_pixel(headers, plotranges, sat):
 
 
 def plot_histogram(errors, opath, namefile):
+    breakpoint()
     fig, ax = plt.subplots(1, 4, figsize=(14, 7))
     flatten_errors = [item for sublist in errors for item in sublist]
     ax[0].hist(flatten_errors, bins=30)
@@ -222,10 +223,11 @@ def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, pl
     # Assuming you have IMG_SIZE defined
     IMG_SIZE = (img.shape[0], img.shape[1], img.shape[2])
 
-    fig, ax = plt.subplots(2, IMG_SIZE[0], figsize=(13, 11))
+    fig, ax = plt.subplots(2, IMG_SIZE[0], figsize=(13, 12))
     fig.tight_layout()
+    diff = ((target/prediction) - 1) * 100
     fig.suptitle(
-        f'target: {np.around(target, 3)}\nPrediction: {np.around(prediction, 3)}')
+        f'target: {np.around(target, 3)}\nPrediction: {np.around(prediction, 3)}\ndiff(%){np.around(diff, 3)}')
 
     color = ['purple', 'k', 'r', 'b', 'g']
     cmap = mpl.colors.ListedColormap(color)

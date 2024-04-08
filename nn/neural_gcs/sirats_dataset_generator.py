@@ -3,13 +3,11 @@ import sys
 import datetime
 import logging
 import scipy
-import random
-import time
 import concurrent.futures
+import pickle
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 import numpy as np
 import matplotlib.pyplot as plt
-import sunpy.map
 import pandas as pd
 from pyGCS_raytrace import pyGCS
 from pyGCS_raytrace.rtraytracewcs import rtraytracewcs
@@ -18,8 +16,15 @@ from nn_training.corona_background.get_corona_gcs_ml import get_corona
 from astropy.io import fits
 from nn_training.low_freq_map import low_freq_map
 from nn.utils.coord_transformation import deg2px, center_rSun_pixel, pnt2arr
-import cv2
 
+
+def save_state(succes_num, opath): #save buffer
+    with open(opath, 'wb') as f:
+        pickle.dump(succes_num, f)
+
+def load_state(opath): #load buffer
+    with open(opath, 'rb') as f:
+        return pickle.load(f)
 
 def get_params(par_names, par_rng, random_driver): #par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
                          #            [[-180,180],[-70,70],[-90,90],[5,10],[0.2,0.6],[10,60],[7e2,1e3]]
@@ -211,12 +216,9 @@ def main():
     # Save configuration to .CSV
     date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
     configfile_name = OPATH + '/' + date_str+'Set_Parameters.csv'
-    faileddf_name = OPATH + '/' + date_str+'Failed_Parameters.csv'
+    #faileddf_name = OPATH + '/' + date_str+'Failed_Parameters.csv'
     succesful_df = pd.DataFrame(columns=par_names)
-    failed_df = pd.DataFrame(columns=par_names)
     is_writing = False
-    check_df = succesful_df.iloc[:, :-2]
-    used_params = set()
 
     if os.path.exists(OPATH) and OVERWRITE:
         os.system("rm -r " + OPATH)
@@ -225,59 +227,35 @@ def main():
         #check if the csv file exists
         list_files = os.listdir(OPATH)
         csv_file = [s for s in list_files if "Set_Parameters.csv" in s][0]
-        failed_csv_file = [s for s in list_files if "Failed_Parameters.csv" in s][0]
         configfile_name = OPATH + '/' + csv_file
-        faileddf_name = OPATH + '/' + failed_csv_file
         succesful_df = pd.read_csv(configfile_name, index_col=0)
-        failed_df = pd.read_csv(faileddf_name, index_col=0)
-        iter_counter = len(succesful_df.index)
-        total_iter = iter_counter + len(failed_df.index)
 
         # create backup of the csv file
         os.system("cp " + configfile_name + " " + configfile_name + ".back")
-        os.system("cp " + faileddf_name + " " + faileddf_name + ".back")
-
-        #iterate the np.random to the last iteration
-        for i in range(total_iter):
-            temp = get_params(par_names, par_rng)
-            print(temp)
+        #os.system("cp " + faileddf_name + " " + faileddf_name + ".back")
 
     os.makedirs(OPATH, exist_ok=True)
 
-    # defining lists
-    satpos_all = []
-    plotranges_all = []
-    back_corona=[]
-    headers=[]
-    size_occ=[]
-
     # MAIN LOOP
-
-    # loop vars
-    successful_cases = []
-    success_counter = 0
-    failure_counter = 0
-    too_many_failures = False
-    cases_buffer = [(i, False) for i in range(par_num)] # (idx, failed)
-    original_buffer_size = len(cases_buffer)
-    buffer_size = len(cases_buffer)
-
-    with concurrent.futures.ProcessPoolExecutor(max_workers=20) as executor:
-        while True:
-            futures = [executor.submit(process_img, cases_buffer.pop(0), original_buffer_size) for i in range(buffer_size)]
-
+    sucess_num_path = OPATH + '/succes_num.pkl'
+    if os.path.exists(sucess_num_path) and not OVERWRITE:
+        success_num = load_state(sucess_num_path)
+    else:
+        success_num = 0
+    futures = []
+    
+    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        while success_num != par_num:
+            # futures = [executor.submit(process_img, cases_buffer.pop(0), original_buffer_size) for i in range(buffer_size)]
+            while len(futures) != MAX_WORKERS: # Task loader
+                futures.append(executor.submit(process_img, success_num))
+                success_num += 1
             for future in concurrent.futures.as_completed(futures):
                 idx, params = future.result()
-                if params is None:
-                    # append failed case to the buffer
-                    cases_buffer.append((idx, True))
-                else:
-                    succesful_df.loc[idx] = params
-                    save_to_csv(succesful_df, configfile_name)
-
-            buffer_size = len(cases_buffer)
-            if len(cases_buffer) == 0:
-                break
+                succesful_df.loc[idx] = params
+                save_to_csv(succesful_df, configfile_name)
+                save_state(success_num, sucess_num_path)
+                futures.remove(future)
 
     # When all finished, sort and make backup of the csv file
     succesful_df = succesful_df.sort_index()
@@ -285,35 +263,57 @@ def main():
     os.system("cp " + configfile_name + " " + configfile_name + ".back")
 
 
-def process_img(idx_tuple, org_buffer_size):
-    global random_driver, succesful_df, configfile_name, is_writing
+def process_img(idx, failed=False):
+    try:
+        global random_driver, succesful_df, configfile_name, is_writing
 
-    # initialize vars
-    idx, failed = idx_tuple
-    success_counter = 0
-    successful_cases = []
-    
-    # setup random state
-    if not failed:
-        for i in range(idx):
-            random_driver.uniform()
-    else: # if failed, generate a new random state (not the best solution, but it works for now)
-        rnd_seed = np.random.randint(0, int(1e5))
-        random_driver = np.random.RandomState(seed=rnd_seed)
+        # initialize vars
+        success_counter = 0
+        successful_cases = []
+        
+        # setup random state
+        if not failed:
+            for i in range(idx):
+                random_driver.uniform()
+        else: # if failed, generate a new random state (not the best solution, but it works for now)
+            rnd_seed = np.random.randint(0, int(1e5))
+            random_driver = np.random.RandomState(seed=rnd_seed)
 
-    # get parameters
-    params = get_params(par_names, par_rng, random_driver)
+        # get parameters
+        params = get_params(par_names, par_rng, random_driver)
 
-    #get background corona,headers and occulter size
-    if same_corona==False or len(back_corona)==0:
-        back_corona, headers, size_occ, _ = get_corona(imsize=imsize, custom_headers=same_position)
-    
-    # Get the location of sats and gcs:
-    satpos, plotranges = pyGCS.processHeaders(headers)
+        #get background corona,headers and occulter size
+        if same_corona==False or len(back_corona)==0:
+            back_corona, headers, size_occ, _ = get_corona(imsize=imsize, custom_headers=same_position)
+        
+        # Get the location of sats and gcs:
+        satpos, plotranges = pyGCS.processHeaders(headers)
 
-    if not mask_from_cloud:
-        # Computes with mask from cloud just to see if there is any failure
+        if not mask_from_cloud:
+            # Computes with mask from cloud just to see if there is any failure
+            for sat in range(n_sat):
+                #defining ranges and radius of the occulter
+                x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
+                y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
+                xx, yy = np.meshgrid(x, y)
+                x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)  
+                r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
+
+                #mask for cme outer envelope
+                clouds = pygcsWrapper(params, satpos)             
+                x = clouds[sat, :, 1]
+                y = clouds[0, :, 2]
+                p_x,p_y=deg2px(x,y,plotranges,imsize, sat)
+                mask=get_mask_cloud(p_x,p_y,imsize)
+                #check for null mask
+
+                mask[r <= size_occ[sat]] = 0
+
+                if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
+                    raise Exception('CME mask is null because it is probably behind the occulter')
+
         for sat in range(n_sat):
+
             #defining ranges and radius of the occulter
             x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
             y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
@@ -321,94 +321,73 @@ def process_img(idx_tuple, org_buffer_size):
             x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)  
             r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
 
-            #mask for cme outer envelope
-            clouds = pygcsWrapper(params, satpos)             
-            x = clouds[sat, :, 1]
-            y = clouds[0, :, 2]
-            p_x,p_y=deg2px(x,y,plotranges,imsize, sat)
-            mask=get_mask_cloud(p_x,p_y,imsize)
-            #check for null mask
+            if mask_from_cloud:
+                clouds, x, y, p_x, p_y, mask = generate_mask_from_clouds(sat, params, satpos, plotranges, imsize)
+            else:
+                btot_mask, mask = generate_mask_from_raytracing(sat, params, satpos, plotranges, imsize, headers, size_occ)
+                if btot_mask is None:
+                    raise Exception('CME mask is too small compared to cme brigthness image')
 
+            # check for null mask
             mask[r <= size_occ[sat]] = 0
-
             if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
-                print(f'WARNING: CME mask is null because it is probably behind the occulter')
-                return idx, None
+                raise Exception('CME mask is null because it is probably behind the occulter')
 
-    for sat in range(n_sat):
+            #mask for occulter
+            occ_mask = np.zeros(xx.shape)
+            occ_mask[r <= size_occ[sat]] = 1
 
-        #defining ranges and radius of the occulter
-        x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
-        y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
-        xx, yy = np.meshgrid(x, y)
-        x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)  
-        r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
-
-        if mask_from_cloud:
-            clouds, x, y, p_x, p_y, mask = generate_mask_from_clouds(sat, params, satpos, plotranges, imsize)
-        else:
-            btot_mask, mask = generate_mask_from_raytracing(sat, params, satpos, plotranges, imsize, headers, size_occ)
-            if btot_mask is None:
-                return idx, None
-
-        # check for null mask
-        mask[r <= size_occ[sat]] = 0
-        if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
-            logging.warning(f'WARNING: CME mask is null because it is probably behind the occulter')
-            return idx, None
-
-        #mask for occulter
-        occ_mask = np.zeros(xx.shape)
-        occ_mask[r <= size_occ[sat]] = 1
-
-        if synth_int_image:
-            btot = process_intensity_figure(headers, sat, params, size_occ, back_corona, mask, btot_mask, r)
-
-        case_stuff =[]
-        if otype=="fits":
-            cme_mask = fits.PrimaryHDU(mask)
-            case_stuff.append(cme_mask)
             if synth_int_image:
-                cme = fits.PrimaryHDU(btot)
-                case_stuff.append(cme)
-            occ = fits.PrimaryHDU(occ_mask)
-            case_stuff.append(occ)
-        elif not mesh and otype == "png":
-            case_stuff.append(mask)
-            case_stuff.append(occ_mask)
-            if synth_int_image:
-                case_stuff.append(btot)
-        elif mesh and otype=='png':
-            clouds = pygcsWrapper(params, satpos)             
-            x = clouds[sat, :, 1]
-            y = clouds[0, :, 2]    
-            arr_cloud=pnt2arr(x,y,plotranges,imsize, sat)
-            case_stuff.append(mask)
-            case_stuff.append(arr_cloud)
-            case_stuff.append(occ_mask)
-        
-        successful_cases.append(case_stuff)
-        success_counter += 1
+                btot = process_intensity_figure(headers, sat, params, size_occ, back_corona, mask, btot_mask, r)
 
-    if success_counter >= min_nviews:
-        # save cases
-        save_cases(params, successful_cases, otype, idx)
+            case_stuff =[]
+            if otype=="fits":
+                cme_mask = fits.PrimaryHDU(mask)
+                case_stuff.append(cme_mask)
+                if synth_int_image:
+                    cme = fits.PrimaryHDU(btot)
+                    case_stuff.append(cme)
+                occ = fits.PrimaryHDU(occ_mask)
+                case_stuff.append(occ)
+            elif not mesh and otype == "png":
+                case_stuff.append(mask)
+                case_stuff.append(occ_mask)
+                if synth_int_image:
+                    case_stuff.append(btot)
+            elif mesh and otype=='png':
+                clouds = pygcsWrapper(params, satpos)             
+                x = clouds[sat, :, 1]
+                y = clouds[0, :, 2]    
+                arr_cloud=pnt2arr(x,y,plotranges,imsize, sat)
+                case_stuff.append(mask)
+                case_stuff.append(arr_cloud)
+                case_stuff.append(occ_mask)
+            
+            successful_cases.append(case_stuff)
+            success_counter += 1
 
-        params.append(satpos)
-        params.append(plotranges)
-        #success_df = pd.DataFrame([params], columns=par_names)
+        if success_counter >= min_nviews:
+            # save cases
+            save_cases(params, successful_cases, otype, idx)
 
-        # save to csv
-        #save_to_csv(succesful_df, configfile_name)
-        return idx, params
+            params.append(satpos)
+            params.append(plotranges)
+            #success_df = pd.DataFrame([params], columns=par_names)
+
+            # save to csv
+            #save_to_csv(succesful_df, configfile_name)
+            return idx, params
+    except Exception as e:
+        logging.warning(f'WARNING: Exception occurred inside thread: {e}')
+        return process_img(idx, True)
 
 
 if __name__ == "__main__":
     # GLOBAL VARS
     #files
     DATA_PATH = '/gehme/data'
-    BASE_PATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/test'
-    OVERWRITE = True # set to True to overwrite existing files
+    BASE_PATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_V3'
+    OVERWRITE = False # set to True to overwrite existing files
     n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
     min_nviews = 3 # minimum number succesful views 
 
@@ -418,7 +397,8 @@ if __name__ == "__main__":
     par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme', 'satpos', 'plotranges'] # par names
     par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
     par_rng = [[-180,180],[-70,70],[-90,90],[3,10],[0.1,0.6],[10,60],[1e-1,1e1]] # min-max ranges of each parameter in par_names {2.5,7} heights
-    par_num = int(100)  # total number of samples that will be generated for each param (there are nsat images per param combination)
+    par_num = int(1e5)  # total number of samples that will be generated for each param (there are nsat images per param combination)
+    MAX_WORKERS = 20 # number of workers for parallel processing
     rnd_par=False # when true it apllies a random seed to generate the same parameters for each run
     SEED = 72430 # seed to use when rnd_par is False
     same_corona=False # Set to True use a single corona back for all par_num cases
