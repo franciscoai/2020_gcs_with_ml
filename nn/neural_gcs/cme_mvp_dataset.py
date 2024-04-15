@@ -28,7 +28,7 @@ class Cme_MVP_Dataset(Dataset):
     def __get_dirs(self, root_dir):
         imgs = []
         dirs = os.listdir(root_dir)
-        dirs = [int(d) for d in dirs if not d.endswith('.csv') and not d.endswith('.back')]
+        dirs = [int(d) for d in dirs if not d.endswith('.csv') and not d.endswith('.back') and not d.endswith('.pkl')]
         dirs.sort()
         for d in dirs:
             imgs.append(os.path.join(root_dir, str(d)))

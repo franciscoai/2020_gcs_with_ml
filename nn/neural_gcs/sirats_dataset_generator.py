@@ -143,7 +143,6 @@ def generate_mask_from_raytracing(sat, params, satpos, plotranges, imsize, heade
         return None, None
     return btot_mask, mask
 
-
 def process_intensity_figure(headers, sat, params, size_occ, back_corona, mask, btot_mask, r):
     btot0 = raytracewcsWrapper(headers[sat], params, imsize=imsize, occrad=size_occ[sat], in_sig=0.5, out_sig=0.25, nel=1e5)                   
     
@@ -404,7 +403,7 @@ if __name__ == "__main__":
     par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
     par_rng = [[-180,180],[-70,70],[-90,90],[3,10],[0.1,0.6],[10,60],[1e-1,1e1]] # min-max ranges of each parameter in par_names {2.5,7} heights
     par_num = int(1e5)  # total number of samples that will be generated for each param (there are nsat images per param combination)
-    MAX_WORKERS = 20 # number of workers for parallel processing
+    MAX_WORKERS = 10 # number of workers for parallel processing
     rnd_par=False # when true it apllies a random seed to generate the same parameters for each run
     SEED = 72430 # seed to use when rnd_par is False
     same_corona=False # Set to True use a single corona back for all par_num cases

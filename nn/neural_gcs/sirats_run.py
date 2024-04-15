@@ -32,7 +32,6 @@ def correct_path(s):
     s = s.replace("(2)", "")
     return s
 
-
 def convert_string(s, level):
     if level == 1:
         s = s.replace("preped/", "")
@@ -41,7 +40,6 @@ def convert_string(s, level):
         s = s.replace("_04", "_14")
         s = s.replace("level1/", "")
     return s
-
 
 def load_model(model: SiratsNet, model_folder: Path):
     model_path = os.path.join(model_folder, 'model.pth')
@@ -55,12 +53,10 @@ def load_model(model: SiratsNet, model_folder: Path):
         logging.warning(
             f"No model found at: {model_path}, starting from scratch\n")
 
-
 def copy_and_rename_existing_model(model_folder: Path):
     models_counter = len(os.listdir(model_folder))
     new_path = os.path.join(model_folder, f"model_run{models_counter}")
     os.system(f'cp {os.path.join(model_folder, "model.pth")} {new_path}')
-
 
 def test_specific_image(model, opath, img_size, binary_mask, device):
     sat1_path = Path(
@@ -138,12 +134,10 @@ def test_specific_image(model, opath, img_size, binary_mask, device):
     plt.savefig(os.path.join(masks_dir, 'test_image.png'))
     plt.close()
 
-
 def calculate_non_overlapping_area(mask1, mask2):
     # Combine masks to identify overlapping areas
     non_overlapping_area_err = np.sum(np.abs(mask1 - mask2)) / np.sum(mask1)
     return non_overlapping_area_err
-
 
 def add_occulter(img, occulter_size, centerpix, repleace_value=None):
     '''
@@ -167,14 +161,12 @@ def add_occulter(img, occulter_size, centerpix, repleace_value=None):
         img[mask == 1] = repleace_value
     return img
 
-
 def radius_to_px(plotranges, imsize, headers, sat):
     x = np.linspace(plotranges[0], plotranges[1], num=imsize[0])
     y = np.linspace(plotranges[2], plotranges[3], num=imsize[1])
     xx, yy = np.meshgrid(x, y)
     x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)
     return np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
-
 
 def center_rSun_pixel(headers, plotranges, sat):
     '''
@@ -185,7 +177,6 @@ def center_rSun_pixel(headers, plotranges, sat):
     y_cS = (headers['CRPIX2']*plotranges[sat]*2) / \
         headers['NAXIS2'] - plotranges[sat]  # headers['CRPIX2']
     return x_cS, y_cS
-
 
 def plot_histogram(errors, opath, namefile):
     breakpoint()
@@ -208,7 +199,6 @@ def plot_histogram(errors, opath, namefile):
 
     fig.savefig(os.path.join(masks_dir, namefile), dpi=300)
     plt.close(fig)
-
 
 def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, plotranges, opath, namefile):
     # Convert tensors to numpy arrays
@@ -291,7 +281,6 @@ def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, pl
 
     return error
 
-
 def plot_real_infer(imgs, prediction, satpos, plotranges, opath, namefile, fixed_satpos=None, fixed_plotranges=None, use_fixed=False):
     # Convert tensors to numpy arrays
     imgs = imgs.squeeze().cpu().detach().numpy()
@@ -359,7 +348,6 @@ def plot_real_infer(imgs, prediction, satpos, plotranges, opath, namefile, fixed
     plt.savefig(os.path.join(masks_dir, namefile), dpi=300)
     plt.close()
 
-
 def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, epochs, opath, par_loss_weights, save_model):
     train_losses_per_batch = []
     median_train_losses_per_batch = []
@@ -414,7 +402,6 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
         if save_model:
             status = model.save_model(opath)
             logging.info(f"Model saved at: {status}\n")
-
 
 def get_paths_cme_exp_sources(dates=None):
     """
@@ -576,11 +563,10 @@ def get_paths_cme_exp_sources(dates=None):
         event.append(cdict)
     return event
 
-
 def main():
     # Configuración de parámetros
     configuration = Configuration(Path(
-        "/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run4.ini"))
+        "/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run6.ini"))
 
     TRAINDIR = configuration.train_dir
     OPATH = configuration.opath
