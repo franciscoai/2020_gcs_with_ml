@@ -24,6 +24,9 @@ class Cme_MVP_Dataset(Dataset):
         csv_path = [f for f in os.listdir(
             self.root_dir) if f.endswith('Set_Parameters.csv')][0]
         self.csv_df = pd.read_csv(os.path.join(self.root_dir, csv_path))
+        self.ids = set(row[0] for row in self.csv_df.values) # The id is the fist column of the csv
+        self.corrupter_indexes = []
+        self.len_csv = len(self.csv_df)
 
     def __get_dirs(self, root_dir):
         imgs = []
@@ -52,6 +55,8 @@ class Cme_MVP_Dataset(Dataset):
                 - idx (int): The index of the retrieved data.
         """
         try:
+
+  
             flag = True
             
             mask_dir = os.path.join(self.imgs[idx], 'mask')
@@ -126,6 +131,7 @@ class Cme_MVP_Dataset(Dataset):
         
         except Exception as e:
             logging.error(f"Error reading data from {self.imgs[idx]}: {str(e)}")
+            self.corrupter_indexes.append(idx)
             return self.__getitem__(idx+1)
 
     def __normalize(self, img):
