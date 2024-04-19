@@ -33,7 +33,7 @@ class Configuration:
 
         # Training Configuration
         self.epochs = self.config.getint("Training Configuration", 'epochs')
-        self.train_index_size = self.config.getint("Training Configuration", 'train_index_size')
+        self.train_index_percent = self.config.getfloat("Training Configuration", 'train_index_percent')
         self.lr = self.config["Training Configuration"]['lr'].split(',')
         self.lr = [float(i) for i in self.lr]
         self.par_rng = self.config["Training Configuration"]['par_rng'].split('|')

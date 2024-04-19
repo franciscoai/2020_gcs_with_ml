@@ -1,46 +1,24 @@
 import sys
 import os
-import cv2
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-import torch
-import numpy as np
-import random
-import pickle
-import torchvision
-import logging
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-mpl.use('Agg')
-# mpl.use('TkAgg')
 from sirats_normalization import *
 from pathlib import Path
 from pyGCS_raytrace import pyGCS
 from astropy.io import fits
 from torch.utils.data import DataLoader
 from nn.neural_gcs.cme_mvp_dataset import Cme_MVP_Dataset
-from nn.neural_gcs.sirats_model import SiratsNet, SiratsInception, SiratsDistribution
-from nn.utils.gcs_mask_generator import maskFromCloud
+from nn.neural_gcs.sirats_model import *
 from nn.neural_gcs.sirats_config import Configuration
 from pyGCS_raytrace import pyGCS
-from nn.utils.coord_transformation import pnt2arr
-from torchvision.io import read_image
-from pyGCS_raytrace import pyGCS
-
-
-def correct_path(s):
-    s = s.replace("(1)", "")
-    s = s.replace("(2)", "")
-    return s
-
-
-def convert_string(s, level):
-    if level == 1:
-        s = s.replace("preped/", "")
-        s = s.replace("L0", "L1")
-        s = s.replace("_0B", "_1B")
-        s = s.replace("_04", "_14")
-        s = s.replace("level1/", "")
-    return s
+from sirats_utils.sirats_plotter import SiratsPlotter
+from sirats_utils.utils_functions import get_paths_cme_exp_sources
+import cv2
+import torch
+import numpy as np
+import random
+import pickle
+import torchvision
+import logging
 
 
 def load_model(model: SiratsNet, model_folder: Path):
@@ -55,95 +33,10 @@ def load_model(model: SiratsNet, model_folder: Path):
         logging.warning(
             f"No model found at: {model_path}, starting from scratch\n")
 
-
 def copy_and_rename_existing_model(model_folder: Path):
     models_counter = len(os.listdir(model_folder))
     new_path = os.path.join(model_folder, f"model_run{models_counter}")
     os.system(f'cp {os.path.join(model_folder, "model.pth")} {new_path}')
-
-
-def test_specific_image(model, opath, img_size, binary_mask, device):
-    sat1_path = Path(
-        "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20110317_filter_True/FMwLASCO201103173_0.fits")
-    sat2_path = Path(
-        "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_exp_paper_filtered/GCS_20110317_filter_True/FMwLASCO201103173_1.fits")
-
-    resize = torchvision.transforms.Resize(
-        img_size[1:3], torchvision.transforms.InterpolationMode.BILINEAR)
-
-    sat1_data, sat1_h = fits.getdata(sat1_path, header=True)
-    sat2_data, sat2_h = fits.getdata(sat2_path, header=True)
-    headers = [sat1_h, sat2_h]
-
-    satpos, plotranges = pyGCS.processHeaders(headers)
-    satpos = np.array(satpos)
-    plotranges = np.array(plotranges)
-
-    img = torch.tensor([sat1_data, sat2_data, sat1_data], dtype=torch.float32)
-
-    if not binary_mask:
-        sd_range = 1
-        m = torch.mean(img)
-        sd = torch.std(img)
-        img = (img - m + sd_range * sd) / (2 * sd_range * sd)
-    else:
-        img[img > 1] = 1
-        img[img < 0] = 0
-
-    img = resize(img)
-    img = img.to(device)
-
-    with torch.no_grad():
-        predictions = model.infer(img).cpu().numpy()
-
-    img = img.cpu().numpy()
-    predictions = np.squeeze(predictions)
-
-    mask_infered_sat1 = maskFromCloud(predictions, sat=0, satpos=[
-                                      satpos[0, :]], imsize=img_size[1:3], plotranges=[plotranges[0, :]])
-    mask_infered_sat2 = maskFromCloud(predictions, sat=0, satpos=[
-                                      satpos[1, :]], imsize=img_size[1:3], plotranges=[plotranges[1, :]])
-    fig, ax = plt.subplots(1, 2, figsize=(9, 5))
-
-    # Define colors and colormap
-    color = ['purple', 'r']
-    cmap = mpl.colors.ListedColormap(color)
-
-    # Tight layout
-    fig.tight_layout()
-
-    # Set the main title
-    fig.suptitle("Lasco specific image")
-
-    # Update masks for saturation
-    mask_infered_sat1[mask_infered_sat1 > 0] = 1
-    mask_infered_sat2[mask_infered_sat2 > 0] = 1
-    mask_infered_sat1[mask_infered_sat1 <= 0] = np.nan
-    mask_infered_sat2[mask_infered_sat2 <= 0] = np.nan
-
-    # Set image values
-    img[img <= 0] = np.nan
-    img[img > 0] = 0
-
-    # Plot the masks and images
-    ax[0].imshow(mask_infered_sat1, cmap=cmap)
-    ax[0].imshow(img[0, :, :], vmin=0, vmax=1, alpha=0.4, cmap=cmap)
-
-    ax[1].imshow(mask_infered_sat2, cmap=cmap)
-    ax[1].imshow(img[1, :, :], vmin=0, vmax=1, alpha=0.4, cmap=cmap)
-
-    # Save the figure
-    masks_dir = os.path.join(opath, 'masks')
-    os.makedirs(masks_dir, exist_ok=True)
-    plt.savefig(os.path.join(masks_dir, 'test_image.png'))
-    plt.close()
-
-
-def calculate_non_overlapping_area(mask1, mask2):
-    # Combine masks to identify overlapping areas
-    non_overlapping_area_err = np.sum(np.abs(mask1 - mask2)) / np.sum(mask1)
-    return non_overlapping_area_err
-
 
 def add_occulter(img, occulter_size, centerpix, repleace_value=None):
     '''
@@ -167,14 +60,12 @@ def add_occulter(img, occulter_size, centerpix, repleace_value=None):
         img[mask == 1] = repleace_value
     return img
 
-
 def radius_to_px(plotranges, imsize, headers, sat):
     x = np.linspace(plotranges[0], plotranges[1], num=imsize[0])
     y = np.linspace(plotranges[2], plotranges[3], num=imsize[1])
     xx, yy = np.meshgrid(x, y)
     x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat)
     return np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
-
 
 def center_rSun_pixel(headers, plotranges, sat):
     '''
@@ -185,178 +76,6 @@ def center_rSun_pixel(headers, plotranges, sat):
     y_cS = (headers['CRPIX2']*plotranges[sat]*2) / \
         headers['NAXIS2'] - plotranges[sat]  # headers['CRPIX2']
     return x_cS, y_cS
-
-
-def plot_histogram(errors, opath, namefile):
-    fig, ax = plt.subplots(1, 4, figsize=(14, 7))
-    flatten_errors = [item for sublist in errors for item in sublist]
-    ax[0].hist(flatten_errors, bins=30)
-    ax[0].set_title(
-        f'AllVPs, mean: {np.around(np.mean(flatten_errors), 2)}, std: {np.around(np.std(flatten_errors), 2)}')
-    ax[1].hist(errors[0], bins=30)
-    ax[1].set_title(
-        f'VP1, mean: {np.around(np.mean(errors[0]), 2)}, std: {np.around(np.std(errors[0]), 2)}')
-    ax[2].hist(errors[1], bins=30)
-    ax[2].set_title(
-        f'VP2, mean: {np.around(np.mean(errors[1]), 2)}, std: {np.around(np.std(errors[1]), 2)}')
-    ax[3].hist(errors[2], bins=30)
-    ax[3].set_title(
-        f'VP3, mean: {np.around(np.mean(errors[2]), 2)}, std: {np.around(np.std(errors[2]), 2)}')
-
-    masks_dir = os.path.join(opath, 'infered_masks')
-
-    fig.savefig(os.path.join(masks_dir, namefile), dpi=300)
-    plt.close(fig)
-
-
-def plot_mask_MVP(img, sat_masks, target, prediction, occulter_masks, satpos, plotranges, opath, namefile):
-    # Convert tensors to numpy arrays
-    img = img.cpu().detach().numpy()
-    sat_masks = sat_masks.cpu().detach().numpy()
-    target = target.cpu().detach().numpy()
-    prediction = np.squeeze(prediction.cpu().detach().numpy())
-    satpos = satpos.cpu().detach().numpy()
-    plotranges = plotranges.cpu().detach().numpy()
-    occulter_masks = occulter_masks.cpu().detach().numpy()
-
-    # Assuming you have IMG_SIZE defined
-    IMG_SIZE = (img.shape[0], img.shape[1], img.shape[2])
-
-    fig, ax = plt.subplots(2, IMG_SIZE[0], figsize=(13, 11))
-    fig.tight_layout()
-    fig.suptitle(
-        f'target: {np.around(target, 3)}\nPrediction: {np.around(prediction, 3)}')
-
-    color = ['purple', 'k', 'r', 'b', 'g']
-    cmap = mpl.colors.ListedColormap(color)
-
-    error = []
-    for i in range(IMG_SIZE[0]):
-        mask_infered_sat = maskFromCloud(prediction, satpos=[
-                                         satpos[i, :]], imsize=IMG_SIZE[1:3], plotranges=[plotranges[i, :]])
-        masks_infered = np.zeros(IMG_SIZE)
-        masks_infered[i, :, :] = mask_infered_sat
-        sat_mask_for_err = maskFromCloud(
-            target, satpos=[satpos[i, :]], imsize=IMG_SIZE[1:3], plotranges=[plotranges[i, :]])
-        sat_masks_for_err = np.zeros(IMG_SIZE)
-        sat_masks_for_err[i, :, :] = sat_mask_for_err
-
-        param_clouds = []
-        param_clouds += prediction.tolist()
-        param_clouds.append([satpos[i, :]])
-        clouds = pyGCS.getGCS(*param_clouds, nleg=50, ncirc=100, ncross=100)
-        x, y = clouds[0, :, 1], clouds[0, :, 2]
-        arr_cloud = pnt2arr(x, y, [plotranges[i, :]], IMG_SIZE[1:3], 0)
-
-        nan_mask = np.full(IMG_SIZE[1:3], np.nan)
-        nan_occulter = np.full(IMG_SIZE[1:3], np.nan)
-
-        sat_mask_for_err[sat_mask_for_err <= 0] = np.nan
-        sat_mask_for_err[sat_mask_for_err > 0] = 0
-
-        arr_cloud[arr_cloud <= 0] = 0
-        arr_cloud[arr_cloud > 0] = 1
-        arr_cloud = np.flip(arr_cloud, axis=0)
-
-        nan_occulter[occulter_masks[i, :, :] > 0] = 1
-        nan_mask[:, :][masks_infered[i, :, :] > 0] = 2
-
-        non_overlapping_area = calculate_non_overlapping_area(
-            sat_masks_for_err[i], masks_infered[i])
-
-        error.append(non_overlapping_area)
-        ax[0][i].imshow(sat_mask_for_err, vmin=0,
-                        vmax=len(color) - 1, cmap=cmap)
-        ax[0][i].imshow(nan_mask, cmap=cmap, alpha=0.6,
-                        vmin=0, vmax=len(color) - 1)
-        # ax[0][i].imshow(nan_occulter, cmap=cmap, alpha=0.25, vmin=0, vmax=len(color) - 1)
-        ax[0][i].set_title(
-            f'non-overlapping area: {np.around(non_overlapping_area, 3)}')
-
-        img_mean = np.mean(img[i, :, :])
-        img_std = np.std(img[i, :, :])
-        ax[1][i].imshow(img[i, :, :], cmap="gray", vmin=img_mean - 3 * img_std, vmax=img_mean + 3 * img_std)
-        #replace 0 for np.nan in arr_cloud
-        arr_cloud[arr_cloud == 0] = np.nan
-        arr_cloud[arr_cloud == 1] = img[i, :, :].max() + 1
-        ax[1][i].imshow(arr_cloud, cmap='Greens', alpha=0.6, vmin=0, vmax=1, interpolation='nearest')
-
-
-    masks_dir = os.path.join(opath, 'infered_masks')
-    os.makedirs(masks_dir, exist_ok=True)
-    plt.savefig(os.path.join(masks_dir, namefile), dpi=300)
-    plt.close()
-
-    return error
-
-
-def plot_real_infer(imgs, prediction, satpos, plotranges, opath, namefile, fixed_satpos=None, fixed_plotranges=None, use_fixed=False):
-    # Convert tensors to numpy arrays
-    imgs = imgs.squeeze().cpu().detach().numpy()
-    prediction = np.squeeze(prediction.cpu().detach().numpy())
-
-    # Convert to numpy non fixed variables
-    if type(satpos) is not np.ndarray:
-        satpos = np.array(satpos, dtype=np.float32)
-    if type(plotranges) is not np.ndarray:
-        plotranges = np.array(plotranges, dtype=np.float32)
-
-    # Convert to numpy fixed variables
-    if use_fixed and fixed_satpos is not None and fixed_plotranges is not None:
-        if type(fixed_satpos) is not np.ndarray:
-            fixed_satpos = np.array(fixed_satpos, dtype=np.float32)
-        if type(fixed_plotranges) is not np.ndarray:
-            fixed_plotranges = np.array(fixed_plotranges, dtype=np.float32)
-
-    # Assuming you have IMG_SIZE defined
-    IMG_SIZE = (imgs.shape[0], imgs.shape[1], imgs.shape[2])
-
-    fig, ax = plt.subplots(1, IMG_SIZE[0], figsize=(17, 10))
-    fig.tight_layout()
-
-    suptitle = f'ima satpos: {", ".join([f"{x:.2f}" for x in satpos[0, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[0, :]])} -- plotranges: {", ".join([f"{x:.2f}" for x in plotranges[0, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[0, :]])}\n\n'
-    suptitle += f'imb satpos: {", ".join([f"{x:.2f}" for x in satpos[1, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[1, :]])} -- plotranges: {", ".join([f"{x:.2f}" for x in plotranges[1, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[1, :]])}\n\n'
-    suptitle += f'lasco satpos: {", ".join([f"{x:.2f}" for x in satpos[2, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[2, :]])} -- plotranges: {", ".join([f"{x:.2f}" for x in plotranges[2, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[2, :]])}\n\n'
-    suptitle += f'Using fixed satpos = {use_fixed}'
-
-    fig.suptitle(suptitle, x=0.05, y=.95, horizontalalignment='left')
-
-    color = ['purple', 'k', 'r', 'b']
-    cmap = mpl.colors.ListedColormap(color)
-
-    for i in range(IMG_SIZE[0]):
-        param_clouds = prediction.tolist()
-        if not use_fixed:
-            param_clouds.append([satpos[i, :]])
-            clouds = pyGCS.getGCS(*param_clouds, nleg=50,
-                                  ncirc=100, ncross=100)
-            x, y = clouds[0, :, 1], clouds[0, :, 2]
-            arr_cloud = pnt2arr(x, y, [plotranges[i, :]], IMG_SIZE[1:3], 0)
-
-            # Flip img
-            imgs[i, :, :] = np.flip(imgs[i, :, :], axis=0)
-
-            ax[i].imshow(imgs[i, :, :], cmap="gray", vmin=0, vmax=1)
-            ax[i].imshow(arr_cloud, cmap='Greens', alpha=0.6, vmin=0, vmax=1)
-        else:
-            param_clouds.append([fixed_satpos[i, :]])
-            clouds = pyGCS.getGCS(*param_clouds, nleg=50,
-                                  ncirc=100, ncross=100)
-            x, y = clouds[0, :, 1], clouds[0, :, 2]
-            arr_cloud = pnt2arr(
-                x, y, [fixed_plotranges[i, :]], IMG_SIZE[1:3], 0)
-
-            # Flip img
-            imgs[i, :, :] = np.flip(imgs[i, :, :], axis=0)
-
-            ax[i].imshow(imgs[i, :, :], cmap="gray", vmin=0, vmax=1)
-            ax[i].imshow(arr_cloud, cmap='Greens', alpha=0.6, vmin=0, vmax=1)
-
-    masks_dir = os.path.join(opath, 'real_img_infer')
-    os.makedirs(masks_dir, exist_ok=True)
-    plt.savefig(os.path.join(masks_dir, namefile), dpi=300)
-    plt.close()
-
 
 def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, epochs, opath, par_loss_weights, save_model):
     train_losses_per_batch = []
@@ -413,172 +132,10 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
             status = model.save_model(opath)
             logging.info(f"Model saved at: {status}\n")
 
-
-def get_paths_cme_exp_sources(dates=None):
-    """
-    Read all files for selected events of the CME exp sources project
-    """
-    data_path = '/gehme/data'  # Path to the dir containing /sdo ,/soho and /stereo data directories as well as the /Polar_Observations dir.
-    # Path with our GCS data directories
-    gcs_path = '/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_cme_expansion/GCSs'
-    lasco_path = data_path+'/soho/lasco/level_1/c2'  # LASCO proc images Path
-    secchipath = data_path+'/stereo/secchi/L0'
-    level = 0  # set the reduction level of the images
-    # events to read
-    if dates is None:
-        dates = ['20101212', '20101214', '20110317', '20110605', '20130123', '20130129',
-                '20130209', '20130424', '20130502', '20130517', '20130527', '20130608']
-    # pre event iamges per instrument
-    pre_event = ["/soho/lasco/level_1/c2/20101212/25354377.fts",
-                 "/stereo/secchi/L1/a/seq/cor1/20101212/20101212_022500_1B4c1A.fts",
-                 "/stereo/secchi/L1/b/seq/cor1/20101212/20101212_023500_1B4c1B.fts",
-                 "/stereo/secchi/L1/a/img/cor2/20101212/20101212_015400_14c2A.fts",
-                 "/stereo/secchi/L1/b/img/cor2/20101212/20101212_015400_14c2B.fts",
-                 "/soho/lasco/level_1/c2/20101214/25354679.fts",
-                 "/stereo/secchi/L1/a/seq/cor1/20101214/20101214_150000_1B4c1A.fts",
-                 "/stereo/secchi/L1/b/seq/cor1/20101214/20101214_150000_1B4c1B.fts",
-                 "/stereo/secchi/L1/a/img/cor2/20101214/20101214_152400_14c2A.fts",
-                 "/stereo/secchi/L1/b/img/cor2/20101214/20101214_153900_14c2B.fts",
-                 "/soho/lasco/level_1/c2/20110317/25365446.fts",
-                 "/stereo/secchi/L1/a/seq/cor1/20110317/20110317_103500_1B4c1A.fts",
-                 "/stereo/secchi/L1/b/seq/cor1/20110317/20110317_103500_1B4c1B.fts",
-                 "/stereo/secchi/L1/a/img/cor2/20110317/20110317_115400_14c2A.fts",
-                 "/stereo/secchi/L1/b/img/cor2/20110317/20110317_123900_14c2B.fts",
-                 "/soho/lasco/level_1/c2/20110605/25374823.fts",
-                 "/stereo/secchi/L1/a/seq/cor1/20110605/20110605_021000_1B4c1A.fts",
-                 "/stereo/secchi/L1/b/seq/cor1/20110605/20110605_021000_1B4c1B.fts",
-                 "/stereo/secchi/L1/a/img/cor2/20110605/20110605_043900_14c2A.fts",
-                 "/stereo/secchi/L1/b/img/cor2/20110605/20110605_043900_14c2B.fts",
-                 "/soho/lasco/level_1/c2/20130123/25445617.fts",
-                 "/stereo/secchi/L1/a/seq/cor1/20130123/20130123_131500_1B4c1A.fts",
-                 "/stereo/secchi/L1/b/seq/cor1/20130123/20130123_125500_1B4c1B.fts",
-                 "/stereo/secchi/L1/a/img/cor2/20130123/20130123_135400_14c2A.fts",
-                 "/stereo/secchi/L1/b/img/cor2/20130123/20130123_142400_14c2B.fts",
-                 "/soho/lasco/level_1/c2/20130129/25446296.fts",
-                 "/stereo/secchi/L1/a/seq/cor1/20130129/20130129_012500_1B4c1A.fts",
-                 "/stereo/secchi/L1/b/seq/cor1/20130129/20130129_012500_1B4c1B.fts",
-                 "/stereo/secchi/L1/a/img/cor2/20130129/20130129_015400_14c2A.fts",
-                 "/stereo/secchi/L1/b/img/cor2/20130129/20130129_015400_14c2B.fts",
-                 "/soho/lasco/level_1/c2/20130209/25447666.fts",
-                 "/stereo/secchi/L1/a/seq/cor1/20130209/20130209_054000_1B4c1A.fts",
-                 "/stereo/secchi/L1/b/seq/cor1/20130209/20130209_054500_1B4c1B.fts",
-                 "/stereo/secchi/L1/a/img/cor2/20130209/20130209_062400_14c2A.fts",
-                 "/stereo/secchi/L1/b/img/cor2/20130209/20130209_062400_14c2B.fts",
-                 "/soho/lasco/level_1/c2/20130424_1/25456651.fts",
-                 "/stereo/secchi/L1/a/seq/cor1/20130424/20130424_051500_1B4c1A.fts",
-                 "/stereo/secchi/L1/b/seq/cor1/20130424/20130424_051500_1B4c1B.fts",
-                 "/stereo/secchi/L1/a/img/cor2/20130424/20130424_055400_14c2A.fts",
-                 "/stereo/secchi/L1/b/img/cor2/20130424/20130424_065400_14c2B.fts",
-                 "/soho/lasco/level_1/c2/20130502/25457629.fts",
-                 "/stereo/secchi/L1/a/seq/cor1/20130502/20130502_045000_1B4c1A.fts",
-                 "/stereo/secchi/L1/b/seq/cor1/20130502/20130502_050000_1B4c1B.fts",
-                 "/stereo/secchi/L1/a/img/cor2/20130502/20130502_012400_14c2A.fts",
-                 "/stereo/secchi/L1/b/img/cor2/20130502/20130502_053900_14c2B.fts"
-                 "/soho/lasco/level_1/c2/20130517/25459559.fts",
-                 "/stereo/secchi/L1/a/seq/cor1/20130517/20130517_194500_1B4c1A.fts",
-                 "/stereo/secchi/L1/b/seq/cor1/20130517/20130517_194500_1B4c1B.fts",
-                 "/stereo/secchi/L1/a/img/cor2/20130517/20130517_203900_14c2A.fts",
-                 "/stereo/secchi/L1/b/img/cor2/20130517/20130517_205400_14c2B.fts",
-                 "/soho/lasco/level_1/c2/20130527_2/25460786.fts",
-                 "/stereo/secchi/L1/a/seq/cor1/20130527/20130527_183000_1B4c1A.fts",
-                 "/stereo/secchi/L1/b/seq/cor1/20130527/20130527_183000_1B4c1B.fts",
-                 "/stereo/secchi/L1/a/img/cor2/20130527/20130527_192400_14c2A.fts",
-                 "/stereo/secchi/L1/b/img/cor2/20130527/20130527_195400_14c2B.fts",
-                 "/soho/lasco/level_1/c2/20130608/25462149.fts",
-                 "/stereo/secchi/L1/a/seq/cor1/20130607/20130607_221500_1B4c1A.fts",
-                 "/stereo/secchi/L1/b/seq/cor1/20130607/20130607_223000_1B4c1B.fts",
-                 "/stereo/secchi/L1/a/img/cor2/20130607/20130607_225400_14c2A.fts",
-                 "/stereo/secchi/L1/b/img/cor2/20130607/20130607_232400_14c2B.fts"]
-    pre_event = [data_path + f for f in pre_event]
-
-    # get file event for each event
-    temp = os.listdir(gcs_path)
-    events_path = [os.path.join(gcs_path, d)
-                   for d in temp if str.split(d, '_')[-1] in dates]
-
-    # gets .savs, andthe cor and lasco file event for each time instant in each event
-    event = []
-    for ev in events_path:
-        cdict = {'date': [], 'pro_files': [], 'sav_files': [], 'ima1': [], 'ima0': [], 'imb1': [
-        ], 'imb0': [], 'lasco1': [], 'lasco0': [], 'pre_ima': [], 'pre_imb': [], 'pre_lasco': []}
-        tinst = os.listdir(ev)
-        sav_files = sorted([os.path.join(ev, f)
-                           for f in tinst if f.endswith('.sav')])
-        pro_files = sorted([os.path.join(ev, f) for f in tinst if (f.endswith(
-            '.pro') and 'fit_' not in f and 'tevo_' not in f and 'm1.' not in f)])
-        if len(sav_files) != len(pro_files):
-            os.error('ERROR. Found different number of .sav and .pro files')
-            sys.exit
-        # reads the lasco and stereo files from within each pro
-        ok_pro_files = []
-        ok_sav_files = []
-        for f in pro_files:
-            with open(f) as of:
-                for line in of:
-                    if 'ima=sccreadfits(' in line:
-                        cline = secchipath + line.split('\'')[1]
-                        if 'cor1' in cline:
-                            cor = 'cor1'
-                        if 'cor2' in cline:
-                            cor = 'cor2'
-                        cdate = cline[cline.find(
-                            '/preped/')+8:cline.find('/preped/')+16]
-                        cline = convert_string(cline, level)
-                        cline = correct_path(cline)
-                        cdict['ima1'].append(cline)
-                        ok_pro_files.append(f)
-                        cpre = [s for s in pre_event if (
-                            cdate in s and cor in s and '/a/' in s)]
-                        if len(cpre) == 0:
-                            print(
-                                f'Cloud not find pre event image for {cdate}')
-                            breakpoint()
-                        cdict['pre_ima'].append(cpre[0])
-                        cdict['pre_imb'].append([s for s in pre_event if (
-                            cdate in s and cor in s and '/a/' in s)][0])
-                    if 'imaprev=sccreadfits(' in line:
-                        cline = convert_string(
-                            secchipath + line.split('\'')[1], level)
-                        cline = correct_path(cline)
-                        cdict['ima0'].append(cline)
-                    if 'imb=sccreadfits(' in line:
-                        cline = convert_string(
-                            secchipath + line.split('\'')[1], level)
-                        cline = correct_path(cline)
-                        cdict['imb1'].append(cline)
-                    if 'imbprev=sccreadfits(' in line:
-                        cline = convert_string(
-                            secchipath + line.split('\'')[1], level)
-                        cline = correct_path(cline)
-                        cdict['imb0'].append(cline)
-                    if 'lasco1=readfits' in line:
-                        cline = lasco_path + line.split('\'')[1]
-                        cline = correct_path(cline)
-                        cdict['lasco1'].append(cline)
-                        cdate = cline[cline.find(
-                            '/preped/')+8:cline.find('/preped/')+16]
-                        cpre = [s for s in pre_event if (
-                            cdate in s and '/c2/' in s)]
-                        if len(cpre) == 0:
-                            print(
-                                f'Cloud not find pre event image for {cdate}')
-                            breakpoint()
-                        cdict['pre_lasco'].append(cpre[0])
-                    if 'lasco0=readfits' in line:
-                        cline = lasco_path + line.split('\'')[1]
-                        cline = correct_path(cline)
-                        cdict['lasco0'].append(cline)
-        cdict['date'] = ev
-        cdict['pro_files'] = ok_pro_files
-        cdict['sav_files'] = ok_sav_files
-        event.append(cdict)
-    return event
-
-
 def main():
     # Configuración de parámetros
     configuration = Configuration(Path(
-        "/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run4.ini"))
+        "/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run6.ini"))
 
     TRAINDIR = configuration.train_dir
     OPATH = configuration.opath
@@ -596,7 +153,7 @@ def main():
     SAVE_MODEL = configuration.save_model
     LOAD_MODEL = configuration.load_model
     EPOCHS = configuration.epochs
-    TRAIN_IDX_SIZE = configuration.train_index_size
+    TRAIN_IDX_PERCENT = configuration.train_index_percent
     LR = configuration.lr
     PAR_RNG = configuration.par_rng
     PAR_LOSS_WEIGHTS = configuration.par_loss_weight
@@ -624,9 +181,14 @@ def main():
     dataset = Cme_MVP_Dataset(root_dir=TRAINDIR,
                               img_size=IMG_SIZE,
                               only_mask=ONLY_MASK)
+    
+    # Instanciar plotter
+
+    sirats_plotter = SiratsPlotter()
+    
     random.seed(SEED)
     total_samples = len(dataset)
-    train_size = TRAIN_IDX_SIZE
+    train_size = int((dataset.len_csv - 1) * TRAIN_IDX_PERCENT)
     train_indices = random.sample(range(total_samples), train_size)
     test_indices = list(set(range(total_samples)) - set(train_indices))
     train_dataset = torch.utils.data.Subset(dataset, train_indices)
@@ -690,7 +252,7 @@ def main():
                     img_counter += 1
                     logging.info(
                         f"Plotting image {img_counter} of {IMAGES_TO_INFER}")
-                    error = plot_mask_MVP(img[i], sat_masks[i], targets[i], predictions[i],
+                    error = sirats_plotter.plot_mask_MVP(img[i], sat_masks[i], targets[i], predictions[i],
                                           occulter_masks[i], satpos[i], plotranges[i], OPATH, f'img_{img_counter}.png')
                     errorVP1.append(error[0])
                     errorVP2.append(error[1])
@@ -703,7 +265,7 @@ def main():
 
             errors = [errorVP1, errorVP2, errorVP3]
             logging.info("Plotting histogram")
-            plot_histogram(errors, OPATH, 'histogram.png')
+            sirats_plotter.plot_histogram(errors, OPATH, 'histogram.png')
 
             # Save errors in a pickle file
             with open(os.path.join(OPATH, 'errors.pkl'), 'wb') as f:
@@ -807,9 +369,8 @@ def main():
                         eval(fixed_plotranges), dtype=torch.float32)
 
                     # Plot infered masks
-                    plot_real_infer(event_img, predictions, satpos, plotranges, OPATH,
+                    sirats_plotter.plot_real_infer(event_img, predictions, satpos, plotranges, OPATH,
                                     f'{filename}.png', fixed_satpos=fixed_satpos, fixed_plotranges=fixed_plotranges, use_fixed=True)
-
 
 if __name__ == '__main__':
     main()
