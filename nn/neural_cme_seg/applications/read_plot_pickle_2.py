@@ -6,14 +6,12 @@ import numpy as np
 """
 TODO: 
 - En lugar de generar plots individuales, generar un panel con los tres plots para todos los instrumentos. por ahora seria 3x3.
+
+
+Asuming a txt file with a list of pickle files + path (containing all the parameters calculated from the mask, product of compute_mask_prop)
+and the corresponding label (runXXX, GCS, Img)
 """
 
-
-#Asuming a txt file with a list of pickle files + path (containing all the parameters calculated from the mask, product of compute_mask_prop)
-# and the corresponding label (runXXX, GCS, Img)
-#
-#
-#
 
 
 def read_pickle(file):
@@ -26,7 +24,8 @@ def read_txt(list_file,param):
     x_global = []
     y_global = []
     labels = []
-
+    x_subglobal = []
+    y_subglobal = []
     with open(list_file, 'r') as file:
         data = file.readlines()
         for i in range(len(data)):
@@ -34,19 +33,50 @@ def read_txt(list_file,param):
             labels.append(parts[1])
             all_data = read_pickle(parts[0])
             #breakpoint()
+            #hacer el chequeo de SCR maximo para no tener 2 mascaras por tiempo. Hacer un print que avise que se esta eliminando una mascara con cierto SCR
+            # y por tanto que implica que el filtro del infer 2 no esta funcionando al 100%.
+
+            #check for repeated elements in all_data['x_pointsSCR']
+            x_subglobal = []
+            y_subglobal = []
             if param != 'MASK':
-                x_global.append(all_data['x_points'+param])
-                if param == 'APEX_ANGL_PER' or param == 'APEX_DIST_PER':
-                    y_sub_global=[]
-                    for p in range(len(all_data['y_points'+param])):
-                        y_sub_global.append( np.median(all_data['y_points'+param][p]) )
-                    y_global.append(y_sub_global)
-                else:
-                    y_global.append(all_data['y_points'+param])           
+                #filter repeted elements in x_pointsSCR
+                dates_to_filter = all_data['x_points'+param]
+                for time in dates_to_filter:
+                    #matching_indices = all_data['x_points'+param].isin([time])
+                    matching_indices = np.where(np.array(all_data['x_points'+param]) == time)[0]
+                    #x_global.append(all_data['x_points'+param][matching_indices])
+                    #breakpoint()
+                    #just 1 mask for each date_time
+                    if len(matching_indices) == 1:
+                        #breakpoint()
+                        if param == 'APEX_ANGL_PER' or param == 'APEX_DIST_PER':
+                            y_subglobal.append(np.median(all_data['y_points'+param][matching_indices.item()] ))
+                        else:
+                            y_subglobal.append(all_data['y_points'+param][matching_indices.item()])    
+                        x_subglobal.append(all_data['x_points'+param][matching_indices.item()])
+
+                    #more than 1 mask for each date_time
+                    if len(matching_indices) > 1:
+                        #select only one element depending on the SCR value
+                        #breakpoint()
+                        select_indices= np.where(np.array(all_data['y_pointsSCR'])[matching_indices] == np.max(np.array(all_data['y_pointsSCR'])[matching_indices]))[0]
+                        matching_indices = matching_indices[select_indices]
+                        if param == 'APEX_ANGL_PER' or param == 'APEX_DIST_PER':
+                            y_subglobal.append(np.median(all_data['y_points'+param][matching_indices.item()] ))
+                        else:
+                            y_subglobal.append(all_data['y_points'+param][matching_indices.item()])    
+                        x_subglobal.append(all_data['x_points'+param][matching_indices.item()])                       
+                x_global.append(x_subglobal)
+                y_global.append(y_subglobal)
+
             if param == 'MASK':
+                #usefull for IoU score
                 #return list of dataframes containing the masks
                 x_global.append(all_data['df'])
                 y_global.append(all_data['df'])
+
+
         #breakpoint()
     return x_global, y_global, labels
 
@@ -96,20 +126,16 @@ def plot_params(lista,param,opath,title,clockwise=False):
     list_legend=[]
     fig, ax = plt.subplots()
     ax.set_xlabel("Date and hour")
-    if param == "AW" or param == "APEX_ANGL" or param == "True_CPA" or param =='APEX_ANGL_PER':
+    if param == "AW" or param == "APEX_ANGL" or param == "AW_MIN" or param == "AW_MAX":
         ax.set_ylabel(param+" [deg]")
-    if param == "AW_MIN" or param == "AW_MAX":
-        #check if title parameter ends with "ccw"
-        #when using ccw, max and min are inverted.
-        if title.find("ccw") != -1:
-            if param == "AW_MIN":
-                ax.set_ylabel("AW_MAX"+" [deg]")
-            if param == "AW_MAX":
-                ax.set_ylabel("AW_MIN"+" [deg]")
+    if param =='APEX_ANGL_PER':
+        ax.set_ylabel("Apex Angle"+" [deg]")
+    if param == "True_CPA":
+        ax.set_ylabel("CPA"+" [deg]")
     if param == "CPA":
         ax.set_ylabel("W"+param+" [deg]")
     if param == "APEX" or param=="APEX_DIST_PER":
-        ax.set_ylabel(param+" [Rsun]")   
+        ax.set_ylabel("Apex"+" [Rsun]")   
     if param == "AREA_SCORE":
         ax.set_ylabel(param+"%")
     
@@ -119,6 +145,7 @@ def plot_params(lista,param,opath,title,clockwise=False):
     for contador in range(len(x_global)):
         marker="*"
         linestyle=''
+        #breakpoint()
         if labels[contador].find('GCS') != -1:
             linestyle='--'
         if labels[contador].find('Img') != -1:
@@ -157,9 +184,9 @@ def plot_params(lista,param,opath,title,clockwise=False):
 
 #Define a function that read 2 pickle files and use both mask to calculate Intersection over Union, and return the value
 def calculate_IOU(lista,opath,title=''):
+    mask_threshold = 0.6
     #read pickle files
     x_df, y_df, labels = read_txt(lista,'MASK')
-
     #en el caso de Img real, necesito remover mascaras que se hayan filtrado en el infer2. EN este caso la que tiene score<0.65
     aux = y_df[0]
     new_data2_df = aux.drop(aux[aux['SCR'] <0.65].index).reset_index(drop=True)
@@ -173,8 +200,8 @@ def calculate_IOU(lista,opath,title=''):
     fig, ax = plt.subplots()
     ax.set_xlabel("Date and hour")
     ax.set_ylabel("IoU Score")
-    title='iou_score'+title
 
+    #breakpoint()
     for contador in range(1,len(y_df)):
         matching_index_list = []
         #filter y_df[contador] base on date_img timestamp, and keeping the mask with higher SCR value.
@@ -200,7 +227,7 @@ def calculate_IOU(lista,opath,title=''):
             if count_true == 1:
                 matching_indices = matching_indices.idxmax()
             matching_index_list.append(matching_indices)
-        breakpoint()
+        #breakpoint()
         #integer_positions = [idx[0] for idx in matching_index_list]
         #filter de y_df[contador] dataframe with the integer_positions list
         matching_indices = y_df[contador].index.isin(matching_index_list)
@@ -221,8 +248,10 @@ def calculate_IOU(lista,opath,title=''):
             date_img_aux = date_img
         #calculate intersection over union for each mask
         iou_score = []
-        breakpoint()
         for i in range(len(masks_img_aux)):
+            #convert elements of numpy.ndarray <0.6 in 0
+            masks_img_aux[i] = np.where(masks_img_aux[i] < mask_threshold, 0, masks_img_aux[i])
+            masks_2[i] = np.where(masks_2[i] < mask_threshold, 0, masks_2[i])
             intersection = np.logical_and(masks_img_aux[i], masks_2[i])
             union = np.logical_or(masks_img_aux[i], masks_2[i])
             iou_score.append(np.sum(intersection) / np.sum(union))
@@ -245,13 +274,13 @@ def calculate_IOU(lista,opath,title=''):
     ax.set_title(title)
     plt.grid()
     #save plot on opath directory
-    ending = title+'_plot'
+    ending = 'iou_score'+title+'_plot'
     fig.savefig(opath+'/'+ending+".png") 
     return iou_score
 
 
 if __name__ == "__main__":
-    full_plot = False
+    full_plot = True
     if full_plot == True:
         plot_apex       = True
         plot_AW         = True
@@ -264,6 +293,7 @@ if __name__ == "__main__":
         plot_AW_MAX     = True
         plot_apex_angl_per = True
         plot_apex_dist_per = True
+        plot_iou           = True
 
     if full_plot == False:
         plot_apex       = False
@@ -277,17 +307,19 @@ if __name__ == "__main__":
         plot_AW_MAX     = False
         plot_apex_angl_per = False
         plot_apex_dist_per = False
+        plot_iou           = False
 
     #path and name of file including all the pickle files + labels
     dir_lista = '/gehme/projects/2023_eeggl_validation/output/2011-02-15/pickle/'
-    lista = "2011_02_15_pickle.txt"
+    #lista = "2011_02_15_pickle.txt"
+    #lista = "2011_02_15_sta.txt"
+    lista = "2011_02_15_stb.txt"
     #paht de salida
-    opath = dir_lista
-    instrument = "Cor2A"
-
-    file1='/gehme/projects/2023_eeggl_validation/output/2011-02-15/gcs/cor2a/mask_props/parametros_filtered.pkl'
-    file2='/gehme/projects/2023_eeggl_validation/output/2011-02-15/Cor2A/occ_medida_RD_infer2/model_v5/mask_props/parametros_filtered.pkl'
-    calculate_IOU(dir_lista+lista,opath,title=instrument)
+    opath = dir_lista+'modified_version/'
+    #instrument = "Cor2A"
+    instrument = "Cor2B"
+    if plot_iou == True:
+        calculate_IOU(dir_lista+lista,opath,title=instrument)
 
     if plot_apex == True:
         plot_params(dir_lista+lista,"APEX",opath,title=instrument)
@@ -299,22 +331,22 @@ if __name__ == "__main__":
         plot_params(dir_lista+lista,"AW",opath,title=instrument)
 
     if plot_wcpa == True:
-        plot_params(dir_lista+lista,"CPA",opath,title=instrument+"_ccw",clockwise=True)
+        plot_params(dir_lista+lista,"CPA",opath,title=instrument,clockwise=True)
 
     if plot_apex_angle == True:
-        plot_params(dir_lista+lista,"APEX_ANGL",opath,title=instrument+"_ccw",clockwise=True)
+        plot_params(dir_lista+lista,"APEX_ANGL",opath,title=instrument,clockwise=True)
 
     if plot_true_cpa == True:
-        plot_params(dir_lista+lista,["AW_MAX","AW_MIN"],opath,title=instrument+"_ccw",clockwise=True)
+        plot_params(dir_lista+lista,["AW_MAX","AW_MIN"],opath,title=instrument,clockwise=True)
 
     if plot_AW_MIN == True:
-        plot_params(dir_lista+lista,"AW_MIN",opath,title=instrument+"_ccw",clockwise=True)
+        plot_params(dir_lista+lista,"AW_MIN",opath,title=instrument,clockwise=True)
 
     if plot_AW_MAX == True:
-        plot_params(dir_lista+lista,"AW_MAX",opath,title=instrument+"_ccw",clockwise=True)
+        plot_params(dir_lista+lista,"AW_MAX",opath,title=instrument,clockwise=True)
 
     if plot_apex_angl_per == True:
-        plot_params(dir_lista+lista,"APEX_ANGL_PER",opath,title=instrument+"_ccw",clockwise=True)
+        plot_params(dir_lista+lista,"APEX_ANGL_PER",opath,title=instrument,clockwise=True)
 
     if plot_apex_dist_per == True:
         plot_params(dir_lista+lista,"APEX_DIST_PER",opath,title=instrument)

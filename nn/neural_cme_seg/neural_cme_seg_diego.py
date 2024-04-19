@@ -16,15 +16,15 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 import matplotlib.dates as mdates
 import pickle
-
+from scipy import stats
 mpl.use('Agg')
 from astropy.io import fits
 
 __author__ = "Francisco Iglesias"
 __copyright__ = "Grupo de Estudios en Heliofisica de Mendoza - https://sites.google.com/um.edu.ar/gehme"
-__version__ = "0.1"
-__maintainer__ = "Francisco Iglesias"
-__email__ = "franciscoaiglesias@gmail.com"
+__version__ = "0.1X"
+__maintainer__ = "Francisco Iglesias 1 | Diego Lloveras"
+__email__ = "franciscoaiglesias@gmail.com | lloverasdiego@gmail.com"
 
 def quadratic(t,a,b,c):
     return a*t**2. + b*t + c
@@ -41,7 +41,30 @@ def linear(t,a,b):
 def linear_error(p, x, y, w):
     return w*(linear(x, *p) - y)
 
-
+def apply_linear_multiplier(image):
+    """
+    Applies a linear multiplier to an image, increasing outwards from the center.
+    Args:
+        image: A NumPy array representing the image (grayscale or color).
+    Returns:
+        A NumPy array representing the modified image.
+    """
+    # Get image dimensions
+    height, width = image.shape[:2]
+    # Create a meshgrid representing coordinates from center outwards
+    y, x = np.ogrid[0:height, 0:width]
+    center_x = width // 2
+    center_y = height // 2
+    radius = max(center_x, center_y)  # Consider the larger dimension for radius
+    # Calculate normalized distance from center (0 at center, 1 at edges)
+    distance = np.sqrt(((x - center_x) ** 2) + ((y - center_y) ** 2)) #/ radius
+    # Define linear multiplier function (adjust slope and offset as needed)
+    multiplier = 1. + (0.1/np.max(distance)) * distance #0.15
+    #aumenta 10% desde el centro hasta la esquina. entonces en 256 pixels seria 10% * cos(45)
+    # Apply element-wise multiplication with broadcasting
+    modified_image = np.multiply(image, multiplier)
+    
+    return modified_image,radius,distance, multiplier
 
 
 class neural_cme_segmentation():
@@ -88,7 +111,7 @@ class neural_cme_segmentation():
         self.model.to(self.device)
         return
 
-    def normalize(self, image, sd_range=1.5, norm_limits=[None, None]):
+    def normalize(self, image,histogram_names='',path='', sd_range=1.5, norm_limits=[None, None],increase_contrast=None):
         '''
         Normalizes the input image to 0-1 range
         sd_range: number of standard deviations to use for normalization around the mean
@@ -104,23 +127,67 @@ class neural_cme_segmentation():
             image[image > norm_limits[1]] = 1
         #using only 1 channel for statistics    
         
-        image_for_statistics = image[:,:,0] 
+        image_for_statistics = image[:,:,0].copy()
         #remove NaN
         not_nan_values = image_for_statistics[~np.isnan(image_for_statistics)]    
         #remove occulter values fixed at 0
         m = np.mean(not_nan_values[not_nan_values != 0])
+        mode, count = stats.mode(not_nan_values)
+        #m = np.median(not_nan_values[not_nan_values != 0])
         sd = np.std(not_nan_values[not_nan_values != 0])
+        plot_histograms = False
+        if plot_histograms:
+            plt.hist(not_nan_values, bins=50, range=(np.percentile(not_nan_values,1),np.percentile(not_nan_values,99)), color='blue', alpha=0.7)
+            plt.title('Histograma de valores de la imagen')
+            plt.xlabel('Valor')
+            plt.ylabel('Frecuencia')
+            plt.savefig(path+"histograms/orig/"+histogram_names+".png")
+            plt.close()
+        #breakpoint()
+        #p1  = np.percentile(image[:,:,0].flatten(), 0.07)
+        #p10 = np.percentile(image[:,:,0].flatten(), 10)
+        #p99 = np.percentile(image[:,:,0].flatten(), 99.95)
+        #iqr = p75 - p25  # Interquartile Range
+        #image = (image - p25) / iqr
+
         #normalizing
-        image = (image - m + sd_range * sd) / (2 * sd_range * sd)
+        #image = (image - mode +0.7*(abs(p95) - abs(p5))) / (1.4*(abs(p95) - abs(p5)))
+        #image = (image - m + 1.5* sd) / ( 4 * sd)
+        #image = ( (image -p10) / (1.2*(p95 - p10)) ) + 0.5
+        #breakpoint()
+        image_new = (image - m + sd_range * sd) / (2 * sd_range * sd)
+
+        img_final = image_new[:,:,0].copy()
+
+        if increase_contrast:
+            modified_image,radius,distance, multiplier = apply_linear_multiplier(image_new[:,:,0])
+            m1  = np.mean(image_new)
+            sd1 = np.std(image_new)
+            binary_image = np.where(image_new[:,:,0] > m1+sd1/40, 1, 0) #0.51
+
+            aaa=np.where(distance > 100., 1, 0)
+            img_final[np.logical_and(binary_image == 1, aaa == 1)] = np.multiply(img_final, multiplier)[np.logical_and(binary_image == 1, aaa == 1)]
         
+        image = img_final.copy()
+        
+        #image = (image - p1) / ((abs(p99) + abs(p1)))
         #fixing from 0 to 1
         cota_sup = 1
         cota_inf = 0
         image[image > cota_sup]=cota_sup
         image[image < cota_inf]=cota_inf
-
-        #image[image >1]=1
-        #image[image <0]=0
+        
+        image = np.dstack([image,image,image])
+        if plot_histograms:
+            normalized_asd = image[:,:,0].flatten()
+            plt.hist(image[:,:,0].flatten(), bins=50, range=(np.percentile(image[:,:,0].flatten(), 5),  np.percentile(image[:,:,0].flatten(), 95)), color='blue', alpha=0.7)
+            plt.hist(normalized_asd, bins=50, range=(0,1), color='blue', alpha=0.7)
+            plt.title('Histograma de valores de la imagen Normalizados')
+            plt.xlabel('Valor')
+            plt.ylabel('Frecuencia')
+            plt.savefig(path+"histograms/resize/"+histogram_names+".png")
+            plt.close()
+        
         return image
     """
     def show_normalize(self, image):
@@ -260,7 +327,7 @@ class neural_cme_segmentation():
             img[mask!=1] = repleace_value
         return img
 
-    def infer(self, img, model_param=None, resize=True, occulter_size=None,occulter_size_ext=None,centerpix=None,getmask=None,hdr=None,repleace_value=None):
+    def infer(self, img, model_param=None, resize=True, occulter_size=None,occulter_size_ext=None,centerpix=None,getmask=None,hdr=None,repleace_value=None,histogram_names='',path=''):
         '''        
         Infers a cme segmentation mask in the input coronograph image (img) using the trained R-CNN
         model_param: model parameters to use for inference. If None, the model parameters given at initialization are used
@@ -294,7 +361,7 @@ class neural_cme_segmentation():
         if getmask:
             images = self.get_mask(images, hdr)
 
-        images = self.normalize(images) # normalize to 0,1
+        images = self.normalize(images,histogram_names=histogram_names,path=path) # normalize to 0,1
         
         """
         #----------------------------------------------------------------------------------
@@ -378,21 +445,29 @@ class neural_cme_segmentation():
         return orig_img, all_masks[imin], all_scores[imin], all_lbl[imin], all_boxes[imin], all_loss[imin]
         
 
-    def _rec2pol(self, mask):
+    def _rec2pol(self, mask, center=[None,None]):
         '''
         Converts the x,y mask to polar coordinates
         Only pixels above the mask_threshold are considered
-        TODO: Consider arbitrary image center
+        TODO: Consider arbitrary image center, usefull in case of Cor-2B images.
+        NO FUNCIONA BIEN EN EL CASO DE COR2B y en relacion al plot2. CHEQUEAR
         '''
         nans = np.full(self.imsize, np.nan)
         pol_mask=[]
         #creates an array with zero value inside the mask and Nan value outside             
         masked = nans.copy()
         masked[:, :][mask > self.mask_threshold] = 0   
-        #calculates geometric center of the image
         height, width = masked.shape
-        center_x = width / 2
-        center_y = height / 2
+        if not center[0]:
+            #case center is not defined (None). Calculates geometric center of the image
+            center_x = width / 2
+            center_y = height / 2
+        else:
+            #case center is defined as input. 
+            center_x = center[0]
+            #since occ_center is given using images coordinates, we need to invert the y axis.
+            center_y = height-center[1]
+            #center_y = center[1]
         #calculates distance to the point and the angle for the positive y axis
         for x in range(width):
             for y in range(height):
@@ -414,7 +489,6 @@ class neural_cme_segmentation():
         '''
         area_score=0.
         nans = np.full(self.imsize, np.nan)
-        pol_mask=[]
         #creates an array with zero value inside the mask and Nan value outside             
         masked = nans.copy()
         masked[:, :][mask > self.mask_threshold] = 0   
@@ -426,7 +500,6 @@ class neural_cme_segmentation():
                 value=masked[x,y]
                 if not np.isnan(value):
                     area_score = area_score + 1.
-        #breakpoint()
         area_score = area_score/(height*width)
         return area_score
 
@@ -457,7 +530,7 @@ class neural_cme_segmentation():
                 
             
             if self.labels[labels[i]]=='CME' and scores[i]>self.scr_threshold and halo_flag: 
-                pol_mask=self._rec2pol(masks[i])
+                pol_mask=self._rec2pol(masks[i],center=centerpix)
                 
                 if (pol_mask is not None):            
                     #takes the min and max angles and calculates cpa and wide angles
@@ -1047,7 +1120,7 @@ class neural_cme_segmentation():
         
     def infer_event2(self, imgs, dates, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None,occulter_size_ext=None,
                     centerpix=None, mask_threshold=None, 
-                    scr_threshold=None, plot_params=None, filter_halos=True,percentiles=[5,95]):
+                    scr_threshold=None, plot_params=None, filter_halos=True,modified_masks=None,percentiles=[5,95]):
         '''
         Updated version of infer_event, it recognices more than one CME per event.
         Infers masks for a temporal series of images belonging to the same event. It filters the masks found in the
@@ -1105,16 +1178,34 @@ class neural_cme_segmentation():
         all_mask_prop = []
         all_dates = []
         all_plate_scl=[]
+
+        if modified_masks is not None:
+            with open(modified_masks, "rb") as f:
+                data = pd.compat.pickle_compat.load(f) #pickle.load(f) works if pandas version is same on both sides.
+            in_imgs = data["OK_ORIG_IMG"].copy()
+            all_orig_img = data["OK_ORIG_IMG"].copy()
+            dates = data["OK_DATES"]
+            breakpoint()
+
         for i in range(len(in_imgs)):
-            #infer masks
-            orig_img, mask, score, lbl, box = self.infer(in_imgs[i], model_param=model_param, resize=resize, 
-                                                        occulter_size=in_occulter_size[i],occulter_size_ext=in_occulter_size_ext[i],centerpix=centerpix[i])
-            print(i,dates[i])
-            all_orig_img.append(orig_img)
+            if modified_masks is None:
+                #infer masks
+                orig_img, mask, score, lbl, box = self.infer(in_imgs[i], model_param=model_param, resize=resize, 
+                                                            occulter_size=in_occulter_size[i],occulter_size_ext=in_occulter_size_ext[i],centerpix=centerpix[i])
+                all_orig_img.append(orig_img)
+                print(i,dates[i])
             #OBSERVATION:
             #HERE WE SHOULD PUT AS INPUT THE NEW_MASKS TUNED BY MYSELF INSTEAD OF THE MASKS OBTAINED BY THE MODEL
             #NECCESARY IN THE CASE OF REAL IMAGES!
 
+            if modified_masks is not None:
+                
+                score = [data["SCR"][i]]
+                lbl = [data["LABEL"][i]]
+                box = [data["BOX"][i]]
+                mask = [data["MASK"][i][0]]
+                print(i,dates[i])
+            #breakpoint()
             # compute cpa, aw and apex. Already filters by score and other aspects
             self.debug_flag = i
             mask_prop = self._compute_mask_prop(mask, score, lbl, box, plate_scl=in_plate_scl[i], 
