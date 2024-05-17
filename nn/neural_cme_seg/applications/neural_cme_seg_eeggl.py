@@ -305,7 +305,7 @@ eeggl = False        #Synthetic images created using eeggl.
 run = 'run005'
 btot  = False       #Synthetic images created using pyGCS.
 real_img = True    #Real images from cor2a, cor2b, lascoC2, level1.
-modified_masks = None #If True, it will use the modified masks for the real images. If None, it will use the original masks.
+modified_masks = True #If True, it will use the modified masks for the real images. If None, it will use the original masks.
 #---------------------------
 #select date of event
 cme_date_event = '2011-02-15' 
@@ -320,7 +320,7 @@ instr='cor2_b'
 #instr='lascoC2'
 
 #select infer event
-infer_event2=False
+infer_event2=True
 infer_event1=True
 
 #manage input and output paths

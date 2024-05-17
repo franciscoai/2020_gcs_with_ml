@@ -38,7 +38,8 @@ def manage_variables(cme_date_event,eeggl=False,btot=False,real_img=False,input_
                 aux = aux+'infer2/'
             opath = '/gehme/projects/2023_eeggl_validation/output/2011-02-15/'+instr+'/'+aux
         if modified_masks:
-            modified_masks = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/EEGGL_project/new_masks20110215_cor2a_v10.pkl'
+            #modified_masks = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/EEGGL_project/new_masks20110215_cor2a_v10.pkl'
+            modified_masks = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/EEGGL_project/new_masks20110215_cor2b_v2.pkl'
             opath = opath + 'modified_mask_v2/'
         list_name = 'list.txt'
     breakpoint()
