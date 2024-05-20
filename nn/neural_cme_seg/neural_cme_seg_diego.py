@@ -1185,7 +1185,7 @@ class neural_cme_segmentation():
             in_imgs = data["OK_ORIG_IMG"].copy()
             all_orig_img = data["OK_ORIG_IMG"].copy()
             dates = data["OK_DATES"]
-            breakpoint()
+            #breakpoint()
 
         for i in range(len(in_imgs)):
             if modified_masks is None:
@@ -1200,10 +1200,15 @@ class neural_cme_segmentation():
 
             if modified_masks is not None:
                 
-                score = [data["SCR"][i]]
-                lbl = [data["LABEL"][i]]
-                box = [data["BOX"][i]]
-                mask = [data["MASK"][i][0]]
+                #score = [data["SCR"][i]]
+                score = data["SCR"][i]
+                #lbl = [data["LABEL"][i]]
+                lbl = data["LABEL"][i]
+                #box = [data["BOX"][i]]
+                box = data["BOX"][i]
+                #mask = [data["MASK"][i][0]]
+                mask = [data["MASK"][i]]
+                #mask = data["MASK"][i]
                 print(i,dates[i])
             #breakpoint()
             # compute cpa, aw and apex. Already filters by score and other aspects
