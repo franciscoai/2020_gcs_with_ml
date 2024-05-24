@@ -8,29 +8,54 @@ import torch
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.use('Agg')
+from scipy.ndimage.filters import gaussian_filter
 import csv
 from neural_cme_seg import neural_cme_segmentation
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))))
+asd=os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+sys.path.append(asd)
+asd2=os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.append(asd2)
+asd3=os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+sys.path.append(asd3)
 from ext_libs.rebin import rebin
+from scipy.interpolate import RectBivariateSpline
 
 def read_fits(file_path, header=False, imageSize=[512,512]):
     try:       
         img = fits.open(file_path)[0].data
-        img = rebin(img, imageSize)   
+        img=img.astype("float32")
+        img = gaussian_filter(img, sigma=[0,0])
+        #img = rebin(img, imageSize, operation='mean')
+        img = rebin_interp(img, new_size=[512,512])
+        img = np.flip(img, axis=0)    
         if header:
             return img, fits.open(file_path)[0].header
         else:
             return img 
     except:
-        print(f'WARNING. I could not find file {file_path}')
+        print(f'WARNING. Error while processing {file_path}')
         return None
     
+def rebin_interp(img,new_size=[512,512]):
+    #rebinea imagenes, por default a 512
+    x1 = np.linspace(0, img.shape[0], img.shape[0])-img.shape[0]
+    y1 = np.linspace(0, img.shape[1], img.shape[1])-img.shape[1]
+    #fun = interp2d(x1, y1, img, kind='linear')
+    #interp2d is going to be deprecated, and replaced by RectBivariateSpline.
+    spline = RectBivariateSpline(x1, y1, img)
+    x = np.linspace(0, img.shape[0], new_size[0])-img.shape[0]
+    y = np.linspace(0, img.shape[1], new_size[1])-img.shape[1]
+    #Z3 = fun(x, y)
+    interpolated_image = spline(x, y)
+    return interpolated_image
+
 def plot_to_png(ofile, orig_img, masks, scr_threshold=0.3, mask_threshold=0.8 , title=None, labels=None, boxes=None, scores=None):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
     """    
-     # only detections with score larger than this value are considered
+    # only detections with score larger than this value are considered
     color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
     obj_labels = ['Back', 'Occ','CME','N/A']
     #
@@ -67,34 +92,47 @@ def plot_to_png(ofile, orig_img, masks, scr_threshold=0.3, mask_threshold=0.8 , 
     plt.tight_layout()
     plt.savefig(ofile)
     plt.close()
-      
+    
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 model_version="v4"
-repo_path = os.dirname(os.dirname(os.dirname(os.path.abspath(__file__))))
+repo_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 ipath = '/gehme/data/solo/fsi/20220325/'
 opath= repo_path + '/output/fsi/20220325/'
 file_ext=".fits" # files to use
 trained_model = '6000.torch'
 occ_size = 50 # Artifitial occulter radius in pixels. Use 0 to avoid. [Stereo a/b C1, Stereo a/b C2, Lasco C2]
+run_diff=True
 
 #main
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
 #loads images
-files = os.listdir(ipath)
+#files = os.listdir(ipath)
+#files = [os.path.join(ipath, e) for e in files]
+#files = [e for e in files if os.path.splitext(e)[1] == file_ext]
+
+with open(ipath+'list.txt', 'r') as file:
+    lines = file.readlines()
+files = [line.strip() for line in lines]
 files = [os.path.join(ipath, e) for e in files]
-files = [e for e in files if os.path.splitext(e)[1] == file_ext]
+
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 os.makedirs(opath, exist_ok=True)
 #inference on all images
-for f in files:
-    print(f'Processing file {f}')
-    img = cv2.imread(f)
+#for f in files:
+for j in range(1,len(files)):
+    print(f'Processing file {files[j]}')
+    if run_diff:
+        img0 = read_fits(files[j-1])
+        img1 = read_fits(files[j  ])
+        breakpoint()
+        img = img1 - img0
+    #img = cv2.imread(f)
     orig_img, masks, scores, labels, boxes  = nn_seg.infer(img, model_param=None, resize=False, occulter_size=0)
     # plot the predicted mask
-    ofile = opath+"/"+os.path.basename(f)+'.png'
+    ofile = opath+"/"+os.path.basename(files[j])+'.png'
     plot_to_png(ofile, [img], [masks], scores=[scores], labels=[labels], boxes=[boxes])
