@@ -21,6 +21,30 @@ sys.path.append(asd3)
 from ext_libs.rebin import rebin
 from scipy.interpolate import RectBivariateSpline
 
+
+def mask_occulter(img, occulter_size,centerpix,repleace_value=None):
+    '''
+    Replace a circular area of radius occulter_size in input image[h,w,3] with a constant value
+    repleace_value: if None, the area is replaced with the image mean. If set to scalar float that value is used
+    '''
+    if centerpix is not None:
+        w=int(round(centerpix[0]))
+        h=int(round(centerpix[1]))
+    else:
+        h,w = img.shape[:2]
+        h=int(h/2)
+        w=int(w/2)
+
+    mask = np.zeros((img.shape[0],img.shape[0]), dtype=np.uint8)
+    cv2.circle(mask, (w,h), occulter_size, 1, -1)
+    
+    if repleace_value is None:
+        img[mask==1] = 0#np.nan #np.mean(img)
+    else:
+        img[mask==1] = repleace_value
+    return img
+
+
 def read_fits(file_path, header=False, imageSize=[512,512]):
     try:       
         img = fits.open(file_path)[0].data
@@ -50,20 +74,20 @@ def rebin_interp(img,new_size=[512,512]):
     interpolated_image = spline(x, y)
     return interpolated_image
 
-def plot_to_png(ofile, orig_img, masks, scr_threshold=0.3, mask_threshold=0.8 , title=None, labels=None, boxes=None, scores=None):
+def plot_to_png(ofile, orig_img, masks, scr_threshold=0.15, mask_threshold=0.6 , title=None, labels=None, boxes=None, scores=None):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
     """    
     # only detections with score larger than this value are considered
-    color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
+    color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w','w','w','w','w','w','w','w','w','w','w','w','w','w','w']
     obj_labels = ['Back', 'Occ','CME','N/A']
     #
     cmap = mpl.colors.ListedColormap(color)  
     nans = np.full(np.shape(orig_img[0]), np.nan)
     fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
     axs = axs.ravel()
-    for i in range(len(orig_img)):
+    for i in range(len(orig_img)): #1 iteracion por imagen?
         axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
         axs[i].axis('off')
         axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
@@ -83,12 +107,52 @@ def plot_to_png(ofile, orig_img, masks, scr_threshold=0.3, mask_threshold=0.8 , 
                     axs[i+1].add_patch(box)
                     if labels is not None:
                         axs[i+1].annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
+                print(nb)
                 nb+=1
     # axs[0].set_title(f'Cor A: {len(boxes[0])} objects detected') 
     # axs[1].set_title(f'Cor B: {len(boxes[1])} objects detected')               
     # axs[2].set_title(f'Lasco: {len(boxes[2])} objects detected')     
     #if title is not None:
     #    fig.suptitle('\n'.join([title[i]+' ; '+title[i+1] for i in range(0,len(title),2)]) , fontsize=16)   
+    plt.tight_layout()
+    plt.savefig(ofile)
+    plt.close()
+
+def plot_to_png_max(ofile, orig_img, masks, scr_threshold=0.89, mask_threshold=0.6 , title=None, labels=None, boxes=None, scores=None):
+    """
+    Plot the input images (orig_img) along with the infered masks, labels and scores
+    in a single image saved to ofile
+    """    
+    # only detections with score larger than this value are considered
+    color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
+    obj_labels = ['Back', 'Occ','CME','N/A']
+    #
+    cmap = mpl.colors.ListedColormap(color)  
+    nans = np.full(np.shape(orig_img[0]), np.nan)
+    fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
+    axs = axs.ravel()
+    for i in range(len(orig_img)):
+        axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
+        axs[i].axis('off')
+        axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
+        axs[i+1].axis('off')        
+        if boxes is not None:
+            max_index,max_value = max(enumerate(scores[i]), key=lambda x: x[1])
+            b = boxes[i][max_index]
+            nb = max_index
+            if scores is not None:
+                scr = scores[i][nb]
+            else:
+                scr = 0   
+            if scr > scr_threshold:             
+                masked = nans.copy()
+                masked[:, :][masks[i][nb] > mask_threshold] = nb              
+                axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
+                box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
+                axs[i+1].add_patch(box)
+                if labels is not None:
+                    axs[i+1].annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
+           # nb+=1 
     plt.tight_layout()
     plt.savefig(ofile)
     plt.close()
@@ -129,10 +193,15 @@ for j in range(1,len(files)):
     if run_diff:
         img0 = read_fits(files[j-1])
         img1 = read_fits(files[j  ])
-        breakpoint()
         img = img1 - img0
+        img = mask_occulter(img, 120,centerpix=[258.8,256.1])
     #img = cv2.imread(f)
-    orig_img, masks, scores, labels, boxes  = nn_seg.infer(img, model_param=None, resize=False, occulter_size=0)
+    orig_img, masks, scores, labels, boxes  = nn_seg.infer(img, model_param=None, resize=False, occulter_size=120,centerpix=[258.8,256.1])
     # plot the predicted mask
-    ofile = opath+"/"+os.path.basename(files[j])+'.png'
-    plot_to_png(ofile, [img], [masks], scores=[scores], labels=[labels], boxes=[boxes])
+    
+    mask_prop = nn_seg._compute_mask_prop(masks, scores, labels, boxes, plate_scl=1, occulter_size=120,centerpix=[258.8,256.1])#,percentiles=[5.95])
+    breakpoint()
+
+    
+    ofile = opath+"/"+os.path.basename(files[j])+'_2.png'
+    plot_to_png_max(ofile, [img], [masks], scores=[scores], labels=[labels], boxes=[boxes])
