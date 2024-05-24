@@ -292,7 +292,8 @@ def read_dat(file,path="",dim_matrix=300,instrument=""):
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
 aux_in = "/gehme-gpu"
 #aux_in = "/gehme-gpu"
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4" #no contiene oculter externo
+#model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4" #no contiene oculter externo
+model_path= "/gehme/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 #model_version="v4"
 trained_model = '6000.torch'
 #model_path= "/gehme/projects/2020_gcs_with_ml/output/neural_cme_seg_v5" #contiene oculter externo
@@ -301,12 +302,15 @@ model_version="v4"
 
 #--------------------------
 #Select only one of the folllowing image types
-eeggl = False        #Synthetic images created using eeggl.
-run = 'run005'
+#run = 'run016' #'run005'
+run = 'run001_AWSoM_restart_run038_AWSoM'
+eeggl = True        #Synthetic images created using eeggl.
 btot  = False       #Synthetic images created using pyGCS.
-real_img = True    #Real images from cor2a, cor2b, lascoC2, level1.
-modified_masks = True #If True, it will use the modified masks for the real images. If None, it will use the original masks.
+real_img = False    #Real images from cor2a, cor2b, lascoC2, level1.
+modified_masks = None #If True, it will use the modified masks for the real images. If None, it will use the original masks.
 #---------------------------
+#increase contrast radialy, usefull for siimulations.
+increase_contrast = True #None or True. Will apply to infer2. IMPORTANT for eeggl.
 #select date of event
 cme_date_event = '2011-02-15' 
 
@@ -546,7 +550,7 @@ if infer_event2:
     ok_orig_img,ok_dates, df =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl,resize=False,
                                                     occulter_size=all_occ_size,occulter_size_ext=all_occulter_size_ext,
                                                     centerpix=all_center,plot_params=opath+'mask_props',filter_halos=False,percentiles=percentiles,
-                                                    modified_masks=dir_modified_masks)
+                                                    modified_masks=dir_modified_masks,increase_contrast=increase_contrast)
     
     zeros = np.zeros(np.shape(ok_orig_img[0]))
     all_idx=[]

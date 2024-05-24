@@ -313,11 +313,17 @@ if __name__ == "__main__":
     dir_lista = '/gehme/projects/2023_eeggl_validation/output/2011-02-15/pickle/'
     #lista = "2011_02_15_pickle.txt"
     #lista = "2011_02_15_sta.txt"
-    lista = "2011_02_15_stb.txt"
-    #paht de salida
-    opath = dir_lista+'modified_version/'
+    #lista = "2011_02_15_stb.txt"
+    
+    #opath = dir_lista+'modified_version/'                  #modified version indicates real images modified by hand.
+
     #instrument = "Cor2A"
     instrument = "Cor2B"
+
+    #lista = "2011_02_15_sta_contrast.txt"
+    lista = "2011_02_15_stb_contrast.txt"
+    opath = dir_lista+'modified_version_higher_contrast/'+instrument.lower()   #modified by hand real img and higher contrast (specially eeggl)
+
     if plot_iou == True:
         calculate_IOU(dir_lista+lista,opath,title=instrument)
 

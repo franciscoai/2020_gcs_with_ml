@@ -116,6 +116,7 @@ class neural_cme_segmentation():
         Normalizes the input image to 0-1 range
         sd_range: number of standard deviations to use for normalization around the mean
         norm_limits: if not None, the image is first truncated to the given limits
+        increase_contrast: if True, increases the contrast of the normalized image.
         '''
         #sd_range=3 #1.5
         #smooth_kernel=3
@@ -158,7 +159,7 @@ class neural_cme_segmentation():
         image_new = (image - m + sd_range * sd) / (2 * sd_range * sd)
 
         img_final = image_new[:,:,0].copy()
-
+        #If True, increase contrast of the Normalized image, radialy and above a specific radius.
         if increase_contrast:
             modified_image,radius,distance, multiplier = apply_linear_multiplier(image_new[:,:,0])
             m1  = np.mean(image_new)
@@ -327,7 +328,7 @@ class neural_cme_segmentation():
             img[mask!=1] = repleace_value
         return img
 
-    def infer(self, img, model_param=None, resize=True, occulter_size=None,occulter_size_ext=None,centerpix=None,getmask=None,hdr=None,repleace_value=None,histogram_names='',path=''):
+    def infer(self, img, model_param=None, resize=True, occulter_size=None,occulter_size_ext=None,centerpix=None,getmask=None,hdr=None,repleace_value=None,histogram_names='',path='',increase_contrast=None):
         '''        
         Infers a cme segmentation mask in the input coronograph image (img) using the trained R-CNN
         model_param: model parameters to use for inference. If None, the model parameters given at initialization are used
@@ -361,7 +362,7 @@ class neural_cme_segmentation():
         if getmask:
             images = self.get_mask(images, hdr)
 
-        images = self.normalize(images,histogram_names=histogram_names,path=path) # normalize to 0,1
+        images = self.normalize(images,histogram_names=histogram_names,path=path,increase_contrast=increase_contrast) # normalize to 0,1
         
         """
         #----------------------------------------------------------------------------------
@@ -1120,7 +1121,7 @@ class neural_cme_segmentation():
         
     def infer_event2(self, imgs, dates, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None,occulter_size_ext=None,
                     centerpix=None, mask_threshold=None, 
-                    scr_threshold=None, plot_params=None, filter_halos=True,modified_masks=None,percentiles=[5,95]):
+                    scr_threshold=None, plot_params=None, filter_halos=True,modified_masks=None,percentiles=[5,95],increase_contrast=None):
         '''
         Updated version of infer_event, it recognices more than one CME per event.
         Infers masks for a temporal series of images belonging to the same event. It filters the masks found in the
@@ -1191,7 +1192,8 @@ class neural_cme_segmentation():
             if modified_masks is None:
                 #infer masks
                 orig_img, mask, score, lbl, box = self.infer(in_imgs[i], model_param=model_param, resize=resize, 
-                                                            occulter_size=in_occulter_size[i],occulter_size_ext=in_occulter_size_ext[i],centerpix=centerpix[i])
+                                                            occulter_size=in_occulter_size[i],occulter_size_ext=in_occulter_size_ext[i],
+                                                            centerpix=centerpix[i],increase_contrast=increase_contrast)
                 all_orig_img.append(orig_img)
                 print(i,dates[i])
             #OBSERVATION:
