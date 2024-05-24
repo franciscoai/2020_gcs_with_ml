@@ -10,6 +10,8 @@ import matplotlib as mpl
 mpl.use('Agg')
 import csv
 from neural_cme_seg import neural_cme_segmentation
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))))
+from ext_libs.rebin import rebin
 
 def read_fits(file_path, header=False, imageSize=[512,512]):
     try:       
@@ -65,15 +67,15 @@ def plot_to_png(ofile, orig_img, masks, scr_threshold=0.3, mask_threshold=0.8 , 
     plt.tight_layout()
     plt.savefig(ofile)
     plt.close()
-
       
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 model_version="v4"
-ipath = '/gehme-gpu/projects/2023_eeggl_validation/data'
-opath= '/gehme-gpu/projects/2023_eeggl_validation/ouput'
-file_ext=".png"
+repo_path = os.dirname(os.dirname(os.dirname(os.path.abspath(__file__))))
+ipath = '/gehme/data/solo/fsi/20220325/'
+opath= repo_path + '/output/fsi/20220325/'
+file_ext=".fits" # files to use
 trained_model = '6000.torch'
 occ_size = 50 # Artifitial occulter radius in pixels. Use 0 to avoid. [Stereo a/b C1, Stereo a/b C2, Lasco C2]
 
@@ -81,15 +83,12 @@ occ_size = 50 # Artifitial occulter radius in pixels. Use 0 to avoid. [Stereo a/
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
-
 #loads images
 files = os.listdir(ipath)
 files = [os.path.join(ipath, e) for e in files]
 files = [e for e in files if os.path.splitext(e)[1] == file_ext]
-
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
-
 os.makedirs(opath, exist_ok=True)
 #inference on all images
 for f in files:
