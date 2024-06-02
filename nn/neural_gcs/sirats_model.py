@@ -17,8 +17,12 @@ class SiratsNet(nn.Module):
 
         self.img_shape = img_shape
         self.output_size = output_size
-        self.device = torch.device(
-            f'cuda:{device}') if torch.cuda.is_available() else torch.device('cpu')
+        # self.device = torch.device(
+        #     f'cuda:{device}') if torch.cuda.is_available() else torch.device('cpu')
+        if eval(device) >= 0:
+            self.device = torch.device(f'cuda:{device}')
+        else:
+            self.device = torch.device('cpu')
         logging.info(f'\nUsing device: {self.device}\n')
 
         # send to device

@@ -28,6 +28,9 @@ class Cme_MVP_Dataset(Dataset):
         self.corrupter_indexes = []
         self.len_csv = len(self.csv_df)
 
+    def getByIndex(self, idx):
+        return self.__getitem__(idx)
+
     def __get_dirs(self, root_dir):
         imgs = []
         dirs = os.listdir(root_dir)

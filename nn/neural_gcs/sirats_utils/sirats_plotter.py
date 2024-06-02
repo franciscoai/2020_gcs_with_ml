@@ -46,6 +46,46 @@ class SiratsPlotter:
         fig.savefig(os.path.join(masks_dir, namefile), dpi=300)
         plt.close(fig)
 
+
+    def plot_images(self, img, prediction, satpos, plotranges, opath, namefile):
+        images = img.cpu().detach().numpy()
+        images = np.squeeze(images)
+        prediction = np.squeeze(prediction.cpu().detach().numpy())
+        satpos = satpos.cpu().detach().numpy()
+        plotranges = plotranges.cpu().detach().numpy()
+
+        # flip images in y axis
+        images = np.flip(images, axis=1)
+
+        fig, ax = plt.subplots(1, 3, figsize=(10, 5))
+        fig.tight_layout()
+
+        fig.suptitle(prediction)
+
+        color = ['purple', 'k', 'r', 'b']
+        cmap = mpl.colors.ListedColormap(color)
+
+        IMG_SIZE = (images.shape[0], images.shape[1], images.shape[2])
+
+        for i in range(IMG_SIZE[0]):
+            param_clouds = []
+            param_clouds += prediction.tolist()
+            param_clouds.append([satpos[i, :]])
+            clouds = pyGCS.getGCS(*param_clouds, nleg=50,
+                                  ncirc=100, ncross=100)
+            x, y = clouds[0, :, 1], clouds[0, :, 2]
+            arr_cloud = pnt2arr(x, y, [plotranges[i, :]], images.shape[1:3], 0)
+
+            ax[i].imshow(images[i, :, :], cmap="gray", vmin=0, vmax=1)
+            ax[i].imshow(arr_cloud, cmap='Greens', alpha=0.6,
+                         vmin=0, vmax=1)
+            
+        opath = os.path.join(opath, 'plots')
+            
+        os.makedirs(opath, exist_ok=True)
+        plt.savefig(os.path.join(opath, namefile), dpi=300)
+        plt.close()
+
     def plot_mask_MVP(self, img, sat_masks, target, prediction, occulter_masks, satpos, plotranges, opath, namefile):
         # Convert tensors to numpy arrays
         img = img.cpu().detach().numpy()
