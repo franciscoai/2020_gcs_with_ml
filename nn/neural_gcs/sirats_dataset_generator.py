@@ -5,6 +5,7 @@ import logging
 import scipy
 import concurrent.futures
 import pickle
+import resource
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 import numpy as np
 import matplotlib.pyplot as plt
@@ -200,28 +201,29 @@ def process_intensity_figure(headers, sat, params, size_occ, back_corona, mask, 
     return btot
 
 def thread_maneger():
-    try:
-        sucess_num_path = OPATH + '/succes_num.pkl'
-        if os.path.exists(sucess_num_path) and not OVERWRITE:
-            success_num = load_state(sucess_num_path)
-        else:
-            success_num = 0
-        futures = []
-        with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            while success_num != par_num:
-                while len(futures) != MAX_WORKERS: # Task loader
-                    futures.append(executor.submit(process_img, success_num))
-                    success_num += 1
-                for future in concurrent.futures.as_completed(futures):
-                    idx, params = future.result()
-                    succesful_df.loc[idx] = params
-                    save_to_csv(succesful_df, configfile_name)
-                    save_state(success_num, sucess_num_path)
-                    futures.remove(future)
+    # try:
+    sucess_num_path = OPATH + '/succes_num.pkl'
+    if os.path.exists(sucess_num_path) and not OVERWRITE:
+        success_num = load_state(sucess_num_path)
+    else:
+        success_num = 0
+    futures = []
+    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        while success_num != par_num:
+            while len(futures) != MAX_WORKERS: # Task loader
+                futures.append(executor.submit(process_img, success_num))
+                success_num += 1
+            for future in concurrent.futures.as_completed(futures):
+                idx, params = future.result()
+                succesful_df.loc[idx] = params
+                save_to_csv(succesful_df, configfile_name)
+                save_state(success_num, sucess_num_path)
+                futures.remove(future)
 
-    except:
-        logging.warning(f'WARNING: Exception occurred inside thread_maneger, restarting...')
-        thread_maneger()
+    # except exception as e:
+    #     # print error and traceback
+    #     logging.error(f'ERROR: {e}')
+    #     logging.error(f'ERROR: {traceback.format_exc()}')
 
 def main():
     global OPATH, random_driver, succesful_df, configfile_name, is_writing
@@ -388,10 +390,17 @@ def process_img(idx, failed=False):
 
 
 if __name__ == "__main__":
+
+    # Set up resources this script can use
+    resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+    resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+
+
+
     # GLOBAL VARS
     #files
     DATA_PATH = '/gehme/data'
-    BASE_PATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_V3'
+    BASE_PATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_v3_redone'
     OVERWRITE = False # set to True to overwrite existing files
     n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
     min_nviews = 3 # minimum number succesful views 
@@ -403,7 +412,7 @@ if __name__ == "__main__":
     par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
     par_rng = [[-180,180],[-70,70],[-90,90],[3,10],[0.1,0.6],[10,60],[1e-1,1e1]] # min-max ranges of each parameter in par_names {2.5,7} heights
     par_num = int(1e5)  # total number of samples that will be generated for each param (there are nsat images per param combination)
-    MAX_WORKERS = 10 # number of workers for parallel processing
+    MAX_WORKERS = 20 # number of workers for parallel processing
     rnd_par=False # when true it apllies a random seed to generate the same parameters for each run
     SEED = 72430 # seed to use when rnd_par is False
     same_corona=False # Set to True use a single corona back for all par_num cases

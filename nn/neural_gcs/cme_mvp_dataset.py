@@ -28,6 +28,9 @@ class Cme_MVP_Dataset(Dataset):
         self.corrupter_indexes = []
         self.len_csv = len(self.csv_df)
 
+    def getByIndex(self, idx):
+        return self.__getitem__(idx)
+
     def __get_dirs(self, root_dir):
         imgs = []
         dirs = os.listdir(root_dir)
@@ -132,7 +135,7 @@ class Cme_MVP_Dataset(Dataset):
         except Exception as e:
             logging.error(f"Error reading data from {self.imgs[idx]}: {str(e)}")
             self.corrupter_indexes.append(idx)
-            return self.__getitem__(idx+1)
+            return self.__getitem__(idx-1)
 
     def __normalize(self, img):
         if self.only_mask:
@@ -152,4 +155,4 @@ class Cme_MVP_Dataset(Dataset):
         return transform
     
     def __len__(self):
-        return len(self.imgs)
+        return self.len_csv - 1

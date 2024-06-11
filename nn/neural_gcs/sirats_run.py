@@ -183,12 +183,12 @@ def main():
                               only_mask=ONLY_MASK)
     
     # Instanciar plotter
-
     sirats_plotter = SiratsPlotter()
     
+    # Dividir datos en entrenamiento y prueba
     random.seed(SEED)
-    total_samples = len(dataset)
-    train_size = int((dataset.len_csv - 1) * TRAIN_IDX_PERCENT)
+    total_samples = dataset.len_csv - 1
+    train_size = int(total_samples * TRAIN_IDX_PERCENT)
     train_indices = random.sample(range(total_samples), train_size)
     test_indices = list(set(range(total_samples)) - set(train_indices))
     train_dataset = torch.utils.data.Subset(dataset, train_indices)
