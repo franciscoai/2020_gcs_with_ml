@@ -10,7 +10,8 @@ def manage_variables(cme_date_event,eeggl=False,btot=False,real_img=False,input_
     """
     if eeggl:
         if cme_date_event == '2011-02-15':
-            ipath = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15/'+simulation_run+'/'
+            ipath = '/gehme/projects/2023_eeggl_validation/eeggl_simulations/2011-02-15/'+simulation_run+'/run12/SC/'
+            simulation_run = simulation_run.split('_')[0]
             #aux = simulation_run+'/'+instr+'/runing_diff/testeo_histo/'
             aux = simulation_run+'/'+instr+'/runing_diff/neural_cme_seg_v5/'
             if infer_event2:

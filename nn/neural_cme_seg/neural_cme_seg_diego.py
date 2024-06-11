@@ -22,8 +22,8 @@ from astropy.io import fits
 
 __author__ = "Francisco Iglesias"
 __copyright__ = "Grupo de Estudios en Heliofisica de Mendoza - https://sites.google.com/um.edu.ar/gehme"
-__version__ = "0.1X"
-__maintainer__ = "Francisco Iglesias 1 | Diego Lloveras"
+__version__ = "0.2"
+__maintainer__ = "Francisco Iglesias | Diego Lloveras"
 __email__ = "franciscoaiglesias@gmail.com | lloverasdiego@gmail.com"
 
 def quadratic(t,a,b,c):
@@ -164,7 +164,7 @@ class neural_cme_segmentation():
             modified_image,radius,distance, multiplier = apply_linear_multiplier(image_new[:,:,0])
             m1  = np.mean(image_new)
             sd1 = np.std(image_new)
-            binary_image = np.where(image_new[:,:,0] > m1+sd1/40, 1, 0) #0.51
+            binary_image = np.where(image_new[:,:,0] > m1+sd1/15, 1, 0) #0.51
 
             aaa=np.where(distance > 100., 1, 0)
             img_final[np.logical_and(binary_image == 1, aaa == 1)] = np.multiply(img_final, multiplier)[np.logical_and(binary_image == 1, aaa == 1)]
@@ -341,9 +341,7 @@ class neural_cme_segmentation():
         elif self.pre_trained_model is None:
             os.error('No model parameters given')
         self.model.eval() #set the model to evaluation state
-
-    
-        
+        breakpoint()
         #inference
         if img.ndim == 2:
             images = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
@@ -364,30 +362,6 @@ class neural_cme_segmentation():
 
         images = self.normalize(images,histogram_names=histogram_names,path=path,increase_contrast=increase_contrast) # normalize to 0,1
         
-        """
-        #----------------------------------------------------------------------------------
-        valores = images[~np.isnan(images)]
-        hist, bins, _ = plt.hist(valores, bins=30, range=((np.min(valores)+np.std(valores)), 
-        (np.max(valores)-np.std(valores))), color='blue', alpha=0.7, density=True)
-
-        plt.figure()
-        plt.subplot(1, 2, 1)
-        plt.imshow(images, cmap='gray')
-
-        plt.subplot(1, 2, 2)
-        plt.plot(hist, color='gray')
-        type_info = images.dtype
-        min_value = round(np.nanmin(images),2)
-        max_value = round(np.nanmax(images),2)
-        mean_value = round(np.nanmean(images),2)
-        plt.title(f'Type: {type_info}, Min: {min_value}')
-        plt.xlabel(f'Max: {max_value}, Mean: {mean_value:.2f}')
-        plt.show()
-        plt.savefig("/gehme-gpu/projects/2023_eeggl_validation/output/histo_cv2_normalize.png")
-        #----------------------------------------------------------------------------------
-        """
-        #self.show_normalize(images)      
-        #breakpoint()
         oimages = images.copy()                                   
         images = torch.as_tensor(images, dtype=torch.float32).unsqueeze(0)
         images=images.swapaxes(1, 3).swapaxes(2, 3)
@@ -411,9 +385,6 @@ class neural_cme_segmentation():
                 all_lbl.append(lbl)
                 msk=pred[0]['masks'][i,0].detach().cpu().numpy()
                 # eliminates px within the occulter for non -OCC masks
-                    #Preguntar que hacen las 2 lineas de abajo
-                
-                #if occulter_size > 0 and lbl == self.labels.index('Occ'):
                 if occulter_size != None and lbl == self.labels.index('Occ'):
                     msk = self.mask_occulter(msk, occulter_size,centerpix, repleace_value=0)
                 all_masks.append(msk)                
@@ -659,8 +630,6 @@ class neural_cme_segmentation():
                         ax.plot(x_points, y_points_mean, style,color=colors[k])
                     else:
                         ax.plot(x_points, y_points, style,color=colors[k])
-                dict['x_points'+par]=x_points
-                dict['y_points'+par]=y_points
                 
                 hours = [str(timestamp.time()) for timestamp in dt_list]
                 hours1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in hours]
@@ -678,6 +647,25 @@ class neural_cme_segmentation():
                     plt.close()
                 else:
                     return fig, ax 
+                    
+                #OBS: lo siguiente no deberia estar si el filtro funcionase adecuadamente.
+                #select the cluster with the highest df["SCR"] value
+                #and the longest available masks. If they are the same, then the cluster is selected
+                scr_list=[]
+                len_list=[]
+                for k in range(optimal_n_clusters):
+                    cluster_data=df.loc[(df["CME_ID"])==k]
+                    scr_list.append(np.mean(cluster_data['SCR']))
+                    len_list.append(len(cluster_data))
+                #breakpoint()
+                if scr_list.index(np.nanmax(scr_list)) == len_list.index(np.nanmax(len_list)):
+                    cluster_data=df.loc[(df["CME_ID"])==scr_list.index(np.nanmax(scr_list))]
+                    x_points=cluster_data["DATE_TIME"].tolist()
+                    y_points=cluster_data[par].tolist()
+                else:
+                    breakpoint()
+                dict['x_points'+par]=x_points
+                dict['y_points'+par]=y_points
             dict['df']=df
             if save_pickle:
                 with open(opath+'/'+str.lower("parametros")+ending+'.pkl', 'wb') as write_file:
@@ -1196,35 +1184,23 @@ class neural_cme_segmentation():
                                                             centerpix=centerpix[i],increase_contrast=increase_contrast)
                 all_orig_img.append(orig_img)
                 print(i,dates[i])
-            #OBSERVATION:
-            #HERE WE SHOULD PUT AS INPUT THE NEW_MASKS TUNED BY MYSELF INSTEAD OF THE MASKS OBTAINED BY THE MODEL
-            #NECCESARY IN THE CASE OF REAL IMAGES!
 
             if modified_masks is not None:
-                
-                #score = [data["SCR"][i]]
+                #Usefull in case of using modified masks in real images. Ask D. Lloveras.
                 score = data["SCR"][i]
-                #lbl = [data["LABEL"][i]]
                 lbl = data["LABEL"][i]
-                #box = [data["BOX"][i]]
                 box = data["BOX"][i]
-                #mask = [data["MASK"][i][0]]
                 mask = [data["MASK"][i]]
-                #mask = data["MASK"][i]
                 print(i,dates[i])
-            #breakpoint()
             # compute cpa, aw and apex. Already filters by score and other aspects
             self.debug_flag = i
             mask_prop = self._compute_mask_prop(mask, score, lbl, box, plate_scl=in_plate_scl[i], 
                                                 filter_halos=filter_halos, occulter_size=in_occulter_size[i],centerpix=centerpix[i],percentiles=percentiles)
             # appends results only if mask_prop[1] is not NaN, i.e., if it fulfills the filters in compute_mask_prop
             
-            
-            #breakpoint()
             mask_prop_aux = []
             for j in range(len(mask_prop)):
                 mask_prop_aux.append(mask_prop[j][1])
-            #ok_ind_tmp = np.where(~np.isnan(np.array(mask_prop)[:,1]))
             ok_ind_tmp = np.where(~np.isnan(np.array(mask_prop_aux)))
             ok_ind = ok_ind_tmp[0]
             if len(ok_ind) >0:
@@ -1241,13 +1217,13 @@ class neural_cme_segmentation():
             if filter:
                 df = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,
                                         all_plate_scl,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS)
-                # plots parameters
+                # plot parameters
                 if plot_params is not None:
                     self._plot_mask_prop2(df, self.plot_params , ending='_filtered',save_pickle=True)
-                #save df, all_orig_img, all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop using pickle
                 #ok_dates=sorted(df['DATE_TIME'].unique())
                 ok_dates=df['DATE_TIME'].unique() 
                 #no aplico un sort ya que al hacerlo puede que el index del df no coincida con el de all_orig_img. Creo que es mas robusto asi.
+                #En realidad era necesario xq se mete un reset index al df en filter_masks2.
                 for m in ok_dates:
                     event = df[df['DATE_TIME'] == m]
                     if event["MASK"].isnull().all():
@@ -1261,7 +1237,6 @@ class neural_cme_segmentation():
                         all_idx.append(idx) #sin esta linea el for no cummple ningun roll, ni la linea posterior
                 all_orig_img = [elemento for s, elemento in enumerate(all_orig_img) if s not in all_idx]      
                 df = df.dropna(subset=['MASK']) 
-                #breakpoint()
                 return all_orig_img,ok_dates, df
                         
 

@@ -3,6 +3,9 @@ import matplotlib.pyplot as plt
 import os
 from datetime import datetime, timedelta
 import numpy as np
+import pandas as pd
+import cv2
+
 """
 TODO: 
 - En lugar de generar plots individuales, generar un panel con los tres plots para todos los instrumentos. por ahora seria 3x3.
@@ -19,6 +22,20 @@ def read_pickle(file):
         data = pickle.load(f)
     return data
 
+def check_halo(mask):
+    #check if the mask is a halo
+    M=mask.copy()
+    M[np.where(M > 0.6)] = 1
+    M[np.where(M <= 0.6)] = 0
+    cv2.floodFill(M,None,(255,255),(1,0,0))
+    #check if the mask is a halo
+    #if floodfill reaches the border of the image, then the mask is a halo
+    #ptherwise only fill the occulter size and therefore is not a halo
+    if M[0,0] == 0 or M[511,0] == 0 or M[0,511] == 0 or M[511,511] == 0:
+        return True
+    else:
+        return False
+
 def read_txt(list_file,param):
     #param (APEX, CPA, MASK_ID, SCR, WA, CME_ID)
     x_global = []
@@ -30,6 +47,7 @@ def read_txt(list_file,param):
         data = file.readlines()
         for i in range(len(data)):
             parts = data[i].replace('\n','').split(',')
+            print(parts)
             labels.append(parts[1])
             all_data = read_pickle(parts[0])
             #breakpoint()
@@ -43,30 +61,41 @@ def read_txt(list_file,param):
                 #filter repeted elements in x_pointsSCR
                 dates_to_filter = all_data['x_points'+param]
                 for time in dates_to_filter:
-                    #matching_indices = all_data['x_points'+param].isin([time])
                     matching_indices = np.where(np.array(all_data['x_points'+param]) == time)[0]
-                    #x_global.append(all_data['x_points'+param][matching_indices])
-                    #breakpoint()
+
+                    #check fo Halo.
+                    #mask_aux = all_data['df'].query("DATE_TIME == @time and SCR > 0.6")
+                    #halo = check_halo(mask_aux['MASK'].copy())
+                    #if halo == True:
+                    #    continue
+                    #jump to next iteration if Halo
+
                     #just 1 mask for each date_time
-                    if len(matching_indices) == 1:
+                    #if len(matching_indices) == 1:
                         #breakpoint()
-                        if param == 'APEX_ANGL_PER' or param == 'APEX_DIST_PER':
-                            y_subglobal.append(np.median(all_data['y_points'+param][matching_indices.item()] ))
-                        else:
-                            y_subglobal.append(all_data['y_points'+param][matching_indices.item()])    
-                        x_subglobal.append(all_data['x_points'+param][matching_indices.item()])
+                    #    if param == 'APEX_ANGL_PER' or param == 'APEX_DIST_PER':
+                    #        y_subglobal.append(np.median(all_data['y_points'+param][matching_indices.item()] ))
+                    #    else:
+                    #        y_subglobal.append(all_data['y_points'+param][matching_indices.item()])    
+                    #    x_subglobal.append(all_data['x_points'+param][matching_indices.item()])
 
                     #more than 1 mask for each date_time
                     if len(matching_indices) > 1:
                         #select only one element depending on the SCR value
-                        #breakpoint()
                         select_indices= np.where(np.array(all_data['y_pointsSCR'])[matching_indices] == np.max(np.array(all_data['y_pointsSCR'])[matching_indices]))[0]
                         matching_indices = matching_indices[select_indices]
-                        if param == 'APEX_ANGL_PER' or param == 'APEX_DIST_PER':
-                            y_subglobal.append(np.median(all_data['y_points'+param][matching_indices.item()] ))
-                        else:
-                            y_subglobal.append(all_data['y_points'+param][matching_indices.item()])    
-                        x_subglobal.append(all_data['x_points'+param][matching_indices.item()])                       
+                    mask_aux = all_data['df'].query("DATE_TIME == @time")# and SCR > 0.6")
+                    #check for Halo.
+                    #breakpoint()
+                    halo = check_halo(mask_aux['MASK'][matching_indices[0]].copy())
+                    if halo == True:
+                        print("Halo detected on time: ",time)
+                        continue
+                    if param == 'APEX_ANGL_PER' or param == 'APEX_DIST_PER':
+                        y_subglobal.append(np.median(all_data['y_points'+param][matching_indices.item()] ))
+                    else:
+                        y_subglobal.append(all_data['y_points'+param][matching_indices.item()])    
+                    x_subglobal.append(all_data['x_points'+param][matching_indices.item()])                       
                 x_global.append(x_subglobal)
                 y_global.append(y_subglobal)
 
@@ -75,8 +104,6 @@ def read_txt(list_file,param):
                 #return list of dataframes containing the masks
                 x_global.append(all_data['df'])
                 y_global.append(all_data['df'])
-
-
         #breakpoint()
     return x_global, y_global, labels
 
@@ -104,7 +131,7 @@ def convert_to_clockwise(list_angles,negative_angle=False):
     return clockwise_angles
 
 
-def plot_params(lista,param,opath,title,clockwise=False):
+def plot_params(lista,param,opath,title,instrument,clockwise=False):
     #TODO: check for repeated masks for same date_time. seleck the one with better SCR value
     #check if param variable is a list
     if type(param) != list:
@@ -139,8 +166,12 @@ def plot_params(lista,param,opath,title,clockwise=False):
     if param == "AREA_SCORE":
         ax.set_ylabel(param+"%")
     
-    colors=['k','g','r','b','y','m','c','w']
-    instrument=['Cor2A','Cor2B','C2']
+    #colors in https://www.w3schools.com/colors/colors_picker.asp
+    colors=['k','g','r','b','y','m','c',
+            'tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:orange',
+            'tab:brown', 'tab:pink', 'tab:gray', '#ff4d94', '#b3b3ff',
+            'gold', 'coral', 'lime', 'magenta', 'teal', 'navy']
+    #instrument=['Cor2A','Cor2B','C2']
     #use heach element of the x_global and y_global list to plot x vs y
     for contador in range(len(x_global)):
         marker="*"
@@ -153,7 +184,7 @@ def plot_params(lista,param,opath,title,clockwise=False):
         if param == "AW" or param == "AW_MIN" or param == "AW_MAX" or param == "CPA" or param == "APEX_ANGL" or param =='APEX_ANGL_PER':
             y_global_units = np.degrees(y_global[contador])
             if clockwise == True:
-                if param == "AW_MAX":
+                if param == "AW_MAX" and instrument == "Cor2A":
                     y_global_units = convert_to_clockwise(y_global_units,negative_angle=True)
                 else:
                     y_global_units = convert_to_clockwise(y_global_units)
@@ -164,14 +195,15 @@ def plot_params(lista,param,opath,title,clockwise=False):
                 y_global_units = convert_to_clockwise(y_global_units)
         if param == "APEX" or param == "AREA_SCORE" or param=="APEX_DIST_PER":
             y_global_units = y_global[contador]
-        line1, = ax.plot(x_global[contador], y_global_units, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador])
+        #line1, = ax.plot(x_global[contador], y_global_units, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador])
+        ax.plot(x_global[contador], y_global_units, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador])
         #create a list of legends
-        position = (0.22,1.0-contador*0.07)
-        list_legend.append(ax.legend(handles=[line1], bbox_to_anchor=position))
-
-# Add legends to the plot
-    for legend in list_legend:
-        ax.add_artist(legend)  # Add legend back to the plot  
+        #position = (0.22,1.0-contador*0.07)
+        #list_legend.append(ax.legend(handles=[line1], bbox_to_anchor=position))
+    # Add legends to the plot
+    #for legend in list_legend:
+    #    ax.add_artist(legend)  # Add legend back to the plot  
+    ax.legend(loc="best", prop={'size': 8})
     # Add title using param
     ax.set_title(title)
     plt.grid()
@@ -196,7 +228,11 @@ def calculate_IOU(lista,opath,title=''):
     masks_img   = y_df[0]['MASK'].tolist()
 
     list_legend=[]
-    colors=['k','g','r','b','y','m','c','w']
+    #colors=['k','g','r','b','y','m','c','k','g','r','b','y','m','c','k','g','r','b','y','m','c','k','g','r','b','y','m','c']
+    colors=['k','g','r','b','y','m','c',
+            'tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:orange',
+            'tab:brown', 'tab:pink', 'tab:gray', '#ff4d94', '#b3b3ff',
+            'gold', 'coral', 'lime', 'magenta', 'teal', 'navy']
     fig, ax = plt.subplots()
     ax.set_xlabel("Date and hour")
     ax.set_ylabel("IoU Score")
@@ -263,13 +299,14 @@ def calculate_IOU(lista,opath,title=''):
         if labels[contador].find('Img') != -1:
             linestyle='dotted'  
         #breakpoint()
-
-        line1, = ax.plot(date_img_aux, iou_score, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador])
-        position = (0.22,1.0-contador*0.07)
-        list_legend.append(ax.legend(handles=[line1], bbox_to_anchor=position,loc='upper right'))
-
-    for legend in list_legend:
-        ax.add_artist(legend)  
+        print(contador)
+        ax.plot(date_img_aux, iou_score, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador])
+        #line1, = ax.plot(date_img_aux, iou_score, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador])
+        #position = (0.22,1.0-contador*0.07)
+        #list_legend.append(ax.legend(handles=[line1], bbox_to_anchor=position,loc='upper right'))
+    #for legend in list_legend:
+    #    ax.add_artist(legend)  
+    ax.legend(loc="best", prop={'size': 8})
     # Add title using param
     ax.set_title(title)
     plt.grid()
@@ -319,40 +356,43 @@ if __name__ == "__main__":
 
     #instrument = "Cor2A"
     instrument = "Cor2B"
-
     #lista = "2011_02_15_sta_contrast.txt"
     lista = "2011_02_15_stb_contrast.txt"
+    #lista = "lista_test.txt"
     opath = dir_lista+'modified_version_higher_contrast/'+instrument.lower()   #modified by hand real img and higher contrast (specially eeggl)
-
+    #opath = dir_lista+'modified_version_higher_contrast/test'  
+    if plot_apex_dist_per == True:
+        plot_params(dir_lista+lista,"APEX_DIST_PER",opath,title=instrument,instrument=instrument)
+    
     if plot_iou == True:
         calculate_IOU(dir_lista+lista,opath,title=instrument)
 
     if plot_apex == True:
-        plot_params(dir_lista+lista,"APEX",opath,title=instrument)
+        plot_params(dir_lista+lista,"APEX",opath,title=instrument,instrument=instrument)
 
     if plot_area_score == True:
-        plot_params(dir_lista+lista,"AREA_SCORE",opath,title=instrument)
+        plot_params(dir_lista+lista,"AREA_SCORE",opath,title=instrument,instrument=instrument)
 
     if plot_AW == True:
-        plot_params(dir_lista+lista,"AW",opath,title=instrument)
+        plot_params(dir_lista+lista,"AW",opath,title=instrument,instrument=instrument)
 
     if plot_wcpa == True:
-        plot_params(dir_lista+lista,"CPA",opath,title=instrument,clockwise=True)
+        plot_params(dir_lista+lista,"CPA",opath,title=instrument,clockwise=True,instrument=instrument)
 
     if plot_apex_angle == True:
-        plot_params(dir_lista+lista,"APEX_ANGL",opath,title=instrument,clockwise=True)
+        plot_params(dir_lista+lista,"APEX_ANGL",opath,title=instrument,clockwise=True,instrument=instrument)
 
     if plot_true_cpa == True:
-        plot_params(dir_lista+lista,["AW_MAX","AW_MIN"],opath,title=instrument,clockwise=True)
+        plot_params(dir_lista+lista,["AW_MAX","AW_MIN"],opath,title=instrument,clockwise=True,instrument=instrument)
 
     if plot_AW_MIN == True:
-        plot_params(dir_lista+lista,"AW_MIN",opath,title=instrument,clockwise=True)
+        plot_params(dir_lista+lista,"AW_MIN",opath,title=instrument,clockwise=True,instrument=instrument)
 
     if plot_AW_MAX == True:
-        plot_params(dir_lista+lista,"AW_MAX",opath,title=instrument,clockwise=True)
+        plot_params(dir_lista+lista,"AW_MAX",opath,title=instrument,clockwise=True,instrument=instrument)
 
     if plot_apex_angl_per == True:
-        plot_params(dir_lista+lista,"APEX_ANGL_PER",opath,title=instrument,clockwise=True)
+        plot_params(dir_lista+lista,"APEX_ANGL_PER",opath,title=instrument,clockwise=True,instrument=instrument)
 
     if plot_apex_dist_per == True:
-        plot_params(dir_lista+lista,"APEX_DIST_PER",opath,title=instrument)
+        plot_params(dir_lista+lista,"APEX_DIST_PER",opath,title=instrument,instrument=instrument)

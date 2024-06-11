@@ -8,6 +8,7 @@ import torch
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.use('Agg')
+from scipy.ndimage.filters import gaussian_filter
 import csv
 asd=os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 sys.path.append(asd)
@@ -37,6 +38,7 @@ def read_fits(file_path, header=False, imageSize=[512,512],smooth_kernel=[0,0]):
         img = gaussian_filter(img, sigma=smooth_kernel)
         if imageSize:
             img = rebin(img, imageSize, operation='mean')  
+            #img = rebin_interp(img, new_size=[512,512])#si la imagen no es cuadrada usar esto
             if header:
                 hdr = fits.open(file_path)[0].header
                 naxis_original1 = hdr["naxis1"]
@@ -303,10 +305,10 @@ model_version="v4"
 #--------------------------
 #Select only one of the folllowing image types
 #run = 'run016' #'run005'
-run = 'run001_AWSoM_restart_run038_AWSoM'
-eeggl = True        #Synthetic images created using eeggl.
+run = 'run005_AWSoM_restart_run038_AWSoM'
+eeggl = False        #Synthetic images created using eeggl.
 btot  = False       #Synthetic images created using pyGCS.
-real_img = False    #Real images from cor2a, cor2b, lascoC2, level1.
+real_img = True    #Real images from cor2a, cor2b, lascoC2, level1.
 modified_masks = None #If True, it will use the modified masks for the real images. If None, it will use the original masks.
 #---------------------------
 #increase contrast radialy, usefull for siimulations.
@@ -324,7 +326,7 @@ instr='cor2_b'
 #instr='lascoC2'
 
 #select infer event
-infer_event2=True
+infer_event2=False
 infer_event1=True
 
 #manage input and output paths
@@ -342,7 +344,6 @@ gpu=0 # GPU to use
 #If gpu 1 is out of ram, use gpu=0 or cpu. Check gpu status using nvidia-smi command on terminal.
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
-
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 
@@ -551,7 +552,6 @@ if infer_event2:
                                                     occulter_size=all_occ_size,occulter_size_ext=all_occulter_size_ext,
                                                     centerpix=all_center,plot_params=opath+'mask_props',filter_halos=False,percentiles=percentiles,
                                                     modified_masks=dir_modified_masks,increase_contrast=increase_contrast)
-    
     zeros = np.zeros(np.shape(ok_orig_img[0]))
     all_idx=[]
     #new_ok_dates=[datetime.utcfromtimestamp(dt.astype(int) * 1e-9) for dt in ok_dates]
@@ -587,8 +587,16 @@ if infer_event2:
             pickle.dump(dict, write_file)
             print("Archivo pickle guardado en: ", opath+'/full_parametros_pre_plot2.pkl') 
 
+    #check if there are no unique element on list ok_dates
+    if len(ok_dates) != len(set(ok_dates)):
+        print('Warning: There are repeated dates in ok_dates')
+        breakpoint()
+
     for m in range(len(ok_dates)):
-        event = df[df['DATE_TIME'] == ok_dates[m]].reset_index(drop=True)
+        #OBS: sorted de ok_dates agregado el 28/5/2024 por Diego. ok_orig_img viene ordenadoe en dates, pero df no y por lo tanto ok_dates que se
+        #define desde como df['DATE_TIME'].unique() no viene ordenado. Esto puede causar problemas si se quiere guardar las imagenes en orden.
+        #Por que el df no esta ordenado en date_time? Por que se hace un reset_index(drop=True) _filter_mask. REVISAR!!!!!!!!!!!!
+        event = df[df['DATE_TIME'] == sorted(ok_dates)[m]].reset_index(drop=True)
         image=ok_orig_img[m]
         for n in range(len(event['MASK'])):
             if event['SCR'][n] > scr_threshold:             
@@ -598,8 +606,8 @@ if infer_event2:
                 
                 ofile_fits = os.path.join(os.path.dirname(opath), file_names[m]+"_CME_ID_"+str(int(event['CME_ID'][n]))+'.fits')
                 h0 = all_headers[m]
-                fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
-                print("Saving fits: "+ofile_fits)
+                #fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
+                #print("Saving fits: "+ofile_fits)
         #breakpoint()
         plot_to_png2(opath+file_names[m]+"infer2.png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,
                     scr_threshold=scr_threshold, title=[file_names[m]], plate_scl=all_plate_scl[m])
