@@ -242,7 +242,7 @@ def main():
             img_counter = 0
             stop_flag = False
             for iteration, (img, targets, sat_masks, occulter_masks, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
-                img = img.to(DEVICE)
+                img = img.to(eval(DEVICE))
                 predictions = model.infer(img)
 
                 if MODEL_ARQ == 'distribution':
@@ -356,7 +356,7 @@ def main():
                     event_img = event_img.unsqueeze(0)
 
                     # Move event images to device
-                    event_img = event_img.to(DEVICE)
+                    event_img = event_img.to(eval(DEVICE))
 
                     # Infer event images and save losses
                     predictions = model.infer(event_img)

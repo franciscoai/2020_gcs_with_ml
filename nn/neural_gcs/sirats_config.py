@@ -21,7 +21,7 @@ class Configuration:
         self.rnd_seed = self.config.getint("General Configuration", 'rnd_seed')
         self.img_size = self.config["General Configuration"]['img_size'].split(',')
         self.img_size = [int(i) for i in self.img_size]
-        self.device = self.config.getint("General Configuration", 'device')
+        self.device = self.config.get("General Configuration", 'device')
         self.only_mask = self.config.getboolean("General Configuration", 'only_mask')
         self.do_training = self.config.getboolean("General Configuration", 'do_training')
         self.do_inference = self.config.getboolean("General Configuration", 'do_inference')
