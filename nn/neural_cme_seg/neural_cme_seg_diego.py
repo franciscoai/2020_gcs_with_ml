@@ -341,7 +341,6 @@ class neural_cme_segmentation():
         elif self.pre_trained_model is None:
             os.error('No model parameters given')
         self.model.eval() #set the model to evaluation state
-        breakpoint()
         #inference
         if img.ndim == 2:
             images = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
