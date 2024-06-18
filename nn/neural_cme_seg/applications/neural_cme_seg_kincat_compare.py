@@ -30,6 +30,7 @@ def get_seeds(folder,sat):
     url= 'http://spaceweather.gmu.edu/seeds/secchi/detection_cor2/monthly/'
     col_names=["DATE","TIME","EVENT_MOVIE","CPA_ANG","WIDE_ANG","LINEAR_FIT","2_LINEAR_FIT"]  
     folder=folder+"/seeds_catalogue"
+    dt_to_delete = [datetime(2010, 3, 30,3,24,0), datetime(2010, 3, 1,3,24,0),datetime(2010, 3, 1,5,24,0),datetime(2008, 6, 2,2,37,30)]
     if os.path.exists(folder) and os.path.isdir(folder):
         files=os.listdir(folder)
         df_list=[]
@@ -46,7 +47,8 @@ def get_seeds(folder,sat):
                     df_list.append(df)
         df_full = pd.concat(df_list, ignore_index=True)
         df_full['DATE_TIME'] = pd.to_datetime(df_full['DATE'] + ' ' + df_full['TIME'])
-             
+        #delete some cases that are false or multiple cme detections
+        df_full = df_full[~df_full['DATE_TIME'].isin(dt_to_delete)]
     else:
         os.makedirs(folder)
         response = requests.get(url)
@@ -60,6 +62,9 @@ def get_seeds(folder,sat):
                 if file_response.status_code == 200:
                     with open(folder+'/'+file_name, 'wb') as archivo:
                         archivo.write(file_response.content)
+
+    # correct angles that are > 360
+    df_full.loc[df_full['CPA_ANG'] > 350, 'CPA_ANG'] -= 360
 
     return df_full
 
@@ -109,6 +114,11 @@ def get_vourlidas(folder,sat):
 
 
 def comparator(NN,seeds,vourlidas):
+    '''
+    Compares the NN, seeds and vourlidas catalogues and returns a df with the matching dates
+    '''
+    min_num_of_masks_per_event = 3 # minimum number of masks per event to be considered in NN 
+
     columns=["NN_DATE_TIME","SEEDS_DATE_TIME","VOURLIDAS_DATE_TIME","NN_CPA_ANG_MEDIAN","NN_CPA_ANG_STD","SEEDS_CPA_ANG","VOURLIDAS_CPA_ANG","NN_WIDE_ANG_MEDIAN","NN_WIDE_ANG_STD","SEEDS_WIDE_ANG","VOURLIDAS_WIDE_ANG"]
     NN_ang_col=['CPA_ANG', 'WIDE_ANG']
        
@@ -122,6 +132,10 @@ def comparator(NN,seeds,vourlidas):
     NN.sort_values(by='DATE_TIME', inplace=True)
     seeds.sort_values(by='DATE_TIME', inplace=True)
     NN['DATE'] = NN['DATE_TIME'].dt.date
+
+    # drops NN cases that have only a single sample per day
+    NN = NN[NN.groupby('DATE').transform('size') > min_num_of_masks_per_event]
+
     NN['TIME'] = pd.to_datetime(NN['DATE_TIME']).dt.time
     
     #adjust the 0 degree to the nort
@@ -135,6 +149,7 @@ def comparator(NN,seeds,vourlidas):
     #goups all the hours in each day and calculates medain a std of cpa_ang and wide_ang
     df = NN.groupby('DATE').agg({'WIDE_ANG': ['min', 'std'],'CPA_ANG': ['median', 'std'],})
     df = df.reset_index()
+
     #calculate the unique dates in NN and conservs only those ones in seeds
     unique_dates_NN = NN['DATE_TIME'].dt.date.unique()
     seeds = seeds[seeds['DATE_TIME'].dt.date.isin(unique_dates_NN)].reset_index()
@@ -148,7 +163,6 @@ def comparator(NN,seeds,vourlidas):
         NN_min['DATE_TIME'] = NN_min.apply(lambda row: datetime.combine(row['DATE'], row['TIME']), axis=1)
         NN_max['DATE_TIME'] = NN_max.apply(lambda row: datetime.combine(row['DATE'], row['TIME']), axis=1)
         NN_date=NN_min["DATE_TIME"][i]
-        
         #path=NN.loc[NN["DATE_TIME"]==NN_date, "PATH"].values[0]
         seeds['TIME_DIFF'] = seeds['DATE_TIME'] - pd.to_datetime(NN_date)
         time_diff_seeds = seeds[seeds['TIME_DIFF'] >= pd.Timedelta(0)]
@@ -158,21 +172,20 @@ def comparator(NN,seeds,vourlidas):
         wide_ang_seeds=seeds_data["WIDE_ANG"]
 
         vourlidas['Time_Diff'] = vourlidas['Date_Time'] - pd.to_datetime(NN_date)
-        
-        time_diff_vourlidas = vourlidas[vourlidas['Time_Diff'] >= pd.Timedelta(0)]
-        idx_vourlidas = time_diff_vourlidas['Time_Diff'].idxmin()
+
+        idx_vourlidas = vourlidas['Time_Diff'].abs().idxmin()       
         vourlidas_data = vourlidas.loc[idx_vourlidas]
         cpa_ang_vourlidas=vourlidas_data["CPA"]
         wide_ang_vourlidas=vourlidas_data["Width"]
-        NN_prev=NN_min["DATE_TIME"][i]-pd.Timedelta(hours=4)
-        NN_post=NN_max["DATE_TIME"][i]+pd.Timedelta(hours=4)
+        NN_prev=NN_min["DATE_TIME"][i]-pd.Timedelta(hours=1)
+        NN_post=NN_max["DATE_TIME"][i]+pd.Timedelta(hours=1)
         if (NN_prev<=vourlidas_data["Date_Time"]<=NN_post)and(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
             compare.append([NN_date,seeds_data["DATE_TIME"],vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,wide_ang_vourlidas])
         elif (NN_prev<=vourlidas_data["Date_Time"]<=NN_post) and not(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
             compare.append([NN_date,np.nan,vourlidas_data["Date_Time"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],np.nan,cpa_ang_vourlidas,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],np.nan,wide_ang_vourlidas])
         elif not(NN_prev<=vourlidas_data["Date_Time"]<=NN_post)and(NN_prev<=seeds_data["DATE_TIME"]<=NN_post):
-            
             compare.append([NN_date,seeds_data["DATE_TIME"],np.nan,df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,np.nan,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,np.nan])
+       
     compare = pd.DataFrame(compare, columns=columns)
     
     #vourlidas.loc[vourlidas["Date_Time"]=="2008-05-17 10:37:30"]
@@ -223,19 +236,18 @@ seeds=get_seeds(folder,sat)
 vourlidas= get_vourlidas(folder,sat)
 df=comparator(NN,seeds,vourlidas)
 
-date_to_tag_vourlidas = pd.to_datetime([datetime(2008, 5, 17)])
-date_to_tag_seeds = pd.to_datetime([datetime(2008, 5, 17)])
+date_to_tag_vourlidas = pd.to_datetime([datetime(2009, 8, 4),datetime(2008, 3, 17)])
+date_to_tag_seeds = pd.to_datetime([datetime(2008, 6, 2),datetime(2007, 11, 16)])
 
 fig, ax = plt.subplots(figsize=(6, 6))
 label = 'VOURLIDAS ; '+get_r(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"])
 ax.errorbar(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"], xerr=df["NN_CPA_ANG_STD"], fmt='o', color='green', ecolor='gray', capsize=5, label=label)
 # add a tag to the plot
-
 for date in date_to_tag_vourlidas:
     x = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["NN_CPA_ANG_MEDIAN"]
     y = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["VOURLIDAS_CPA_ANG"]
     if len(x) > 0:
-        ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+        ax.text(x, y, date.strftime('%Y-%m-%d'), ha='right', va='top')
 label = 'SEEDS ; '+get_r(df["NN_CPA_ANG_MEDIAN"], df["SEEDS_CPA_ANG"])
 ax.errorbar(df["NN_CPA_ANG_MEDIAN"], df["SEEDS_CPA_ANG"], xerr=df["NN_CPA_ANG_STD"], fmt='o', color='blue', ecolor='gray', capsize=5, label=label)
 # add a tag to the plot
@@ -243,7 +255,7 @@ for date in date_to_tag_seeds:
     x = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["NN_CPA_ANG_MEDIAN"]
     y = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["SEEDS_CPA_ANG"]
     if len(x) > 0:
-        ax.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+        ax.text(x, y, date.strftime('%Y-%m-%d'), ha='right', va='top')
 ax.plot([0, 450], [0, 450], color='black', linestyle='-',linewidth=0.5)
 ax.set_xlim(0, ax.get_xlim()[1])
 ax.set_xlabel('NN')
@@ -260,7 +272,7 @@ for date in date_to_tag_vourlidas:
     x = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["NN_WIDE_ANG_MEDIAN"]
     y = df.loc[df["VOURLIDAS_DATE_TIME"].dt.date==date]["VOURLIDAS_WIDE_ANG"]
     if len(x) > 0:
-        ax2.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
+        ax2.text(x, y, date.strftime('%Y-%m-%d'), ha='right', va='top')
 label = 'SEEDS ; '+get_r(df["NN_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"])
 ax2.errorbar(df["NN_WIDE_ANG_MEDIAN"], df["SEEDS_WIDE_ANG"], xerr=df["NN_WIDE_ANG_STD"], fmt='o', color='blue', ecolor='gray', capsize=5, label=label)
 # add a tag to the plot
@@ -268,8 +280,8 @@ for date in date_to_tag_seeds:
     x = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["NN_WIDE_ANG_MEDIAN"]
     y = df.loc[df["SEEDS_DATE_TIME"].dt.date==date]["SEEDS_WIDE_ANG"]
     if len(x) > 0:
-        ax2.text(x, y, date.strftime('%Y-%m-%d'), ha='left', va='top')
-ax2.plot([0, 300], [0, 300], color='black', linestyle='-',linewidth=0.5)
+        ax2.text(x, y, date.strftime('%Y-%m-%d'), ha='right', va='top')
+ax2.plot([0, 130], [0, 130], color='black', linestyle='-',linewidth=0.5)
 ax2.set_xlim(0, ax2.get_xlim()[1])
 ax2.set_xlabel('NN')
 ax2.set_title('AW [deg]')
@@ -328,10 +340,11 @@ ax7.set_title('CPA [deg]')
 ax7.legend()
 ax7.grid(True)
 # print thge date of all events that have Seeds/NN CPA > 1.5
-print(f'Seeds/NN CPA>1.5 \n',df.loc[df["SEEDS_CPA_ANG"]/df["NN_CPA_ANG_MEDIAN"]>1.5]["NN_DATE_TIME"])
-print(f'Seeds/NN CPA<0.5 \n',df.loc[df["SEEDS_CPA_ANG"]/df["NN_CPA_ANG_MEDIAN"]<0.5]["NN_DATE_TIME"])
+print(f'Seeds/NN CPA>1.5 \n',df.loc[df["SEEDS_CPA_ANG"]/df["NN_CPA_ANG_MEDIAN"]>1.5][["NN_DATE_TIME","SEEDS_CPA_ANG","NN_CPA_ANG_MEDIAN"]])
+print(f'Seeds/NN CPA<0.5 \n',df.loc[df["SEEDS_CPA_ANG"]/df["NN_CPA_ANG_MEDIAN"]<0.5][["NN_DATE_TIME","SEEDS_CPA_ANG","NN_CPA_ANG_MEDIAN"]])
 
-
+print(f'Vourlidas/NN CPA>1.1 \n',df.loc[df["VOURLIDAS_CPA_ANG"]/df["NN_CPA_ANG_MEDIAN"]>1.1][["NN_DATE_TIME","VOURLIDAS_CPA_ANG","NN_CPA_ANG_MEDIAN"]])
+      
 ax8.errorbar(df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"], fmt='o', color='blue', ecolor='gray', capsize=8, label='NN vs VOURLIDAS')
 plot_fit(ax8,df["NN_CPA_ANG_MEDIAN"], df["VOURLIDAS_CPA_ANG"])
 ax8.plot([0, 500], [0, 500], color='black', linestyle='-',linewidth=0.5)
