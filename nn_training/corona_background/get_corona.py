@@ -35,8 +35,10 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     
     
     cor2_path= "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2"#/gehme/projects/2020_gcs_with_ml/data/corona_background_kincat/cor2"
-    lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_back_database/lasco"
-    size_occ=[2.6, 3.7, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
+    lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/lasco"
+    #size_occ    =[2.6, 3.7, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
+    size_occ    =[2.9, 4.0, 2.]
+    size_occ_ext=[16, 16, 6.]# Occulters size for [sat1, sat2 ,sat3] in [Rsun]
 
     # main
     # STEREO A
@@ -52,6 +54,8 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
         os.error('Input instrument not recognized, check value of sat')
 
     files=[f for f in os.listdir(path) if f.endswith('.fits')]
+    if sat==2:
+        files=[f for f in os.listdir(path) if f.endswith('.fts')]
     
     p0= np.random.choice(files)
     p0=path+"/"+p0
@@ -66,7 +70,7 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     if imsize is not None:
         oimg = rebin(oimg,imsize,operation='mean') 
    
-    return oimg, h0, size_occ[sat]
+    return oimg, h0, size_occ[sat], size_occ_ext[sat]
 
 
     #sattelite positions

@@ -67,7 +67,7 @@ def cmecloud(ang, hin, nleg, ncirc, k, ncross, hIsLeadingEdge=True):
 
     # Calc the cross section vect in xyz
     radVec = crMEGA*(np.array([np.sin(thetaMEGA)*np.sin(betaMEGA), np.sin(thetaMEGA) *
-                     np.cos(betaMEGA), np.cos(thetaMEGA)]))     # Add to the axis to get the full shell
+                    np.cos(betaMEGA), np.cos(thetaMEGA)]))     # Add to the axis to get the full shell
     shell = np.transpose(radVec).reshape([ncross*nbp, 3])+axisMEGA
 
     return np.array(shell)
@@ -130,19 +130,27 @@ def shellSkeleton(alpha, h, nleg, ncirc, k):
     return axisPTS, crossrads, betas
 
 
-def getGCS(CMElon, CMElat, CMEtilt, height, k, ang, satpos, nleg=5, ncirc=20, ncross=30):
+def getGCS(CMElon, CMElat, CMEtilt, height, k, ang, satpos, do_rotate_lat=None, nleg=5, ncirc=20, ncross=30):
     cloud = cmecloud(ang*dtor, height, nleg, ncirc, k, ncross)
     # in order (of parens) rotx to tilt, roty by -lat, rotz by lon
     # cloud = np.transpose(rotz(roty(rotx(np.transpose(cloud), CMEtilt),-CMElat),CMElon))
 
     clouds = []
     # dSat = 213. # was assuming L1 for sat projections which no longer use
-    for sat in satpos:
+    if do_rotate_lat is None:
+        do_rotate_lat = [False]*len(satpos)
+    #for sat in satpos:
+    #Modified 28/02/2024 by D.Lloveras to obtain a better match with IDL in Lasco C2 (satpos[1])
+    #do_rotate_lat list of boolean values to rotate or not the cloud in latitude. Should be True in case of Lasco-C2, False in any other case.
+    for i, sat in enumerate(satpos):
         # rot funcs like things transposed
         cXYZ = np.transpose(cloud)
-
         # Rot to correct tilt and Lat, matches IDL better not including satlat
-        cXYZ = roty(rotx(cXYZ, CMEtilt), -(CMElat))
+        if do_rotate_lat[i] == True:
+            #Lasco-C2 correction in HGLAT
+            cXYZ = roty(rotx(cXYZ, CMEtilt), -(CMElat-sat[1]))
+        if do_rotate_lat[i] == False:
+            cXYZ = roty(rotx(cXYZ, CMEtilt), -CMElat)
         # Project in Lat (not done in IDL)
         # satXYZ = SPH2CART([dSat,sat[1],sat[0]])
         # gamma = np.arctan((cXYZ[2]-satXYZ[2])/(np.sqrt(satXYZ[0]**2+satXYZ[1]**2)-np.sqrt(cXYZ[0]**2+cXYZ[1]**2)))
@@ -171,24 +179,26 @@ def getGCS(CMElon, CMElat, CMEtilt, height, k, ang, satpos, nleg=5, ncirc=20, nc
 def processHeaders(headers):
     satpos = []
     plotranges = []
-
     for i in range(len(headers)):
         # Stonyhurst coords for the sats
         thisHead = headers[i]
         # GEHME corrects header for SOHO 2023/08/07
-        if thisHead['TELESCOP'] == 'SOHO': 
-            # Header fix
-            thisHead['OBSRVTRY'] = 'SOHO'
-            coordL2 = get_horizons_coord(-21, datetime.datetime.strptime(thisHead['DATE-OBS'], "%Y-%m-%dT%H:%M:%S.%f"), 'id')
-            #coordL2ston = get_body_heliographic_stonyhurst('-21', time=datetime.datetime.strptime(thisHead['DATE-OBS'], "%Y-%m-%dT%H:%M:%S.%f"))
-            #coordL2carr = coordL2ston.transform_to(sunpy.coordinates.frames.HeliographicCarrington)
-            coordL2carr = coordL2.transform_to(sunpy.coordinates.frames.HeliographicCarrington(observer='earth'))
-            coordL2ston = coordL2.transform_to(sunpy.coordinates.frames.HeliographicStonyhurst)
-            thisHead['DSUN_OBS'] = coordL2.radius.m
-            thisHead['CRLT_OBS'] = coordL2carr.lat.deg
-            thisHead['CRLN_OBS'] = coordL2carr.lon.deg
-            thisHead['HGLT_OBS'] = coordL2ston.lat.deg
-            thisHead['HGLN_OBS'] = coordL2ston.lon.deg
+        try: # 
+            if thisHead['TELESCOP'] == 'SOHO': 
+                # Header fix
+                thisHead['OBSRVTRY'] = 'SOHO'
+                coordL2 = get_horizons_coord(-21, datetime.datetime.strptime(thisHead['DATE-OBS'], "%Y-%m-%dT%H:%M:%S.%f"), 'id')
+                #coordL2ston = get_body_heliographic_stonyhurst('-21', time=datetime.datetime.strptime(thisHead['DATE-OBS'], "%Y-%m-%dT%H:%M:%S.%f"))
+                #coordL2carr = coordL2ston.transform_to(sunpy.coordinates.frames.HeliographicCarrington)
+                coordL2carr = coordL2.transform_to(sunpy.coordinates.frames.HeliographicCarrington(observer='earth'))
+                coordL2ston = coordL2.transform_to(sunpy.coordinates.frames.HeliographicStonyhurst)
+                thisHead['DSUN_OBS'] = coordL2.radius.m
+                thisHead['CRLT_OBS'] = coordL2carr.lat.deg
+                thisHead['CRLN_OBS'] = coordL2carr.lon.deg
+                thisHead['HGLT_OBS'] = coordL2ston.lat.deg
+                thisHead['HGLN_OBS'] = coordL2ston.lon.deg
+        except:
+            continue
         # GEHME changed HGLN_OBS to CRLN_OBS : 2023/06/30
         satpos.append([float(thisHead['CRLN_OBS']), float(thisHead['HGLT_OBS']), float(thisHead['CROTA'])])
         # GEHME changed to use the correct Sun center 2023/08/07
@@ -198,7 +208,7 @@ def processHeaders(headers):
         # plotranges.append([-xaxrange, xaxrange, -yaxrange, yaxrange])
         xaxrange = [float(thisHead['CRPIX1'])*float(thisHead['CDELT1'])/rSun, (float(thisHead['NAXIS1'])-float(thisHead['CRPIX1']))*float(thisHead['CDELT1'])/rSun]
         yaxrange = [float(thisHead['CRPIX2'])*float(thisHead['CDELT2'])/rSun, (float(thisHead['NAXIS2'])-float(thisHead['CRPIX2']))*float(thisHead['CDELT2'])/rSun]
-        plotranges.append([-xaxrange[0], xaxrange[1], -yaxrange[0], yaxrange[1]])  
+        plotranges.append([-xaxrange[0], xaxrange[1], -yaxrange[0], yaxrange[1]])            
     return satpos, plotranges
 
 

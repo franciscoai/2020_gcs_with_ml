@@ -50,7 +50,7 @@ def save_png(array, ofile=None, range=None):
 # CONSTANTS
 #files
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_1VP_100k' #'/gehme/projects/2020_gcs_with_ml/data/cme_seg_training' 
+OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_1VP_100k' #'/gehme/projects/2020_gcs_with_ml/data/cme_seg_training' 
 n_sat = 1 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 
 # GCS parameters [first 6]
@@ -59,12 +59,12 @@ n_sat = 1 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # par names
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[8,30],[0.2,0.6], [10,60],[7e2,1e3]] # min-max ranges of each parameter in par_names
-par_num = 1000  # total number of samples that will be generated for each param (there are nsat images per param combination)
-rnd_par=True # set to randomnly shuffle the generated parameters linspace 
+par_num = 10  # total number of samples that will be generated for each param (there are nsat images per param combination)
+rnd_par=False # set to randomnly shuffle the generated parameters linspace 
 same_corona=True # Set to True use a single corona back for all par_num cases
 
 # Syntethic image options
-synth_int_image=False
+synth_int_image=True
 imsize=np.array([512, 512], dtype='int32') # output image size
 level_occ=0. #mean level of the occulter relative to the background level
 cme_noise= [0,2.] #gaussian noise level of cme image. [mean, sd], both expressed in fractions of the cme-only image mean level. Set mean to None to avoid
@@ -95,6 +95,8 @@ set = pd.DataFrame(np.column_stack(all_par), columns=par_names)
 set.to_csv(configfile_name)
 df = pd.DataFrame(pd.read_csv(configfile_name))
 mask_prev = None
+satpos_all = []
+plotranges_all = []
 
 #check last image made
 # last_id = sorted([int(i) for i in os.listdir(OPATH) if not i.endswith('.csv')])[-1]-1
@@ -268,4 +270,11 @@ for row in df.index:
                 df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)
             fig=save_png(arr_cloud,ofile=ofile, range=[0, 1])     
 
+    #save satpos and plotranges
+    satpos_all.append(satpos)
+    plotranges_all.append(plotranges)
 
+#add satpos and plotranges to dataframe and save csv
+df['satpos'] = satpos_all
+df['plotranges'] = plotranges_all
+df.to_csv(configfile_name)
