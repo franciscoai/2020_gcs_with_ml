@@ -14,6 +14,7 @@ from nn.utils.coord_transformation import deg2px
 from nn_training.get_cme_mask import get_mask_cloud
 from nn.utils.gcs_mask_generator import maskFromCloud
 from nn.neural_cme_seg.neural_cme_seg import neural_cme_segmentation
+from tqdm import tqdm
 
 def read_fits(file_path, header=False, imageSize=[512,512]):
     try:       
@@ -186,7 +187,7 @@ kincat_orig['PRE_DATE_TIME'] = pd.to_datetime(kincat_orig['PRE_DATE_TIME'])
 kincat_orig['END_DATE_TIME'] = pd.to_datetime(kincat_orig['END_DATE_TIME'])
 
 all_mask_props=[]                                     
-for i in range(len(df)):
+for i in tqdm(range(len(df))):
     try:
         date=pd.to_datetime(df["NN_DATE_TIME"][i])
         folder= str(date)[:-9].replace("-", "")

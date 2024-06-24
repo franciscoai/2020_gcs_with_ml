@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 import glob
 from scipy.ndimage.filters import gaussian_filter
 import pickle
+from tqdm import tqdm
 
 
 __author__ = "Francisco Iglesias"
@@ -138,8 +139,7 @@ catalogue = catalogue.reset_index(drop=True)
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 
-for i in range(len(catalogue.index)):
-    print("Reading date range nª "+str(i))
+for i in tqdm(range(len(catalogue.index)), desc="Reading Catalogue"):
     date_helcat = datetime.strptime((catalogue["PRE_DATE"][i]+" "+catalogue["PRE_TIME"][i]),'%Y-%m-%d %H:%M') #forms datetime object
     start_date = date_helcat 
     end_date= datetime.strptime((catalogue["LAST_DATE"][i]+" "+catalogue["LAST_TIME"][i]),'%Y-%m-%d %H:%M') #forms datetime object
@@ -161,12 +161,9 @@ for i in range(len(catalogue.index)):
         file_names=[]
         all_headers=[]
         all_center=[]
-
         folder=files[0][40:-26]
-        print("WORKING ON FOLDER "+folder)
-        #if folder=="20080317":
-        for j in range(len(files)-1):
-            print(f'Processing {j} of {len(files)-1}')
+       
+        for j in tqdm(range(len(files)-1),desc="Processing files of folder "+ folder):
             #read fits
             image1=read_fits(files[j],smooth_kernel=smooth_kernel)
             image2=read_fits(files[j+1],smooth_kernel=smooth_kernel)
@@ -187,7 +184,7 @@ for i in range(len(catalogue.index)):
                 date= datetime.strptime(filename[0:-6],'%Y%m%d_%H%M%S')
                 os.makedirs(os.path.join(opath, str(folder_name)),exist_ok=True)
                 ofile = os.path.join(opath, str(folder_name), filename )
-                
+
                 if header['NAXIS1'] != imsize_nn[0]:
                     scale=(header['NAXIS1']/imsize_nn[0])
                     plt_scl = header['CDELT1'] * scale
