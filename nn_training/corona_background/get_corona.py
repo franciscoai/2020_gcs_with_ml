@@ -15,7 +15,7 @@ from sunpy.coordinates.ephemeris import get_horizons_coord
 import datetime
 
 
-def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
+def get_corona(sat, imsize=None, diff=True, rnd_rot=False, custom_headers=False):
     '''
     Returns a measured "quiet" (with no CME) solar corona observed by satelitte sat, the implemented instruments are
 
@@ -28,41 +28,52 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
         diff: Set to True to return a time differential corona.
         imsize: Set to [x,y] to imsize the output image to that size
         rnd_rot: Set to rotate the ouput image by a random angle around the central pixel
+        custom_headers: Set to True to use the headers of the H files instead of the corona files
 
     '''
     # CONSTANTS
     #files
     
     
-    cor2_path= "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2"#/gehme/projects/2020_gcs_with_ml/data/corona_background_kincat/cor2"
-    lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/lasco"
-    #size_occ    =[2.6, 3.7, 2]# Occulters size for [sat1, sat2 ,sat3] in [Rsun] 3.7
-    size_occ    =[2.9, 4.0, 2.]
-    size_occ_ext=[16, 16, 6.]# Occulters size for [sat1, sat2 ,sat3] in [Rsun]
+    cor2_a_path= "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2/cor2_a"
+    cor2_b_path= "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2/cor2_b"
+    lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/lasco/c2/3VP"
+    H_COR2B = "/gehme/data/stereo/secchi/L1/b/img/cor2/20130209/20130209_062400_14c2B.fts"
+    H_COR2A = "/gehme/data/stereo/secchi/L1/a/img/cor2/20130209/20130209_062400_14c2A.fts" 
+    H_LASCO = "/gehme/data/soho/lasco/level_1/c2/20130209/25447666.fts"     
+    size_occ  =[2.9, 3.9, 1.9]
+    size_occ_ext=[16+1, 16+1, 6+1] # Occulters size for [sat1, sat2 ,sat3] in [Rsun]
+    occ_center = [[0.5,0.5], [0.4,0.6], [0.5,0.5]] # Occulters center for [sat1, sat2 ,sat3] in fractions of FOV
 
     # main
     # STEREO A
     if sat==0:
-        path=cor2_path+"/cor2_a"
+        path=cor2_a_path
+        h_path=H_COR2A
     # STEREO B
     elif sat==1:
-        path=cor2_path+"/cor2_b"
+        path=cor2_b_path
+        h_path=H_COR2B
     # LASCO    
     elif sat==2:
-        path=lasco_path+"/c2"
+        path=lasco_path
+        h_path=H_LASCO
     else:
         os.error('Input instrument not recognized, check value of sat')
 
-    files=[f for f in os.listdir(path) if f.endswith('.fits')]
-    if sat==2:
-        files=[f for f in os.listdir(path) if f.endswith('.fts')]
+    files=[f for f in os.listdir(path) if (f.endswith('.fits') or f.endswith('.fts'))]
     
     p0= np.random.choice(files)
     p0=path+"/"+p0
     
     print('Using back file ', p0)
     oimg= fits.open(p0)[0].data
-    h0= fits.getheader(p0)
+
+    # returns allways same header
+    if custom_headers:
+        h0 = fits.getheader(h_path)
+    else:
+        h0= fits.getheader(p0)
 
     if rnd_rot:
         oimg = scipy.ndimage.rotate(oimg, np.random.randint(low=0, high=360), reshape=False)
@@ -70,45 +81,4 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False):
     if imsize is not None:
         oimg = rebin(oimg,imsize,operation='mean') 
    
-    return oimg, h0, size_occ[sat], size_occ_ext[sat]
-
-
-    #sattelite positions
-#    secchipath = data_path + '/stereo/secchi/L1'
-#    CorA    = secchipath + '/a/img/cor2/20110317/20110317_133900_14c2A.fts' # sat1
-#    CorA    = secchipath + '/a/img/cor2/20110317/20110317_133900_14c2A.fts' # sat1
-#    CorB    = secchipath + '/b/img/cor2/20110317/20110317_133900_14c2B.fts' # sat2
-#    lascopath = data_path + '/soho/lasco/level_1/c2' # sat3
-#    LascoC2 = None # lascopath + '/20110317/25365451.fts'
-#    ISSIflag = False # flag if using LASCO data from ISSI which has STEREO like headers already
-  
-  #read headers
-  # STEREO A
-#    ima2, hdra2 = sunpy.io._fits.read(CorA)[0]
-  # STEREO B
-#    imb2, hdrb2 = sunpy.io._fits.read(CorB)[0]
-# LASCO
-#    if LascoC2 is not None:
-#        if ISSIflag:
-#            imL2, hdrL2 = sunpy.io._fits.read(LascoC2)[0]
-#        else:
-#            with fits.open(LascoC2) as myfitsL2:
-#                imL2 = myfitsL2[0].data
-#                myfitsL2[0].header['OBSRVTRY'] = 'SOHO'
-#                coordL2 = get_horizons_coord(-21, datetime.datetime.strptime(
-#                    myfitsL2[0].header['DATE-OBS'], "%Y-%m-%dT%H:%M:%S.%f"), 'id')
-#                coordL2carr = coordL2.transform_to(
-#                    sunpy.coordinates.frames.HeliographicCarrington)
-#                coordL2ston = coordL2.transform_to(
-#                    sunpy.coordinates.frames.HeliographicStonyhurst)
-#                myfitsL2[0].header['CRLT_OBS'] = coordL2carr.lat.deg
-#                myfitsL2[0].header['CRLN_OBS'] = coordL2carr.lon.deg
-#                myfitsL2[0].header['HGLT_OBS'] = coordL2ston.lat.deg
-#                myfitsL2[0].header['HGLN_OBS'] = coordL2ston.lon.deg
-#                hdrL2 = myfitsL2[0].header
-#        headers = [hdra2, hdrb2, hdrL2]
-#    else:
-#        headers = [hdra2, hdrb2]
-#        ims = [ima2, imb2]
-
-    
+    return oimg, h0, size_occ[sat], size_occ_ext[sat], occ_center[sat]

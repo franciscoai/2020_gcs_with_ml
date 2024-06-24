@@ -66,7 +66,7 @@ opath= model_path+"/test_output"
 file_ext=".png"
 trained_model = '6000.torch'
 imageSize=[512,512]
-test_ncases = 2000
+test_ncases = 10
 mask_thresholds = [0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99] # only px with scrore avobe this value are considered in the mask.
 
 #main
@@ -105,6 +105,7 @@ for mask_threshold in mask_thresholds:
         this_case_scr.append(scores)
         # plot the predicted mask
         if len(mask_thresholds)==1:
+            breakpoint()
             os.makedirs(opath, exist_ok=True)
             ofile = opath+"/img_"+str(idx)+'.png'
             plot_to_png(ofile, [img], [[masks]], [vesMask], scores=[[scores]], labels=[[labels]], boxes=[[boxes]], mask_threshold=mask_threshold, scr_threshold=0.1)
