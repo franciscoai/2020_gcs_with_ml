@@ -43,7 +43,7 @@ def save_png(array, ofile=None, range=None):
 #paths
 DATA_PATH = '/gehme/data'
 OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_paper'
-opath_fstructure='check' # use 'check' to save all the ouput images in the same dir together for easier checkout
+opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
 # morphology
@@ -52,7 +52,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[1,7]] 
-par_num = 20  # total number of samples that will be generated for each param (there are nsat images per param combination)
+par_num = 50 # total number of samples that will be generated (there are nsat images per param combination)
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -70,10 +70,10 @@ im_range=2. # range of the color scale of the output final syntethyc image in st
 # Output images to save
 otype="png" # set the ouput file type: 'png' or 'fits'
 imsize=np.array([512, 512], dtype='int32') # output image size
-mesh_only_image=False # set to also save a png with the GCSmesh (only for otype='png')
-cme_only_image=False # set to True to save an addditional image with only the cme without the background corona
+mesh_only_image=True # set to also save a png with the GCSmesh (only for otype='png')
+cme_only_image=True # set to True to save an addditional image with only the cme without the background corona
 back_only_image = True # set to True to save an addditional image with only the background corona without the cme
-save_masks = False # set to True to save the masks images
+save_masks = True # set to True to save the masks images
 inner_hole_mask=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
 mask_from_cloud=True #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
@@ -142,7 +142,7 @@ for row in df.index:
         xx, yy = np.meshgrid(x, y)
         x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat) 
         # corrects for the occulter center
-        x_cS, y_cS = x_cS*occ_center[sat][0]*2., y_cS*occ_center[sat][1]*2.       
+        x_cS, y_cS = x_cS+occ_center[sat][0], y_cS+occ_center[sat][1]       
         r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
         phi = np.arctan2(yy - y_cS, xx - x_cS)
         if mask_from_cloud:
