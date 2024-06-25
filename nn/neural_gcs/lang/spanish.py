@@ -12,7 +12,7 @@ spanish_lang = {
     "insert_model_path": "Por favor, inserte la ruta al modelo:\n",
     "model_loaded": "Modelo cargado con éxito",
     "model_not_found": "Modelo no encontrado",
-    "select_device": "Seleccione un dispositivo:\n",
+    "select_device": "\nSeleccione un dispositivo:\n",
     "device": "Dispositivo: ",
     "insert_triplet_path": "\nPor favor, inserte la ruta al triplete de vistas:\n",
     "insert_output_path": "\nPor favor, inserte la ruta de salida:\n",
