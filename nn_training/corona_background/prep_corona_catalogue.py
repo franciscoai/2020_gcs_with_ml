@@ -308,7 +308,8 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
         
         # Process the lasco data
         amount_counter = 0
-        org_paths = []
+        org_paths_temp = []
+        original_paths = []
         for i, date in tqdm(enumerate(lasco_df["date"]), desc="Processing lasco data"):
             # try:
             prev_date = date - timedelta(hours=12)
@@ -345,10 +346,11 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                     img_diff = fits.PrimaryHDU(img_diff, header=header[0:-3])
                     img_data = img_diff.data
 
-
+                    img_data = img_data.astype(np.float32)
+                        
                     # Write the difference image
                     if do_write==True:
-                        imgs, masks, scrs, labels, boxes  = nn_seg.infer(img_data, model_param=None, resize=False, occulter_size=0) #HERE THERE IS AN ERROR
+                        imgs, masks, scrs, labels, boxes  = nn_seg.infer(img_data, model_param=None, resize=False, occulter_size=0)
                         scrs = [scrs[i] for i in range(len(labels)) if labels[i] == 2]
                         scrs = np.concatenate([scrs])
                         if np.all(scrs < SCR_THRESHOLD):
@@ -363,19 +365,25 @@ def prep_catalogue(df,column_list, do_write=True, model_param=None, device=None,
                                 plt.imsave(odir+"/"+namefile+".png", img_diff.data, cmap='gray', vmin=mu-3*sd, vmax=mu+3*sd)
                             else:
                                 img_diff.writeto(odir+"/"+namefile,overwrite=True)
+
+                            # Save the original path
+                            org_paths_temp.append(i)
                 else:
                     continue
 
-                # Save the original path
-                org_paths.append(i)
+                
                 if amout_limit is not None:
                     if amount_counter >= amout_limit:
                         break
             # except:
             #     continue
-
+        # for i in org_paths add the i+1
+        for i in org_paths_temp:
+            original_paths.append(i)
+            original_paths.append(i+1)
+        sorted(original_paths)
         #Create new dataframe with the original paths
-        org_lasco_df = lasco_df.iloc[org_paths]
+        org_lasco_df = lasco_df.iloc[original_paths]
         # Save it as a csv
         org_lasco_df.to_csv(exec_path + "/original_lasco_path_list.csv", index=False)
 
