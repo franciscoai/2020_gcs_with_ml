@@ -168,6 +168,9 @@ cdaw_catalogue='/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/
 
 level = 'L1' # fits reduction level
 filter_pol_images = True
+exclude_mult=False
+exclude_poor_events=False
+quality_idx=3# if exclude_poor_events=True it filtrates every event with a quality index lower to quality_idx. Posible values: (0-5)
 units= ["-","-","yyyymmdd","hhmm","yyyymmdd","hhmm","deg","lon","old","deg","deg","deg", "yyyymmdd","hhmm","km/s","g","km/s","LON","LAT","km/s","LON","LAT","km/s","LON","LAT"]
 
 imsize=[0,0]# if 0,0 no rebin its applied
@@ -206,6 +209,33 @@ os.makedirs(odir, exist_ok=True)
 
 #gets catalogues
 found_events, cdaw_full  = get_cdaw(cdaw_repo,lasco_path, cdaw_catalogue)
+
+if exclude_poor_events:
+    cdaw_full['QUALITY_INDEX'] = cdaw_full['QUALITY_INDEX'].str.extract(r'(\d+)').astype(int)
+    cdaw_full=cdaw_full.loc[cdaw_full['QUALITY_INDEX']>quality_idx]
+    
+if exclude_mult:
+    unique_dates=cdaw_full["DATE"].unique()
+    for j in range(len(unique_dates)):
+        date_event=cdaw_full.loc[cdaw_full["DATE"]==unique_dates[j]]
+        orig_files=date_event['FOLDER_NAME'].unique()
+        for g in range(len(orig_files)-1):
+            first_event=cdaw_full.loc[cdaw_full['FOLDER_NAME']==orig_files[g]]
+            second_event=cdaw_full.loc[cdaw_full['FOLDER_NAME']==orig_files[g+1]]
+            first_event['DATE_TIME'] = pd.to_datetime(first_event['DATE_TIME'])
+            second_event['DATE_TIME'] = pd.to_datetime(second_event['DATE_TIME'])
+            first_interval = pd.Interval(first_event["DATE_TIME"].min(),first_event["DATE_TIME"].max() , closed='both')
+            second_interval = pd.Interval(second_event["DATE_TIME"].min(), second_event["DATE_TIME"].max(), closed='both')
+            if first_interval.overlaps(second_interval):
+                cdaw_full = cdaw_full.loc[~cdaw_full['FOLDER_NAME'].str.contains(orig_files[g], case=False, na=False)]
+                cdaw_full = cdaw_full.loc[~cdaw_full['FOLDER_NAME'].str.contains(orig_files[g+1], case=False, na=False)]
+                
+            
+
+
+
+    
+
 #transforms to datetime objects and sorts the catalogues
 found_events["DATE_TIME"] = pd.to_datetime(found_events["DATE_TIME"])
 found_events["DATE_TIME"] = found_events["DATE_TIME"].dt.strftime('%Y-%m-%d %H:%M:%S')
@@ -218,7 +248,7 @@ yht_files=cdaw_full["FOLDER_NAME"].unique()
 
 # Process the lasco data
 for i in tqdm(range(len(yht_files)), desc="Processing lasco data"):
-    if yht_files[i] =="20021110.083005.w068n.v0290.p097s.yht":
+    if yht_files[i]=="20021110.083005.w068n.v0290.p097s.yht":
         all_images=[]
         all_dates=[]
         all_occ_size=[]
@@ -316,6 +346,7 @@ for i in tqdm(range(len(yht_files)), desc="Processing lasco data"):
                     for d in all_ofiles:
                         os.makedirs(d,exist_ok=True)    
                     for m in range(len(ok_dates)):
+                        breakpoint()
                         event = df[df['DATE_TIME'] == ok_dates[m]].reset_index(drop=True)
 
                         for n in range(len(event['MASK'])):

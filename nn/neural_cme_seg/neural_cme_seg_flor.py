@@ -141,7 +141,37 @@ class neural_cme_segmentation():
             img[mask==1] = repleace_value
         return img
 
-    
+    def save_all_masks(self,orig_img,all_masks,all_lbl,all_boxes,all_dates,all_center,all_scores, plot_params):
+        color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
+        obj_labels = ['Back', 'Occ','CME','N/A']
+        cmap = mpl.colors.ListedColormap(color)  
+        nans = np.full(np.shape(orig_img[0]), np.nan)
+        fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
+        axs = axs.ravel()
+        
+        for i in range(len(orig_img)):
+            axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
+            axs[i].axis('off')
+            axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
+            axs[i+1].axis('off') 
+            for b in range(len(all_masks)):
+                masked = nans.copy()       
+                masked[:, :][all_masks[i][b] > 0.6] = 1          
+                axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
+                
+                box =  mpl.patches.Rectangle((all_boxes[i][b][0],all_boxes[i][b][1]), all_boxes[i][b][2]- all_boxes[i][b][0], all_boxes[i][b][3]- all_boxes[i][b][1], linewidth=2, edgecolor=color[b] , facecolor='none') # add box
+                # axs[i+1].add_patch(box)
+                
+                axs[i+1].scatter(round(all_center[0][0]), round(all_center[0][1]), color='red', marker='x', s=100)
+                #axs[i+1].annotate(all_lbl[i][b]+':'+'{:.2f}'.format(all_scores[i][b][0]),xy=(all_boxes[i][b][0],all_boxes[i][b][1]), fontsize=15, color=color[b])
+            folder_name=plot_params[99:-19]
+            ofile="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1/lasco_extreme_cases/"+folder_name
+            os.mkdir(ofile)
+            plt.tight_layout()
+            plt.savefig(ofile+str(all_dates[i]).replace('-', '').replace(':', '').replace(' ', '_')+".png")
+            plt.close()
+
+
     def infer(self, img, model_param=None, resize=True, occulter_size=0,centerpix=None):
         '''        
         Infers a cme segmentation mask in the input coronograph image (img) using the trained R-CNN
@@ -909,9 +939,7 @@ class neural_cme_segmentation():
                         all_plate_scl.append(in_plate_scl[i])
                         all_dates.append(dates[i])
         if len(all_masks)>=2:
-
-
-
+            self.save_all_masks(all_orig_img,all_masks,all_lbl,all_boxes,all_dates,centerpix,all_scores,plot_params)
             # keeps only one mask per img based on cpa, aw and apex radius evolution consistency
             if filter:      
                 df = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,all_plate_scl,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS)
