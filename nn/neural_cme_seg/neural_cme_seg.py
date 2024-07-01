@@ -41,32 +41,6 @@ def linear(t,a,b):
 def linear_error(p, x, y, w):
     return w*(linear(x, *p) - y)
 
-def apply_linear_multiplier(image):
-    """
-    Applies a linear multiplier to an image, increasing outwards from the center.
-    Args:
-        image: A NumPy array representing the image (grayscale or color).
-    Returns:
-        A NumPy array representing the modified image.
-    """
-    # Get image dimensions
-    height, width = image.shape[:2]
-    # Create a meshgrid representing coordinates from center outwards
-    y, x = np.ogrid[0:height, 0:width]
-    center_x = width // 2
-    center_y = height // 2
-    radius = max(center_x, center_y)  # Consider the larger dimension for radius
-    # Calculate normalized distance from center (0 at center, 1 at edges)
-    distance = np.sqrt(((x - center_x) ** 2) + ((y - center_y) ** 2)) #/ radius
-    # Define linear multiplier function (adjust slope and offset as needed)
-    multiplier = 1. + (0.1/np.max(distance)) * distance #0.15
-    #aumenta 10% desde el centro hasta la esquina. entonces en 256 pixels seria 10% * cos(45)
-    # Apply element-wise multiplication with broadcasting
-    modified_image = np.multiply(image, multiplier)
-    
-    return modified_image,radius,distance, multiplier
-
-
 class neural_cme_segmentation():
     '''
     Class to perform CME segmentation using Mask R-CNN
@@ -90,19 +64,28 @@ class neural_cme_segmentation():
         self.imsize = imsize    
         # model param
         if version == 'v3':
+            # First reasonably performing version of the model
             self.num_classes = 3 # background, CME, occulter
             # number of trainable layers in the backbone resnet, int in [0,5] range. Specifies the stage number.
             # Stages 2-5 are composed of 6 convolutional layers each. Stage 1 is more complex
             # See https://arxiv.org/pdf/1512.03385.pdf
             self.trainable_backbone_layers = 3
         if version == 'v4':
+            # Second version of the model. Trainning more layers in the backbone
             self.labels=['Background','Occ','CME'] # labels for the different classes
             self.num_classes = 3 # background, CME, occulter
             self.trainable_backbone_layers = 4
             self.mask_threshold = 0.60 # value to consider a pixel belongs to the object
-            self.scr_threshold = 0.51#0.25 # only detections with score larger than this value are considered
+            self.scr_threshold = 0.51 # only detections with score larger than this value are considered
+        if version == 'v5':
+            # Third version of the model. Trainning with only 2 classes, CME and background, and all the backbone layers
+            self.labels=['Background','CME'] # labels for the different classes
+            self.num_classes = 2 # background, CME
+            self.trainable_backbone_layers = 5
+            self.mask_threshold = 0.60 # value to consider a pixel belongs to the object
+            self.scr_threshold = 0.51 # only detections with score larger than this value are considered            
         # innitializes the model
-        self.model=torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True, trainable_backbone_layers=self.trainable_backbone_layers) 
+        self.model=torchvision.models.detection.maskrcnn_resnet50_fpn(weights='DEFAULT', trainable_backbone_layers=self.trainable_backbone_layers) 
         self.in_features = self.model.roi_heads.box_predictor.cls_score.in_features 
         self.model.roi_heads.box_predictor=FastRCNNPredictor(self.in_features,num_classes=self.num_classes)
         if self.pre_trained_model is not None:
@@ -111,77 +94,98 @@ class neural_cme_segmentation():
         self.model.to(self.device)
         return
 
-    def normalize(self, image,histogram_names='',path='', sd_range=1.5, norm_limits=[None, None],increase_contrast=None):
+    def _apply_linear_multiplier(self, image):
+        """
+        Applies a linear multiplier to an image, increasing outwards from the center.
+        Args:
+            image: A NumPy array representing the image (grayscale or color).
+        Returns:
+            A NumPy array representing the modified image.
+        """
+        # Get image dimensions
+        height, width = image.shape[:2]
+        # Create a meshgrid representing coordinates from center outwards
+        y, x = np.ogrid[0:height, 0:width]
+        center_x = width // 2
+        center_y = height // 2
+        radius = max(center_x, center_y)  # Consider the larger dimension for radius
+        # Calculate normalized distance from center (0 at center, 1 at edges)
+        distance = np.sqrt(((x - center_x) ** 2) + ((y - center_y) ** 2)) #/ radius
+        # Define linear multiplier function (adjust slope and offset as needed)
+        multiplier = 1. + (0.1/np.max(distance)) * distance #0.15
+        #aumenta 10% desde el centro hasta la esquina. entonces en 256 pixels seria 10% * cos(45)
+        # Apply element-wise multiplication with broadcasting
+        modified_image = np.multiply(image, multiplier)
+        
+        return modified_image,radius,distance, multiplier
+
+    def normalize(self, image, excl_occulter_level='auto', sd_range=2, norm_limits=[None, None], increase_contrast=False, 
+                  median_kernel=3, plot_histograms=False, histogram_names='', path=''):
         '''
         Normalizes the input image to 0-1 range
         sd_range: number of standard deviations to use for normalization around the mean
         norm_limits: if not None, the image is first truncated to the given limits
-        increase_contrast: if True, increases the contrast of the normalized image.
+        increase_contrast: if True, increases the contrast of the normalized image radially.
+        plot_histograms: if True, plots the histograms of the original and normalized images
+        histogram_names: name of the histogram to save 
+        path: dir path to save the histograms
+        excl_occulter_level: if not None, this level is excluded from the mean and sd computation used to normalize
+                             Use 'auto' to exclude the most frequent value in the image
+        median_kernel: if not None, the image is smoothed using a median kernel of the given size. Min is 3
         '''
-        #sd_range=3 #1.5
-        #smooth_kernel=3
-        #image = cv2.GaussianBlur(image, (smooth_kernel, smooth_kernel), 0)
-        
+        # pre clipping
         if norm_limits[0] is not None:
             image[image < norm_limits[0]] = 0
         if norm_limits[1] is not None:
             image[image > norm_limits[1]] = 1
-        #using only 1 channel for statistics    
         
-        image_for_statistics = image[:,:,0].copy()
-        #remove NaN
-        not_nan_values = image_for_statistics[~np.isnan(image_for_statistics)]    
-        #remove occulter values fixed at 0
-        m = np.mean(not_nan_values[not_nan_values != 0])
-        mode, count = stats.mode(not_nan_values)
-        #m = np.median(not_nan_values[not_nan_values != 0])
-        sd = np.std(not_nan_values[not_nan_values != 0])
-        plot_histograms = False
+        #using only first channel
+        oimage = image[:,:,0].copy()
+
+        #median kernel
+        if median_kernel is not None:
+            oimage = cv2.medianBlur(oimage, median_kernel)
+
+        #exclude occulter values at excl_occulter_level
+        if excl_occulter_level is not None:
+            if excl_occulter_level == 'auto':
+                # finds the most frequent integer value in the image
+                occ_indx = (oimage != stats.mode(oimage.flatten(),keepdims=True)[0][0])
+            else:
+                occ_indx = (oimage != excl_occulter_level) & (oimage != excl_occulter_level-1)
+            m = np.nanmean(oimage[occ_indx])
+            sd = np.nanstd(oimage[occ_indx])
+        else:
+            m = np.nanmean(oimage)
+            sd = np.nanstd(oimage)
+        
         if plot_histograms:
-            plt.hist(not_nan_values, bins=50, range=(np.percentile(not_nan_values,1),np.percentile(not_nan_values,99)), color='blue', alpha=0.7)
+            plt.hist(oimage, bins=50, range=(np.percentile(oimage,1),np.percentile(oimage,99)), color='blue', alpha=0.7)
             plt.title('Histograma de valores de la imagen')
             plt.xlabel('Valor')
             plt.ylabel('Frecuencia')
             plt.savefig(path+"histograms/orig/"+histogram_names+".png")
             plt.close()
-        #breakpoint()
-        #p1  = np.percentile(image[:,:,0].flatten(), 0.07)
-        #p10 = np.percentile(image[:,:,0].flatten(), 10)
-        #p99 = np.percentile(image[:,:,0].flatten(), 99.95)
-        #iqr = p75 - p25  # Interquartile Range
-        #image = (image - p25) / iqr
 
         #normalizing
-        #image = (image - mode +0.7*(abs(p95) - abs(p5))) / (1.4*(abs(p95) - abs(p5)))
-        #image = (image - m + 1.5* sd) / ( 4 * sd)
-        #image = ( (image -p10) / (1.2*(p95 - p10)) ) + 0.5
-        #breakpoint()
-        image_new = (image - m + sd_range * sd) / (2 * sd_range * sd)
+        oimage = (oimage - m + sd_range * sd) / (2 * sd_range * sd)
 
-        img_final = image_new[:,:,0].copy()
-        #If True, increase contrast of the Normalized image, radialy and above a specific radius.
+        #If True, increase contrast of the Normalized image radialy, above a specific radius.
         if increase_contrast:
-            modified_image,radius,distance, multiplier = apply_linear_multiplier(image_new[:,:,0])
-            m1  = np.mean(image_new)
-            sd1 = np.std(image_new)
-            binary_image = np.where(image_new[:,:,0] > m1+sd1/15, 1, 0) #0.51
-
+            modified_image,radius,distance, multiplier = self._apply_linear_multiplier(oimage[:,:,0])
+            m1  = np.mean(oimage)
+            sd1 = np.std(oimage)
+            binary_image = np.where(oimage[:,:,0] > m1+sd1/15, 1, 0) #0.51
             aaa=np.where(distance > 100., 1, 0)
-            img_final[np.logical_and(binary_image == 1, aaa == 1)] = np.multiply(img_final, multiplier)[np.logical_and(binary_image == 1, aaa == 1)]
+            oimage[np.logical_and(binary_image == 1, aaa == 1)] = np.multiply(oimage, multiplier)[np.logical_and(binary_image == 1, aaa == 1)]
         
-        image = img_final.copy()
-        
-        #image = (image - p1) / ((abs(p99) + abs(p1)))
-        #fixing from 0 to 1
-        cota_sup = 1
-        cota_inf = 0
-        image[image > cota_sup]=cota_sup
-        image[image < cota_inf]=cota_inf
-        
-        image = np.dstack([image,image,image])
+        #clipping to 0-1 range
+        oimage[oimage > 1]=1
+        oimage[oimage < 0]=0
+
         if plot_histograms:
-            normalized_asd = image[:,:,0].flatten()
-            plt.hist(image[:,:,0].flatten(), bins=50, range=(np.percentile(image[:,:,0].flatten(), 5),  np.percentile(image[:,:,0].flatten(), 95)), color='blue', alpha=0.7)
+            normalized_asd = oimage.flatten()
+            plt.hist(normalized_asd, bins=50, range=(np.percentile(normalized_asd, 5),  np.percentile(normalized_asd, 95)), color='blue', alpha=0.7)
             plt.hist(normalized_asd, bins=50, range=(0,1), color='blue', alpha=0.7)
             plt.title('Histograma de valores de la imagen Normalizados')
             plt.xlabel('Valor')
@@ -189,8 +193,8 @@ class neural_cme_segmentation():
             plt.savefig(path+"histograms/resize/"+histogram_names+".png")
             plt.close()
         
-        return image
-    
+        return  np.dstack([oimage,oimage,oimage])
+ 
     def train(self, opt_type='adam' , lr=1e-5):
         '''
         Sets optimizer type and train mode

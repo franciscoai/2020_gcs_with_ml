@@ -42,7 +42,7 @@ def save_png(array, ofile=None, range=None):
 # CONSTANTS
 #paths
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_paper'
+OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240627'
 opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
@@ -51,8 +51,8 @@ diff_int_cme=True # set to use a differential intensity CME image
 add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[1,7]] 
-par_num = 50 # total number of samples that will be generated (there are nsat images per param combination)
+par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
+par_num = 80000 # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -70,9 +70,9 @@ im_range=2. # range of the color scale of the output final syntethyc image in st
 # Output images to save
 otype="png" # set the ouput file type: 'png' or 'fits'
 imsize=np.array([512, 512], dtype='int32') # output image size
-mesh_only_image=True # set to also save a png with the GCSmesh (only for otype='png')
-cme_only_image=True # set to True to save an addditional image with only the cme without the background corona
-back_only_image = True # set to True to save an addditional image with only the background corona without the cme
+mesh_only_image=False # set to also save a png with the GCSmesh (only for otype='png')
+cme_only_image=False # set to True to save an addditional image with only the cme without the background corona
+back_only_image = False # set to True to save an addditional image with only the background corona without the cme
 save_masks = True # set to True to save the masks images
 inner_hole_mask=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
 mask_from_cloud=True #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
@@ -212,7 +212,7 @@ for row in df.index:
             height_diff = np.random.uniform(low=0, high=1) # in Sr. 1 Sr is covered in 15 min at 1500 mk/s
             if height_diff > df['height'][row]:
                 height_diff = df['height'][row]*height_diff
-            scl_fac = np.random.uniform(low=0.5, high=1.5) # int scaling factor
+            scl_fac = np.random.uniform(low=0.90, high=1.3) # int scaling factor
             def_fac = np.random.uniform(low=0.95, high=1.05, size=3) # deflection and rotation factors [lat, lon, tilt]
             exp_fac = np.random.uniform(low=0.9, high=1, size=2) # non-self-similar expansion factor [k, ang]
             # avoids lat and lon overturns 
@@ -224,21 +224,23 @@ for row in df.index:
                 fr_lat = 90
             else:
                 fr_lat = def_fac[1]*df['CMElat'][row]
-
             btot -= scl_fac*rtraytracewcs(headers[sat], fr_lon, fr_lat ,def_fac[2]*df['CMEtilt'][row],
                                           df['height'][row]-height_diff,df['k'][row]*exp_fac[0], df['ang'][row]*exp_fac[1], imsize=imsize, 
                                           occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5)
         
         #adds a flux rope-like structure
         if add_flux_rope:
-            frope_height_diff = np.random.uniform(low=0.2, high=0.6) # random fractional height
+            if df['height'][row] < 3:
+                frope_height_diff = np.random.uniform(low=0.55, high=0.85) # random flux rope height
+            else:
+                frope_height_diff = np.random.uniform(low=0.45, high=0.75)
             aspect_ratio_frope = np.random.uniform(low=0.4, high=0.8) # random aspect ratio
-            scl_fac = np.random.uniform(low=0, high=1) # int scaling factor
-            btot += 2.*scl_fac*rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*frope_height_diff,
+            scl_fac_fr = np.random.uniform(low=0, high=2) # int scaling factor
+            btot += scl_fac_fr*rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*frope_height_diff,
                                           df['k'][row]*aspect_ratio_frope, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5)    
             # uses a differential flux rope
             if diff_int_cme:
-                btot -= scl_fac*rtraytracewcs(headers[sat], fr_lon, fr_lat,def_fac[2]*df['CMEtilt'][row], 
+                btot -= scl_fac*scl_fac_fr*rtraytracewcs(headers[sat], fr_lon, fr_lat,def_fac[2]*df['CMEtilt'][row], 
                                               df['height'][row]*frope_height_diff-height_diff,df['k'][row]*aspect_ratio_frope*exp_fac[0],df['ang'][row]*exp_fac[1],
                                               imsize=imsize, occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5)    
         #background corona
@@ -258,7 +260,7 @@ for row in df.index:
         var_map = (var_map-np.min(var_map))/(np.max(var_map)-np.min(var_map)) # normalizes to 0-1
         btot *= var_map
 
-        # normalizes CME btot to 0-df['level_cme'][row]*mean_back
+        # normalizes CME btot to 0-df['level_cme'][row]*sd_back
         btot = (btot-np.min(btot))/(np.max(btot)-np.min(btot))*df['level_cme'][row]*sd_back
 
         #adds poissonian noise to btot
