@@ -42,7 +42,7 @@ def save_png(array, ofile=None, range=None):
 # CONSTANTS
 #paths
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240627'
+OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240701'
 opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
@@ -64,8 +64,10 @@ rnd_ext_occ=0.1 # set to randomly reduce the external occulter size by a max fra
 #noise
 cme_noise= True # set to add poissonian noise to the cme image
 #relative int levels
-level_occ=0. # mean level of the occulter relative to the background level
-im_range=2. # range of the color scale of the output final syntethyc image in std dev around the mean
+level_occ='min' # level of the occulter relative to the background level. Note that png images are saved in 0-255 scale
+                # The image range is mapped to 0-255 suning the value given by im_range. 
+                # Use 'min' to set the occulter to the minimum value, thus appearing as 0 in png images
+im_range=3 # range of the color scale of the output final syntethyc image in std dev around the mean
 
 # Output images to save
 otype="png" # set the ouput file type: 'png' or 'fits'
@@ -303,9 +305,13 @@ for row in df.index:
         #adds background
         btot+=back
 
-        #adds occulter  
-        btot[r <= size_occ[sat]]     = level_occ*mean_back 
-        btot[r >= size_occ_ext[sat]] = level_occ*mean_back 
+        #adds occulter 
+        if level_occ == 'min':
+            btot[r <= size_occ[sat]]     = vmin_back
+            btot[r >= size_occ_ext[sat]] = vmin_back
+        else: 
+            btot[r <= size_occ[sat]]     = level_occ*mean_back 
+            btot[r >= size_occ_ext[sat]] = level_occ*mean_back 
 
         #saves images
         if otype=="fits":

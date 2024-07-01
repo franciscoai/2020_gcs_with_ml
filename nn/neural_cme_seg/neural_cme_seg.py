@@ -79,6 +79,7 @@ class neural_cme_segmentation():
             self.scr_threshold = 0.51 # only detections with score larger than this value are considered
         if version == 'v5':
             # Third version of the model. Trainning with only 2 classes, CME and background, and all the backbone layers
+            # Also updated the normalization routine
             self.labels=['Background','CME'] # labels for the different classes
             self.num_classes = 2 # background, CME
             self.trainable_backbone_layers = 5
@@ -122,8 +123,10 @@ class neural_cme_segmentation():
     def normalize(self, image, excl_occulter_level='auto', sd_range=2, norm_limits=[None, None], increase_contrast=False, 
                   median_kernel=3, plot_histograms=False, histogram_names='', path=''):
         '''
-        Normalizes the input image to 0-1 range
-        sd_range: number of standard deviations to use for normalization around the mean
+        Normalizes the input image to the 0-1 range. 
+        Note that only the first channel of the image is used!
+        
+        sd_range: number of standard deviations around the mean to use for normalization 
         norm_limits: if not None, the image is first truncated to the given limits
         increase_contrast: if True, increases the contrast of the normalized image radially.
         plot_histograms: if True, plots the histograms of the original and normalized images
