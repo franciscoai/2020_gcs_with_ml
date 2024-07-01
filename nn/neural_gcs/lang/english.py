@@ -12,7 +12,7 @@ english_lang = {
     "insert_model_path": "Please insert the path to the model:\n",
     "model_loaded": "Model loaded successfully",
     "model_not_found": "Model not found",
-    "select_device": "Select a device:\n",
+    "select_device": "\nSelect a device:\n",
     "device": "Device: ",
     "insert_triplet_path": "\nPlease insert the path to the views triplet:\n",
     "insert_output_path": "\nPlease insert the output path:\n",
