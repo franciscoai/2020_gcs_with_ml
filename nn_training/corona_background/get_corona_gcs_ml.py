@@ -21,9 +21,9 @@ def find_matches(paths, tolerance):
     # listir all paths
     cor2b_path, cor2a_path, lasco_path = paths
     # list all files in the paths
-    cor2b_files = os.listdir(cor2b_path)
-    cor2a_files = os.listdir(cor2a_path)
-    lasco_files = os.listdir(lasco_path)
+    cor2b_files = [file for file in os.listdir(cor2b_path) if file.endswith('.fits')]
+    cor2a_files = [file for file in os.listdir(cor2a_path) if file.endswith('.fits')]
+    lasco_files = [file for file in os.listdir(lasco_path) if file.endswith('.fits')]
 
     for cor2b_file in cor2b_files:
         # Gets the date and time of the file
