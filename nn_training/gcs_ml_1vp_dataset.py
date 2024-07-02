@@ -42,7 +42,7 @@ def save_png(array, ofile=None, range=None):
 # CONSTANTS
 #paths
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240701'
+OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240702'
 opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
@@ -52,7 +52,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 80000 # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 100000 # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -137,7 +137,7 @@ for row in df.index:
     for sat in range(n_sat):
         # for sat==2 (LASCO) we divide the current height by 16/6 to match the scale of the other satellites
         if sat==2:
-            df['height'][row] = df['height'][row]/2.667
+            df.loc[row, 'height'] = df.loc[row, 'height']/2.667
         #defining ranges and radius of the occulter
         x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
         y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
@@ -159,19 +159,19 @@ for row in df.index:
                                       df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.1, nel=1e5)     
             cme_npix= len(btot_mask[btot_mask>0].flatten())
             if cme_npix<=0:
-                print(f'WARNING: CME number {row} raytracing did not work')
+                print("\033[93m WARNING: CME number {} raytracing did not work\033".format(row))                
                 break          
             mask = get_cme_mask(btot_mask,inner_cme=inner_hole_mask)          
             mask_npix= len(mask[mask>0].flatten())
-            if mask_npix/cme_npix<0.9:
-                print(f'WARNING: CME number {row} mask is too small compared to cme brigthness image, skipping all views...')
+            if mask_npix/cme_npix<0.9:                        
+                print("\033[93m WARNING: CME number {} mask is too small compared to cme brigthness image, skipping all views...\033".format(row))
                 break
 
         #adds occulter to the masks and checks for null masks
         mask[r <= size_occ[sat]] = 0  
         mask[r >= size_occ_ext[sat]] = 0
         if len(np.array(np.where(mask==1)).flatten())/len(mask.flatten())<0.005: # only if there is a cme that covers more than 0.5% of the image
-            print(f'WARNING: CME number {row} mask is null because it is probably behind the occulter, skipping all views...')
+            print("\033[93m WARNING: CME number {} mask is null because it is probably behind the occulter, skipping all views...\033".format(row))
             break
        
         # adds mask angluar width to list
@@ -265,9 +265,16 @@ for row in df.index:
         # normalizes CME btot to 0-df['level_cme'][row]*sd_back
         btot = (btot-np.min(btot))/(np.max(btot)-np.min(btot))*df['level_cme'][row]*sd_back
 
+        # checks NaNs in btot
+        m_abs_btot=np.abs(np.mean(btot))
+        if m_abs_btot is np.nan:
+            print("\033[93m WARNING: CME number {} has NaNs in btot, skipping all views...".format(row))            
+            mask_aw_sat.pop()# removes the last appended mask_aw_sat
+            break
+
         #adds poissonian noise to btot
         if cme_noise is not None :
-            btot += np.random.poisson(lam=np.abs(np.mean(btot)), size=imsize) - np.abs(np.mean(btot))
+            btot += np.random.poisson(lam=m_abs_btot, size=imsize) - m_abs_btot
 
         # subtracts the mean value outside the mask
         btot = btot - np.mean(btot[mask==0])
@@ -288,6 +295,7 @@ for row in df.index:
         # output files base name
         ofile_name = '{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}'.format(
                     df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)
+        
         # adds row number at the begining of the file name
         if opath_fstructure=='check':
             ofile_name = '{:04d}_'.format(row) + ofile_name

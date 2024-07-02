@@ -159,11 +159,11 @@ for i in range(epochs):
     #save training results after each epoch
     #model
     torch.save(nn_seg.model.state_dict(),opath + "/" + str(i)+".torch")
-    #saves all losses in a pickle file
+    #all losses in a pickle file
     with open(opath + "/all_loss", 'wb') as file:
         pickle.dump(all_loss, file, protocol=pickle.HIGHEST_PROTOCOL)
-    #plots loss
-    plt.plot(np.arange(len(all_loss))*batchSize,all_loss)
+    #plot loss
+    plt.plot(np.arange(len(all_loss))*batchSize+1,all_loss)
     #add vertical line for each epoch
     for k in range(i):
         plt.axvline(x=k*len(imgs_train), color='r', linestyle='--')
