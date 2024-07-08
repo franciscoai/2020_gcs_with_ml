@@ -132,11 +132,8 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
             status = model.save_model(opath)
             logging.info(f"Model saved at: {status}\n")
 
-def main():
+def main(configuration: Configuration):
     # Configuración de parámetros
-    configuration = Configuration(Path(
-        "/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run6.ini"))
-
     TRAINDIR = configuration.train_dir
     OPATH = configuration.opath
     BATCH_SIZE = configuration.batch_size
@@ -237,6 +234,8 @@ def main():
         errorVP1 = []
         errorVP2 = []
         errorVP3 = []
+        targets_list = []
+        predictions_list = []
 
         if not REAL_IMG_INFERENCE:
             img_counter = 0
@@ -254,18 +253,33 @@ def main():
                         f"Plotting image {img_counter} of {IMAGES_TO_INFER}")
                     error = sirats_plotter.plot_mask_MVP(img[i], sat_masks[i], targets[i], predictions[i],
                                           occulter_masks[i], satpos[i], plotranges[i], OPATH, f'img_{img_counter}.png')
+                    
+                    # Save errors
                     errorVP1.append(error[0])
                     errorVP2.append(error[1])
                     errorVP3.append(error[2])
+
+                    # Save targets and predictions
+                    targets_list.append(targets[i])
+                    predictions_list.append(predictions[i])
+
                     if img_counter == IMAGES_TO_INFER:
                         stop_flag = True
                         break
+
                 if stop_flag:
                     break
-
+            
+            # Plot overlap error histogram
             errors = [errorVP1, errorVP2, errorVP3]
             logging.info("Plotting histogram")
-            sirats_plotter.plot_histogram(errors, OPATH, 'histogram.png')
+            sirats_plotter.plot_overlap_err_histogram(errors, OPATH, 'histogram.png')
+
+            # Plot params error histogram
+            logging.info("Plotting params histogram")
+            targets_list = torch.stack(targets_list, dim=0)
+            predictions_list = torch.stack(predictions_list, dim=0)
+            sirats_plotter.plot_params_error_histogram(targets_list, predictions_list, PAR_LOSS_WEIGHTS, OPATH, 'params_histogram.png')
 
             # Save errors in a pickle file
             with open(os.path.join(OPATH, 'errors.pkl'), 'wb') as f:
@@ -373,4 +387,6 @@ def main():
                                     f'{filename}.png', fixed_satpos=fixed_satpos, fixed_plotranges=fixed_plotranges, use_fixed=True)
 
 if __name__ == '__main__':
-    main()
+    configuration = Configuration(Path(
+        "/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run6.ini"))
+    main(configuration)

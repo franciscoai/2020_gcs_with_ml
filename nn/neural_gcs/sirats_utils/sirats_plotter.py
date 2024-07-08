@@ -2,17 +2,18 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.realpath(__file__)))))
-from pathlib import Path
-from astropy.io import fits
-from nn.utils.coord_transformation import pnt2arr
-from pyGCS_raytrace import pyGCS
-from nn.utils.gcs_mask_generator import maskFromCloud
-import torch
-import torchvision
-import numpy as np
-import matplotlib as mpl
-mpl.use('Agg')
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+import torchvision
+import torch
+from sirats_model import SiratsInception
+from nn.utils.gcs_mask_generator import maskFromCloud
+from pyGCS_raytrace import pyGCS
+from nn.utils.coord_transformation import pnt2arr
+from astropy.io import fits
+from pathlib import Path
+mpl.use('Agg')
 
 
 class SiratsPlotter:
@@ -25,7 +26,7 @@ class SiratsPlotter:
             np.abs(mask1 - mask2)) / np.sum(mask1)
         return non_overlapping_area_err
 
-    def plot_histogram(self, errors, opath, namefile):
+    def plot_overlap_err_histogram(self, errors, opath, namefile):
         fig, ax = plt.subplots(1, 4, figsize=(14, 7))
         flatten_errors = [item for sublist in errors for item in sublist]
         ax[0].hist(flatten_errors, bins=30)
@@ -45,7 +46,6 @@ class SiratsPlotter:
 
         fig.savefig(os.path.join(masks_dir, namefile), dpi=300)
         plt.close(fig)
-
 
     def plot_images(self, img, prediction, satpos, plotranges, opath, namefile):
         images = img.cpu().detach().numpy()
@@ -82,9 +82,9 @@ class SiratsPlotter:
             ax[i].imshow(images[i, :, :], cmap="gray", vmin=0, vmax=1)
             ax[i].imshow(arr_cloud, cmap='Greens', alpha=0.6,
                          vmin=0, vmax=1)
-            
+
         opath = os.path.join(opath, 'plots')
-            
+
         os.makedirs(opath, exist_ok=True)
         plt.savefig(os.path.join(opath, namefile), dpi=300)
         plt.close()
@@ -196,9 +196,12 @@ class SiratsPlotter:
         fig, ax = plt.subplots(1, IMG_SIZE[0], figsize=(17, 10))
         fig.tight_layout()
 
-        suptitle = f'ima satpos: {", ".join([f"{x:.2f}" for x in satpos[0, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[0, :]])} -- plotranges: {", ".join([f"{x:.2f}" for x in plotranges[0, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[0, :]])}\n\n'
-        suptitle += f'imb satpos: {", ".join([f"{x:.2f}" for x in satpos[1, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[1, :]])} -- plotranges: {", ".join([f"{x:.2f}" for x in plotranges[1, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[1, :]])}\n\n'
-        suptitle += f'lasco satpos: {", ".join([f"{x:.2f}" for x in satpos[2, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[2, :]])} -- plotranges: {", ".join([f"{x:.2f}" for x in plotranges[2, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[2, :]])}\n\n'
+        suptitle = f'ima satpos: {", ".join([f"{x:.2f}" for x in satpos[0, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[0, :]])} -- plotranges: {
+            ", ".join([f"{x:.2f}" for x in plotranges[0, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[0, :]])}\n\n'
+        suptitle += f'imb satpos: {", ".join([f"{x:.2f}" for x in satpos[1, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[1, :]])} -- plotranges: {
+            ", ".join([f"{x:.2f}" for x in plotranges[1, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[1, :]])}\n\n'
+        suptitle += f'lasco satpos: {", ".join([f"{x:.2f}" for x in satpos[2, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[2, :]])} -- plotranges: {
+            ", ".join([f"{x:.2f}" for x in plotranges[2, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[2, :]])}\n\n'
         suptitle += f'Using fixed satpos = {use_fixed}'
 
         fig.suptitle(suptitle, x=0.05, y=.95, horizontalalignment='left')
@@ -258,7 +261,8 @@ class SiratsPlotter:
         satpos = np.array(satpos)
         plotranges = np.array(plotranges)
 
-        img = torch.tensor([sat1_data, sat2_data, sat1_data], dtype=torch.float32)
+        img = torch.tensor(
+            [sat1_data, sat2_data, sat1_data], dtype=torch.float32)
 
         if not binary_mask:
             sd_range = 1
@@ -279,9 +283,9 @@ class SiratsPlotter:
         predictions = np.squeeze(predictions)
 
         mask_infered_sat1 = maskFromCloud(predictions, sat=0, satpos=[
-                                        satpos[0, :]], imsize=img_size[1:3], plotranges=[plotranges[0, :]])
+            satpos[0, :]], imsize=img_size[1:3], plotranges=[plotranges[0, :]])
         mask_infered_sat2 = maskFromCloud(predictions, sat=0, satpos=[
-                                        satpos[1, :]], imsize=img_size[1:3], plotranges=[plotranges[1, :]])
+            satpos[1, :]], imsize=img_size[1:3], plotranges=[plotranges[1, :]])
         fig, ax = plt.subplots(1, 2, figsize=(9, 5))
 
         # Define colors and colormap
@@ -316,3 +320,28 @@ class SiratsPlotter:
         os.makedirs(masks_dir, exist_ok=True)
         plt.savefig(os.path.join(masks_dir, 'test_image.png'))
         plt.close()
+
+
+    def plot_params_error_histogram(self, targets: torch.Tensor, predictions: torch.Tensor, par_loss_weight: torch.Tensor, opath: Path, namefile: str):
+        # Get target and predictions to cpu
+        titles = ["Long", "Lat", "Tilt", "Height", "K", "Ang"]
+        targets = targets.cpu().detach().numpy()
+        predictions = predictions.cpu().detach().numpy()
+        par_loss_weight = par_loss_weight.cpu().detach().numpy()
+        # read shape 0 of predictions and add the same shape to par_loss_weight
+        par_loss_weight = np.tile(par_loss_weight, (predictions.shape[0], 1))
+        errors = par_loss_weight * (predictions - targets) ** 2
+
+        # Generate histograms
+        fig, ax = plt.subplots(1, 6, figsize=(23, 7))
+        fig.tight_layout()
+        for i in range(6):
+            ax[i].hist(errors[:, i], bins=30)
+            ax[i].set_title(f'{titles[i]}')
+
+        # Save the figure
+        opath = os.path.join(opath, 'infered_masks')
+        os.makedirs(opath, exist_ok=True)
+        plt.savefig(os.path.join(opath, namefile), dpi=300)
+
+        
