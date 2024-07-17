@@ -24,7 +24,8 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
     imageSize: resize of the images, if None, the original size is used
     '''    
     # elminates used paths
-    ok_paths=[p for p in paths if paths.index(p) not in used_idx]
+    used_idx = set(used_idx) # It uses set because it is faster to check if an element is in a set than in a list
+    ok_paths = [path for i, path in enumerate(paths) if i not in used_idx] 
     if len(ok_paths)==0: 
         return loadData(paths, batchSize, [], imageSize, file_ext, normalization_func, masks2use, rnd_rot)
     batch_Imgs=[]
@@ -89,7 +90,7 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
 #---------------------------------------------------------Fine_tune the pretrained R-CNN----------------------------------------------------------
 #Constants
 trainDir = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240702'
-opath= "/gehme/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
+opath= "/gehme/projects/2020_gcs_with_ml/output/neural_cme_seg_v5_mariano"
 #full path of a model to use it as initial condition, use None to used the stadard pre-trained model 
 pre_trained_model= None # "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v2_running_diff/3999.torch"
 batchSize=12 #number of images used in each iteration

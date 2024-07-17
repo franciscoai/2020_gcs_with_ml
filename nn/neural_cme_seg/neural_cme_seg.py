@@ -186,6 +186,13 @@ class neural_cme_segmentation():
         oimage[oimage > 1]=1
         oimage[oimage < 0]=0
 
+        #checking for nan values and replace for the mean value
+        mean = np.mean(oimage)
+        non_nan_mean = np.nanmean(oimage) # mean of the non-nan values
+        if np.isnan(mean):
+            print('Warning, found nan values in the image. Replacing with the mean value')
+            oimage = np.nan_to_num(oimage, nan=non_nan_mean)
+
         if plot_histograms:
             normalized_asd = oimage.flatten()
             plt.hist(normalized_asd, bins=50, range=(np.percentile(normalized_asd, 5),  np.percentile(normalized_asd, 95)), color='blue', alpha=0.7)
