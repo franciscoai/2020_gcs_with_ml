@@ -19,6 +19,7 @@ import pickle
 from scipy import stats
 mpl.use('Agg')
 from astropy.io import fits
+import logging
 
 __author__ = "Francisco Iglesias"
 __copyright__ = "Grupo de Estudios en Heliofisica de Mendoza - https://sites.google.com/um.edu.ar/gehme"
@@ -52,7 +53,7 @@ class neural_cme_segmentation():
     https://pytorch.org/tutorials/intermediate/torchvision_tutorial.html
     https://towardsdatascience.com/train-mask-rcnn-net-for-object-detection-in-60-lines-of-code-9b6bbff292c3
     '''
-    def __init__(self, device, pre_trained_model=None, version='v4', imsize=[512,512]):
+    def __init__(self, device, pre_trained_model=None, version='v4', imsize=[512,512], logger=None):
         '''
         Initializes the model
         device: device to use for training and inference
@@ -93,6 +94,13 @@ class neural_cme_segmentation():
             model_param = torch.load(self.pre_trained_model, map_location=device)
             self.model.load_state_dict(model_param)      
         self.model.to(self.device)
+        # uses the input logger
+        if logger is not None:
+            self.logger = logger
+        else:
+            self.logger = logging.getLogger(__name__)
+            self.logger.setLevel(logging.INFO)
+            self.logger.addHandler(logging.StreamHandler())
         return
 
     def _apply_linear_multiplier(self, image):
@@ -188,9 +196,9 @@ class neural_cme_segmentation():
 
         #checking for nan values and replace for the mean value
         mean = np.mean(oimage)
-        non_nan_mean = np.nanmean(oimage) # mean of the non-nan values
         if np.isnan(mean):
-            print('Warning, found nan values in the image. Replacing with the mean value')
+            self.logger.warning('Found nan values in the normalized image. Replacing with the mean value')
+            non_nan_mean = np.nanmean(oimage) # mean of the non-nan values        
             oimage = np.nan_to_num(oimage, nan=non_nan_mean)
 
         if plot_histograms:
@@ -212,7 +220,7 @@ class neural_cme_segmentation():
         if opt_type == 'adam':
             self.optimizer = torch.optim.AdamW(params=self.model.parameters(), lr=lr) # optimization technique that comes under gradient decent algorithm    
         else:
-            print('Optimizer opt_type not implemented')
+            self.logger.error('Optimizer type not recognized.')
             return None
         self.model.train()        
         return 
@@ -246,7 +254,7 @@ class neural_cme_segmentation():
                 #check sccrorigin.pro
                 r1col = 51
                 r1row = 1
-                print("Please take a look at this image!!")
+                self.logger.warning("Please take a look at this image!!")
 
         smask = fits.open(file)[0].data
         smask = np.flip(smask, axis=0)
@@ -394,7 +402,7 @@ class neural_cme_segmentation():
             self.mask_threshold = mask_threshold
         orig_img, all_masks, all_scores, all_lbl, all_boxes = self.infer(img, model_param=model_param, resize=resize, occulter_size=occulter_size)
         if len(all_masks) == 0:
-            print('Warning, no masks found in the image')
+            self.logger.warning('Warning, no masks found in the image')
             return None
         # compute loss for all masks
         all_loss = []
@@ -541,7 +549,7 @@ class neural_cme_segmentation():
                 prop_list.append([i,np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, [np.nan], [np.nan]])
         
         if len(masks) == 0:
-            print('Warning, no masks found in the image')
+            self.logger.warning('No masks found in the image')
             prop_list.append([0,np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, [np.nan], [np.nan]])
         return prop_list
 
@@ -554,7 +562,7 @@ class neural_cme_segmentation():
             '''
             self.mask_prop_labels=['MASK ID', 'SCORE','CPA_ANG','WIDTH_ANG','APEX_RADIUS']
 
-            print('Plotting masks properties to '+opath)
+            self.logger.info('Plotting masks properties to '+opath)
             # repeat dates for all masks
             if ending == '_all':
                 x = []
@@ -564,7 +572,7 @@ class neural_cme_segmentation():
             elif ending == '_filtered':                
                 x = dates.copy()
             else:
-                print('Unrecognized value for ending parameter')
+                self.logger.warning('Unrecognized value for ending parameter')
                 return None
             for par in range(len(param[0][0])):
                 cparam = np.array([i[par] for j in param for i in j])           
@@ -1145,7 +1153,7 @@ class neural_cme_segmentation():
                                                             occulter_size=in_occulter_size[i],occulter_size_ext=in_occulter_size_ext[i],
                                                             centerpix=centerpix[i],increase_contrast=increase_contrast)
                 all_orig_img.append(orig_img)
-                print(i,dates[i])
+                #print(i,dates[i])
 
             if modified_masks is not None:
                 #Usefull in case of using modified masks in real images. Ask D. Lloveras.
@@ -1153,7 +1161,7 @@ class neural_cme_segmentation():
                 lbl = data["LABEL"][i]
                 box = data["BOX"][i]
                 mask = [data["MASK"][i]]
-                print(i,dates[i])
+                #print(i,dates[i])
             # compute cpa, aw and apex. Already filters by score and other aspects
             self.debug_flag = i
             mask_prop = self._compute_mask_prop(mask, score, lbl, box, plate_scl=in_plate_scl[i], 

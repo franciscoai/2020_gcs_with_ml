@@ -9,6 +9,7 @@ import pickle
 import matplotlib as mpl
 from neural_cme_seg import neural_cme_segmentation
 import scipy
+import logging
 
 mpl.use('Agg')
 
@@ -90,7 +91,7 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
 #---------------------------------------------------------Fine_tune the pretrained R-CNN----------------------------------------------------------
 #Constants
 trainDir = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240702'
-opath= "/gehme/projects/2020_gcs_with_ml/output/neural_cme_seg_v5_mariano"
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
 #full path of a model to use it as initial condition, use None to used the stadard pre-trained model 
 pre_trained_model= None # "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v2_running_diff/3999.torch"
 batchSize=12 #number of images used in each iteration
@@ -100,10 +101,11 @@ random_rot = False # if True, the images are randomly rotated
 gpu=0 # GPU to use
 masks2use=[2] # list of masks to use, use None to use all masks found in the mask directory
 model_version='v5' # version of the model to use
+logfile=opath + "/training_log.txt" # log file
 
 #main
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
-print(f'Using device:  {device}')
+logging.info(f'Using device:  {device}')
 #flush cuda device memory
 torch.cuda.empty_cache()
 os.makedirs(opath,exist_ok=True)
@@ -113,19 +115,22 @@ os.system(f'cp {__file__} {opath}')
 # saves a copy of the model to opath
 os.system(f'cp nn/neural_cme_seg/neural_cme_seg.py {opath}')
 
+# logger
+logging.basicConfig(filename=logfile, level=logging.INFO)
+
 #list of images on the trainig dataset
 imgs=[] #list of images on the trainig dataset
 dirs=os.listdir(trainDir)
 dirs=[pth for pth in dirs if os.path.isdir(trainDir+"/"+pth)] # keeps only dirs
 for pth in dirs:
     imgs.append(trainDir+"/"+pth)
-print(f'The total number of images found is {len(imgs)}')
+logging.info(f'The total number of images found is {len(imgs)}')
 
 # separates the dataset into training and validation
 random.shuffle(imgs)
 imgs_train = imgs[:int(len(imgs)*train_dataset_prop)]
 imgs_val = imgs[int(len(imgs)*train_dataset_prop):]
-print(f'The total number of images used for training is {len(imgs_train)}')
+logging.info(f'The total number of images used for training is {len(imgs_train)}')
 # saves the list of images used for training and validation as csv files
 with open(opath + "/training_cases.csv", 'w') as file:
     for i in imgs_train:
@@ -135,7 +140,7 @@ with open(opath + "/validation_cases.csv", 'w') as file:
         file.write(i + '\n')
 
 # loads nn model and sets it to train mode
-nn_seg = neural_cme_segmentation(device, pre_trained_model = pre_trained_model, version=model_version)
+nn_seg = neural_cme_segmentation(device, pre_trained_model = pre_trained_model, version=model_version, logger=logging)
 nn_seg.train()  
 
 #training
@@ -155,7 +160,7 @@ for i in range(epochs):
         nn_seg.optimizer.step()
         all_loss.append(losses.item())
         cn_img=j+i*len(imgs_train)
-        print(f'Epoch {i} of {epochs}, batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), loss: {losses.item():.3f}')
+        logging.info(f'Epoch {i} of {epochs}, batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), loss: {losses.item():.3f}')
     
     #save training results after each epoch
     #model
