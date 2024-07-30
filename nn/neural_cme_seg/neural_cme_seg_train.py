@@ -98,12 +98,29 @@ batchSize=12 #number of images used in each iteration
 epochs=5 #number of iterations of the full training dataset
 train_dataset_prop=0.85 #proportion of the full dataset used for training. The rest is saved for validation
 random_rot = False # if True, the images are randomly rotated
-gpu=0 # GPU to use
+gpu=1 # GPU to use
 masks2use=[2] # list of masks to use, use None to use all masks found in the mask directory
 model_version='v5' # version of the model to use
-logfile=opath + "/training_log.txt" # log file
+logfile=opath + "/training_logfile.txt" # log file
 
 #main
+# Configuration of the logger
+# set up logging to file
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(funcName)-5s: %(levelname)-s, %(message)s',
+                    datefmt='%m-%d %H:%M', filename=logfile,
+                    filemode='w')
+# define a Handler which writes INFO messages or higher to the sys.stderr
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+# set a format which is simpler for console use
+formatter = logging.Formatter('%(asctime)s  %(funcName)-5s: %(levelname)-s, %(message)s',datefmt='%m-%d %H:%M')
+# tell the handler to use this format
+console.setFormatter(formatter)
+# add the handler to the root logger
+logging.getLogger('').addHandler(console)
+
+#device
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
 logging.info(f'Using device:  {device}')
 #flush cuda device memory
@@ -114,9 +131,6 @@ os.makedirs(opath,exist_ok=True)
 os.system(f'cp {__file__} {opath}')
 # saves a copy of the model to opath
 os.system(f'cp nn/neural_cme_seg/neural_cme_seg.py {opath}')
-
-# logger
-logging.basicConfig(filename=logfile, level=logging.INFO)
 
 #list of images on the trainig dataset
 imgs=[] #list of images on the trainig dataset
