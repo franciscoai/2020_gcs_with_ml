@@ -199,6 +199,9 @@ class neural_cme_segmentation():
         if np.isnan(mean):
             self.logger.warning('Found nan values in the normalized image. Replacing with the mean value')
             non_nan_mean = np.nanmean(oimage) # mean of the non-nan values        
+            if str(non_nan_mean).isdigit() == False:
+                self.logger.warning('Full nan, se pudre la momia')
+                breakpoint()
             oimage = np.nan_to_num(oimage, nan=non_nan_mean)
 
         if plot_histograms:
