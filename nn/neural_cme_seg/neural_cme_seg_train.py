@@ -98,7 +98,7 @@ batchSize=12 #number of images used in each iteration
 epochs=5 #number of iterations of the full training dataset
 train_dataset_prop=0.85 #proportion of the full dataset used for training. The rest is saved for validation
 random_rot = False # if True, the images are randomly rotated
-gpu=1 # GPU to use
+gpu=0 # GPU to use
 masks2use=[2] # list of masks to use, use None to use all masks found in the mask directory
 model_version='v5' # version of the model to use
 logfile=opath + "/training_logfile.txt" # log file
@@ -126,7 +126,7 @@ logging.info(f'Using device:  {device}')
 #flush cuda device memory
 torch.cuda.empty_cache()
 os.makedirs(opath,exist_ok=True)
-
+breakpoint()
 # saves a copy of this file to opath
 os.system(f'cp {__file__} {opath}')
 # saves a copy of the model to opath
