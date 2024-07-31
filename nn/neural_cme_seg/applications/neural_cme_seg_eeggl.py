@@ -346,6 +346,8 @@ device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.dev
 print(f'Using device:  {device}')
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
+#in order to the mask properties to be calculated according the selected mask_treshold.
+nn_seg.mask_threshold(mask_threshold)
 
 os.makedirs(opath, exist_ok=True)
 #inference on all images
