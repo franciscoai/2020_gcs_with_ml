@@ -42,6 +42,8 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
             img = cv2.resize(img, imageSize, cv2.INTER_LINEAR) #rezise the image  
         if normalization_func is not None:
             img = normalization_func(img)
+        if np.mean(img) == 0:
+            breakpoint()
         maskDir=os.path.join(ok_paths[idx], "mask") #path to the mask corresponding to the random image
         masks=[]
         labels = []
@@ -54,6 +56,8 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
             labels.append(lbl_idx)
             vesMask = cv2.imread(maskDir+'/'+mskName, 0) #reads the mask image in greyscale 
             vesMask = (vesMask > 0).astype(np.uint8) #The mask image is stored in 0–255 format and is converted to 0–1 format
+            if np.mean(vesMask) == 0:
+                breakpoint()
             if imageSize is not None:
                 vesMask=cv2.resize(vesMask,imageSize,cv2.INTER_NEAREST) #resizes the mask image to the same size of the random image
             masks.append(vesMask) # get bounding box coordinates for each mask  
@@ -126,7 +130,6 @@ logging.info(f'Using device:  {device}')
 #flush cuda device memory
 torch.cuda.empty_cache()
 os.makedirs(opath,exist_ok=True)
-breakpoint()
 # saves a copy of this file to opath
 os.system(f'cp {__file__} {opath}')
 # saves a copy of the model to opath
