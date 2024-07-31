@@ -88,8 +88,10 @@ def plot_to_png(ofile, orig_img, masks, scr_threshold=0.15, mask_threshold=0.6 ,
                     masked = nans.copy()
                     masked[:, :][masks[i][nb] > mask_threshold] = nb              
                     axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
-                    levels = [mask_threshold*0.9,mask_threshold*0.8]
-                    axs[i+1].contour(masked, levels=levels, colors='blue', linestyles='dashed')
+                    #levels = [mask_threshold*0.8,mask_threshold*0.9]
+                    levels = [0.5,0.6,0.7,0.8,0.9]
+                    axs[i+1].contour(masks[i][nb], levels=levels, colors=color[nb], linestyles='dashed')
+                    
                     box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
                     axs[i+1].add_patch(box)
                     if labels is not None:
@@ -135,8 +137,9 @@ def plot_to_png2(ofile, orig_img, event, all_center, mask_threshold, scr_thresho
                 masked = nans.copy()            
                 masked[:, :][masks[b] > mask_threshold] = event['CME_ID'][b]           
                 axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
-                levels = [mask_threshold*0.9,mask_threshold*0.8]
-                axs[i+1].contour(masked, levels=levels, colors='blue', linestyles='dashed')
+                levels = [0.5,0.6,0.7,0.8,0.9]
+                axs[i+1].contour(masks[b], levels=levels, colors=color[b], linestyles='dashed')
+                axs[i].contour(masks[b],   levels=levels, colors=color[b], linestyles='dashed')
 
                 box =  mpl.patches.Rectangle(event['BOX'][b][0:2], event['BOX'][b][2]- event['BOX'][b][0], event['BOX'][b][3]- event['BOX'][b][1], linewidth=2, edgecolor=color[int(event['CME_ID'][b])] , facecolor='none') # add box
                 axs[i+1].add_patch(box)
@@ -329,12 +332,13 @@ instr='cor2_b'
 #instr='lascoC2'
 
 #select infer event
-infer_event2=False #True
-infer_event1=True
+infer_event2=True #True
+infer_event1=False #True
+list_name = 'list.txt' #default with list_name = None
 
 #manage input and output paths
 ipath,opath,dir_modified_masks,list_name = manage_variables_niemela(cme_date_event,btot=btot,real_img=real_img,instr=instr,infer_event2=infer_event2,
-                                                                    modified_masks=modified_masks,list_name='test.txt')
+                                                                    modified_masks=modified_masks,list_name=list_name)
 #cor2_a mask_threshold = 0.88
 mask_threshold = 0.80 # value to consider a pixel belongs to the object
 scr_threshold  = 0.56 # only detections with score larger than this value are considered
