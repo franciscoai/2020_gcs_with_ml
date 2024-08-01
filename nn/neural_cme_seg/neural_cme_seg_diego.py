@@ -111,7 +111,8 @@ class neural_cme_segmentation():
         self.model.to(self.device)
         return
 
-    def normalize(self, image,histogram_names='',path='', sd_range=1.5, norm_limits=[None, None],increase_contrast=None):
+    def normalize(self, image,histogram_names='',path='', sd_range=1.5, norm_limits=[None, None],increase_contrast=None,
+                median_kernel=False, plot_histograms=False):
         '''
         Normalizes the input image to 0-1 range
         sd_range: number of standard deviations to use for normalization around the mean
@@ -126,9 +127,14 @@ class neural_cme_segmentation():
             image[image < norm_limits[0]] = 0
         if norm_limits[1] is not None:
             image[image > norm_limits[1]] = 1
+
         #using only 1 channel for statistics    
-        
         image_for_statistics = image[:,:,0].copy()
+        
+        #median kernel, should be an odd value, default should be 3
+        if median_kernel is not None:
+            oimage = cv2.medianBlur(oimage, median_kernel)
+        
         #remove NaN
         not_nan_values = image_for_statistics[~np.isnan(image_for_statistics)]    
         #remove occulter values fixed at 0
