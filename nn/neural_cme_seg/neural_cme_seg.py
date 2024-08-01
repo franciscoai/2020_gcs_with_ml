@@ -362,6 +362,8 @@ class neural_cme_segmentation():
         if getmask:
             images = self.get_mask(images, hdr)
 
+        if np.mean(images[:,:,0]) == 0:
+            breakpoint()
         images = self.normalize(images,histogram_names=histogram_names,path=path,increase_contrast=increase_contrast) # normalize to 0,1
         
         oimages = images.copy()                                   
