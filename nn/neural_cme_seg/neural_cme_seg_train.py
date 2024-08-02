@@ -44,6 +44,10 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
             img = normalization_func(img)
         if np.mean(img) == 0:
             breakpoint()
+        check_for_nan_images= ''.join(filter(str.isdigit,str(np.nanmean(img)) ))
+        if check_for_nan_images =='':
+            #self.logger.warning('Full nan, se pudre la momia')
+            breakpoint()
         maskDir=os.path.join(ok_paths[idx], "mask") #path to the mask corresponding to the random image
         masks=[]
         labels = []
