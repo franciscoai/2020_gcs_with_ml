@@ -40,14 +40,15 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
         img = cv2.imread(os.path.join(ok_paths[idx], file)) #reads the random image
         if imageSize is not None:
             img = cv2.resize(img, imageSize, cv2.INTER_LINEAR) #rezise the image  
+        if np.mean(img) == 0 and np.max(img) == 0:
+            print('Full zero image, skipping')
+            break
         if normalization_func is not None:
             img = normalization_func(img)
-        if np.mean(img) == 0:
-            breakpoint()
         check_for_nan_images= ''.join(filter(str.isdigit,str(np.nanmean(img)) ))
         if check_for_nan_images =='':
-            #self.logger.warning('Full nan, se pudre la momia')
-            breakpoint()
+            print('Full nan image, skipping')
+            break
         maskDir=os.path.join(ok_paths[idx], "mask") #path to the mask corresponding to the random image
         masks=[]
         labels = []
@@ -60,8 +61,9 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
             labels.append(lbl_idx)
             vesMask = cv2.imread(maskDir+'/'+mskName, 0) #reads the mask image in greyscale 
             vesMask = (vesMask > 0).astype(np.uint8) #The mask image is stored in 0–255 format and is converted to 0–1 format
-            if np.mean(vesMask) == 0:
-                breakpoint()
+            if np.mean(vesMask) == 0 and np.max(vesMask) == 0:
+                print('Full zero mask, skipping')
+                break
             if imageSize is not None:
                 vesMask=cv2.resize(vesMask,imageSize,cv2.INTER_NEAREST) #resizes the mask image to the same size of the random image
             masks.append(vesMask) # get bounding box coordinates for each mask  
@@ -151,6 +153,34 @@ logging.info(f'The total number of images found is {len(imgs)}')
 random.shuffle(imgs)
 imgs_train = imgs[:int(len(imgs)*train_dataset_prop)]
 imgs_val = imgs[int(len(imgs)*train_dataset_prop):]
+
+#enter each folder on imgs_train. read the images and masks which filneame ends with _1.png
+#if the mean value is 0, the image is discarded from the list.
+enable_check_zeros = False
+if enable_check_zeros:
+    for i in imgs_train:
+        files=os.listdir(i+'/mask/')
+        files=[f for f in files if f.endswith("_2.png")]
+        for f in files:
+            img = cv2.imread(i+"/mask/"+f)
+            if np.mean(img) == 0:
+                imgs_train.remove(i)
+                logging.info(f'Removing image from image train {i+"/mask/"+f}')
+                print(f'Removing image from image train {i+"/mask/"+f}')
+                break
+
+    for i in imgs_val:
+        files=os.listdir(i+'/mask/')
+        files=[f for f in files if f.endswith("_2.png")]
+        for f in files:
+            img = cv2.imread(i+"/mask/"+f)
+            if np.mean(img) == 0:
+                imgs_train.remove(i)
+                logging.info(f'Removing image from image val {i+"/mask/"+f}')
+                print(f'Removing image from image train {i+"/mask/"+f}')
+                break
+
+
 logging.info(f'The total number of images used for training is {len(imgs_train)}')
 # saves the list of images used for training and validation as csv files
 with open(opath + "/training_cases.csv", 'w') as file:

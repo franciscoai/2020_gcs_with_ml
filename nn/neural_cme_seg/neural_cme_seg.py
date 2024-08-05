@@ -201,7 +201,7 @@ class neural_cme_segmentation():
             non_nan_mean = np.nanmean(oimage) # mean of the non-nan values        
             if str(non_nan_mean).isdigit() == False:
                 self.logger.warning('Full nan, se pudre la momia')
-                breakpoint()
+                
             oimage = np.nan_to_num(oimage, nan=non_nan_mean)
 
         if plot_histograms:
@@ -362,8 +362,8 @@ class neural_cme_segmentation():
         if getmask:
             images = self.get_mask(images, hdr)
 
-        if np.mean(images[:,:,0]) == 0:
-            breakpoint()
+        #if np.mean(images[:,:,0]) == 0:
+        #    breakpoint()
         images = self.normalize(images,histogram_names=histogram_names,path=path,increase_contrast=increase_contrast) # normalize to 0,1
         
         oimages = images.copy()                                   
