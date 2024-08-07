@@ -29,9 +29,15 @@ def manage_variables_niemela(cme_date_event,btot=False,real_img=False,auxiliar='
                 opath = '/gehme/projects/2023_eeggl_validation/niemela_project/2010-04-03/output/'+instr+'/'+aux
         
 
-        #if modified_masks:
-            #modified_masks = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/EEGGL_project/new_masks20110215_cor2b_v13.pkl'
-            #opath = opath + 'modified_mask_v2/'
+        if modified_masks:
+            if instr == 'cor2_a':
+                modified_masks = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/new_masks20100403_cor2a_v1.pkl'
+            if instr == 'cor2_b':
+                modified_masks = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/new_masks20100403_cor2b_v1.pkl'
+            if instr == 'lascoC2':
+                modified_masks = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/new_masks20100403_lascoc2_v1.pkl'
+            opath = '/gehme/projects/2023_eeggl_validation/niemela_project/2010-04-03/output/'+instr+'/'+aux
+            opath = opath + 'modified_mask_v2/'
         if not list_name: 
             list_name = 'list.txt'
     #breakpoint()

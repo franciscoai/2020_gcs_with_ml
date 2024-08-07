@@ -11,6 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath
 from nn.utils.gcs_mask_generator import maskFromCloud_3d
 from pyGCS_raytrace import pyGCS
 import pickle
+import pandas as pd
 mpl.use('Agg')
 
 __author__ = "Francisco Iglesias"
@@ -89,15 +90,15 @@ def load_data(dpath, occ_size, select=None):
         oplotranges.append([plotranges[i] for i in idx])
         ofilenames.append([filenames[i] for i in idx])
         oocc_sizes.append([occ_sizes[i] for i in idx])
-        omasks_prop.append([masks_prop[i] for i in idx])
-    
+        #omasks_prop.append([masks_prop[i] for i in idx])
+    #breakpoint()
     if select is not None:
         omasks = [omasks[i] for i in select]
         osatpos = [osatpos[i] for i in select]
         oplotranges = [oplotranges[i] for i in select]
         ofilenames = [ofilenames[i] for i in select]
         oocc_sizes = [oocc_sizes[i] for i in select]
-        omasks_prop = [omasks_prop[i] for i in select]
+        #omasks_prop = [omasks_prop[i] for i in select]
     return omasks, ofilenames, osatpos, oplotranges, oocc_sizes, omasks_prop
 
 def plot_to_png(ofile, fnames,omask, fitmask, manual_mask):
@@ -193,30 +194,58 @@ Fits a filled masks created with GCS model to the data
 #Constants
 dpath =  '/gehme/projects/2023_eeggl_validation/niemela_project/gcs_20100403_mask'
 opath = dpath + '/gcs_fit'
-select = [-4, -3, -2, -1] # select the time instants to fit, in order as read from dpath
-manual_gcs = '/gehme/projects/2023_eeggl_validation/niemela_project/GCS_20130424'
+select = None#[-4, -3, -2, -1] # select the time instants to fit, in order as read from dpath
+manual_gcs_path = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/'
 imsize = [512, 512] # image size
 gcs_par_range = [[-180,180],[-90,90],[-90,90],[1,50],[0.1,0.9], [1,80]] # bounds for the fit gcs parameters
 occ_size = [50,75,90] # Artifitial occulter radius in pixels. Use 0 to avoid. [Stereo-A C2, Stereo-B C2, Lasco-C2]
-
+Event_Number = 3
 # Load data
 meas_masks, fnames, satpos, plotranges, occ_sizes, masks_prop= load_data(dpath, occ_size, select=select)
-breakpoint()
-mask_total_px = [np.sum(m, axis=(1,2)) for m in meas_masks] # total number of px in the mask
+#breakpoint()
+mask_total_px = [np.sum(m, axis=(1,2)) for m in meas_masks] # total number of positive pixels in the mask
+
+csv_file = 'Event_list.csv'
+df = pd.read_csv(manual_gcs_path+csv_file)
 
 #loads manual gcs for IDL .sav file
 #CMElon, CMElat, CMEtilt, height, k, ang
-gcs_files= sorted(os.listdir(manual_gcs))
-gcs_files =[f for f in gcs_files if f.endswith(".sav")]
-gcs_files = sorted(gcs_files, key=lambda x: x[0] != 'm')
+#gcs_files= sorted(os.listdir(manual_gcs))
+#gcs_files =[f for f in gcs_files if f.endswith(".sav")]
+#gcs_files = sorted(gcs_files, key=lambda x: x[0] != 'm')
+gcs_hebe_par = []
+gcs_tony_par = []
+
+#Read df in triplets
+# Read df in triplets
 gcs_manual_par = []
-for f in gcs_files:
-    temp = readsav(os.path.join(manual_gcs, f))
+df_event = df[df['Event_Number']==Event_Number]
+#temp = readsav('/gehme/projects/2023_eeggl_validation/niemela_project/GCS_20130424/5.sav')
+for i in range(1, len(df_event), 3):
+    print,i
+    
+    #quiero seleccionar la 2da linea de cada tripleta, que es donde ponemos la informacion.
+    gcs_hebe_par.append([[float(str(df_event.iloc[i]['Long_H']).replace(",", "."))],
+                        [float(str(df_event.iloc[i]['Lat_H']).replace(",", "."))],
+                        [float(str(df_event.iloc[i]['Tilt_H']).replace(",", "."))],
+                        [float(str(df_event.iloc[i]['Height_H']).replace(",", "."))],
+                        [float(str(df_event.iloc[i]['Ratio_H']).replace(",", "."))],
+                        [float(str(df_event.iloc[i]['Half_Angle_H']).replace(",", "."))] ] )
+    
+    gcs_tony_par.append([[float(str(df_event.iloc[i]['Long']).replace(",", "."))],
+                        [float(str(df_event.iloc[i]['Lat']).replace(",", "."))],
+                        [float(str(df_event.iloc[i]['Tilt']).replace(",", "."))],
+                        [float(str(df_event.iloc[i]['Height']).replace(",", "."))],
+                        [float(str(df_event.iloc[i]['Ratio']).replace(",", "."))],
+                        [float(str(df_event.iloc[i]['Half_Angle']).replace(",", "."))] ] )
+#breakpoint()
+#for f in gcs_files:
+    #temp = readsav(os.path.join(manual_gcs, f))
     #breakpoint()
-    gcs_manual_par.append([np.degrees(float(temp['sgui']['lon'])), np.degrees(float(temp['sgui']['lat'])), np.degrees(float(temp['sgui']['rot'])),
-                float(temp['sgui']['hgt']), float(temp['sgui']['rat']), np.degrees(float(temp['sgui']['han']))])
+    #gcs_manual_par.append([np.degrees(float(temp['sgui']['lon'])), np.degrees(float(temp['sgui']['lat'])), np.degrees(float(temp['sgui']['rot'])),
+    #            float(temp['sgui']['hgt']), float(temp['sgui']['rat']), np.degrees(float(temp['sgui']['han']))])
 # keeps only select
-gcs_manual_par = [gcs_manual_par[i] for i in select]
+#gcs_manual_par = [gcs_manual_par[i] for i in select]
 
 # read /gehme/projects/2023_eeggl_validation/niemela_project/gcs_events
 # guardar en gcs_manual
@@ -238,34 +267,46 @@ low_bounds= np.append(low_bounds, np.full(len(meas_masks), gcs_par_range[3][0]))
 # ini_cond = np.append(ini_cond, np.arange(len(meas_masks))+gcs_param_ini[3])
 #breakpoint()
 # CMElat from LASCO maks CPA
-ini_lat = np.median([masks_prop[i][2][1] for i in range(len(masks_prop))])
-print(ini_lat)
+#ini_lat = np.median([masks_prop[i][2][1] for i in range(len(masks_prop))])
+#print(ini_lat)
 # change from 0 to 360 to -90 to 90
-if ini_lat > 90 and ini_lat < 180:
-    ini_lat = 180 - ini_lat 
-elif ini_lat > 180 and ini_lat < 270:
-    ini_lat = -(ini_lat - 180)
-elif ini_lat > 270 and ini_lat < 360:
-    ini_lat -= 360
+#if ini_lat > 90 and ini_lat < 180:
+#    ini_lat = 180 - ini_lat 
+#elif ini_lat > 180 and ini_lat < 270:
+#    ini_lat = -(ini_lat - 180)
+#elif ini_lat > 270 and ini_lat < 360:
+#    ini_lat -= 360
 
 # ang from the min mask AW
-ini_ang = np.min([masks_prop[i][j][2] for i in range(len(masks_prop)) for j in range(len(masks_prop[i]))])/2.
+#ini_ang = np.min([masks_prop[i][j][2] for i in range(len(masks_prop)) for j in range(len(masks_prop[i]))])/2.
 # heights from each LASCO mask height
-ini_height = [masks_prop[i][2][3] for i in range(len(masks_prop))]
+#ini_height = [masks_prop[i][2][3] for i in range(len(masks_prop))]
 # k at half the bounds
-ini_k = (gcs_par_range[4][0] + gcs_par_range[4][1])/2.
+#ini_k = (gcs_par_range[4][0] + gcs_par_range[4][1])/2.
 # CMElon from LASCO mask CPA
-ini_lon = np.median([masks_prop[2][0]])
-if ini_lon < 90 or ini_lon > 270:
-    ini_lon = 90
-else:
-    ini_lon = -90
+#ini_lon = np.median([masks_prop[2][0]])
+#if ini_lon < 90 or ini_lon > 270:
+#    ini_lon = 90
+#else:
+#    ini_lon = -90
+
+#estimating initial conditions from gcs_hebe_par
+#breakpoint()
+ini_lon    = np.nanmean([gcs_hebe_par[i][0] for i in range(len(gcs_hebe_par))])
+ini_lat    = np.nanmean([gcs_hebe_par[i][1] for i in range(len(gcs_hebe_par))])
+ini_tilt   = np.nanmean([gcs_hebe_par[i][2] for i in range(len(gcs_hebe_par))])
+ini_height = np.nanmean([gcs_hebe_par[i][3] for i in range(len(gcs_hebe_par))])
+ini_k      = np.nanmean([gcs_hebe_par[i][4] for i in range(len(gcs_hebe_par))])
+ini_ang    = np.nanmean([gcs_hebe_par[i][5] for i in range(len(gcs_hebe_par))])
+
+
+
 ini_cond = np.array([ini_lon, ini_lat, 0, ini_k, ini_ang]+ini_height).flatten()
 # if initial conditions are outside bounds use the closest
-if np.any(ini_cond < low_bounds) or np.any(ini_cond > up_bounds):
-    print('Warning: Initial conditions are outside bounds. Using closest bounds')
-    ini_cond = np.clip(ini_cond, low_bounds, up_bounds)
-#breakpoint()
+#if np.any(ini_cond < low_bounds) or np.any(ini_cond > up_bounds):
+#    print('Warning: Initial conditions are outside bounds. Using closest bounds')
+#    ini_cond = np.clip(ini_cond, low_bounds, up_bounds)
+breakpoint()
 print('Fitting GCS model with initial conditions: ', ini_cond)
 #usar metodo lm
 fit=least_squares(gcs_mask_error, ini_cond , method='trf', 
@@ -276,7 +317,7 @@ fit=least_squares(gcs_mask_error, ini_cond , method='trf',
                 kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'mask_total_px':mask_total_px, 'occ_size':occ_sizes}, 
                 verbose=2, bounds=(low_bounds,up_bounds), diff_step=.5, xtol=1e-15) #, x_scale=scales)
 print('The fit parameters are: ', fit.x)
-
+breakpoint()
 # saves to pickle
 with open(os.path.join(opath, 'gcs_fit.pkl'), 'wb') as f:
     pickle.dump(fit, f)

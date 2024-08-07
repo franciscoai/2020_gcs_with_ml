@@ -315,7 +315,7 @@ model_version="v4"
 #run = 'run005_AWSoM_restart_run038_AWSoM'
 btot  = False       #Synthetic images created using pyGCS.
 real_img = True    #Real images from cor2a, cor2b, lascoC2, level1.
-modified_masks = None #If True, it will use the modified masks for the real images. If None, it will use the original masks.
+modified_masks = True #If True, it will use the modified masks for the real images. If None, it will use the original masks.
 #---------------------------
 #increase contrast radialy, usefull for siimulations.
 increase_contrast = None #None or True. Will apply to infer2. IMPORTANT for eeggl.
@@ -328,8 +328,8 @@ running_difference = True
 
 #select instrument of event
 #instr='cor2_a'
-instr='cor2_b'
-#instr='lascoC2'
+#instr='cor2_b'
+instr='lascoC2'
 
 #select infer event
 infer_event2=True #True
