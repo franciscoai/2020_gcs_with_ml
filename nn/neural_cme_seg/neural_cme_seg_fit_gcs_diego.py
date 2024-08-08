@@ -12,6 +12,8 @@ from nn.utils.gcs_mask_generator import maskFromCloud_3d
 from pyGCS_raytrace import pyGCS
 import pickle
 import pandas as pd
+from datetime import datetime
+import matplotlib.dates as mdates
 mpl.use('Agg')
 
 __author__ = "Francisco Iglesias"
@@ -33,6 +35,7 @@ def load_data(dpath, occ_size, select=None):
     headers = []
     filenames = []
     occ_sizes = []
+    dates = []
     files = sorted(os.listdir(dpath))
     files =[f for f in files if f.endswith(".fits")]
     for f in files:
@@ -50,9 +53,11 @@ def load_data(dpath, occ_size, select=None):
                     occ_sizes.append(occ_size[0])
                 if ('STEREO_B' in hdr['OBSRVTRY']):
                     occ_sizes.append(occ_size[1])
+                dates.append(datetime.strptime(hdr['date-obs'], '%Y-%m-%dT%H:%M:%S.%f'))
         elif 'INSTRUME' in hdr.keys():
             if 'LASCO' in hdr['INSTRUME'] and 'C2' in hdr['DETECTOR']:
                 occ_sizes.append(occ_size[2])
+                dates.append(datetime.strptime(hdr['date-obs'], '%Y-%m-%dT%H:%M:%S.%f'))
         else:
             print('Error: Could not find the instrument name in the headers')
             breakpoint()
@@ -91,15 +96,15 @@ def load_data(dpath, occ_size, select=None):
         ofilenames.append([filenames[i] for i in idx])
         oocc_sizes.append([occ_sizes[i] for i in idx])
         #omasks_prop.append([masks_prop[i] for i in idx])
-    #breakpoint()
     if select is not None:
         omasks = [omasks[i] for i in select]
         osatpos = [osatpos[i] for i in select]
         oplotranges = [oplotranges[i] for i in select]
         ofilenames = [ofilenames[i] for i in select]
         oocc_sizes = [oocc_sizes[i] for i in select]
+        dates      = [dates[i] for i in select]
         #omasks_prop = [omasks_prop[i] for i in select]
-    return omasks, ofilenames, osatpos, oplotranges, oocc_sizes, omasks_prop
+    return omasks, ofilenames, osatpos, oplotranges, oocc_sizes, omasks_prop,dates
 
 def plot_to_png(ofile, fnames,omask, fitmask, manual_mask):
     """
@@ -137,24 +142,43 @@ def plot_to_png(ofile, fnames,omask, fitmask, manual_mask):
     plt.savefig(ofile)
     plt.close()
 
-def plot_gcs_param_vs_time(fit_par, gcs_manual_par, opath, ylim=None):
+def plot_gcs_param_vs_time(fit_par, gcs_manual_par,dates,tiempos, opath, ylim=None):
     """
     Plots the 6 gcs parameters vs time
     :param fit_par: fit parameters, list of [CMElon, CMElat, CMEtilt,height, k, ang]
+    :dates correspond to fit_par
+    :tiempos correspond to gcs_manual_par
     :param gcs_manual_par: manual gcs parameters, list of [CMElon, CMElat, CMEtilt,height, k, ang]
     :param opath: output path
     :param ylim: y limits
     """
     fig, axs = plt.subplots(3, 2, figsize=[12,8])
     axs = axs.ravel()
+    xfmt = mdates.DateFormatter('%H:%M')
+    x_dates   = [mdates.date2num(dt) for dt in dates]
+    breakpoint()
+    x_tiempos = [mdates.date2num(dt) for dt in tiempos]
     for t in range(len(fit_par)):
         for i in range(6):
-            axs[i].plot(t, fit_par[t][i], 'o', color='r', label='fit')
-            axs[i].plot(t, gcs_manual_par[t][i], 'o', color='b', label='manual')
+            axs[i].plot(x_dates[t], fit_par[t][i], 'o', color='r', label='fit')
+            #axs[i].plot(tiempos[t], gcs_manual_par[t][i], 'x', color='b', label='manual')
             if ylim is not None:
                 axs[i].set_ylim(ylim[i])
             if t==0 and i==0:
                 axs[i].legend()
+            axs[i].xaxis.set_major_formatter(xfmt)
+
+    #TODO, hacer andar esto de abajo.
+    for t in range(len(gcs_manual_par)):
+        for i in range(6):
+            #axs[i].plot(x_dates[t], fit_par[t][i], 'o', color='r', label='fit')
+            axs[i].plot(x_tiempos[t], gcs_manual_par[t][i], 'x', color='b', label='manual')
+            if ylim is not None:
+                axs[i].set_ylim(ylim[i])
+            if t==0 and i==0:
+                axs[i].legend()
+            axs[i].xaxis.set_major_formatter(xfmt)
+
     axs[0].set_ylabel('CMElon')
     axs[1].set_ylabel('CMElat')
     axs[2].set_ylabel('CMEtilt')
@@ -194,14 +218,14 @@ Fits a filled masks created with GCS model to the data
 #Constants
 dpath =  '/gehme/projects/2023_eeggl_validation/niemela_project/gcs_20100403_mask'
 opath = dpath + '/gcs_fit'
-select = None#[-4, -3, -2, -1] # select the time instants to fit, in order as read from dpath
+select = select=[2,3,4,5,6,7,8,9,10,11,12] #None # select the time instants to fit, in order as read from dpath
 manual_gcs_path = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/'
 imsize = [512, 512] # image size
 gcs_par_range = [[-180,180],[-90,90],[-90,90],[1,50],[0.1,0.9], [1,80]] # bounds for the fit gcs parameters
 occ_size = [50,75,90] # Artifitial occulter radius in pixels. Use 0 to avoid. [Stereo-A C2, Stereo-B C2, Lasco-C2]
 Event_Number = 3
 # Load data
-meas_masks, fnames, satpos, plotranges, occ_sizes, masks_prop= load_data(dpath, occ_size, select=select)
+meas_masks, fnames, satpos, plotranges, occ_sizes, masks_prop, dates= load_data(dpath, occ_size, select=select)
 #breakpoint()
 mask_total_px = [np.sum(m, axis=(1,2)) for m in meas_masks] # total number of positive pixels in the mask
 
@@ -215,11 +239,13 @@ df = pd.read_csv(manual_gcs_path+csv_file)
 #gcs_files = sorted(gcs_files, key=lambda x: x[0] != 'm')
 gcs_hebe_par = []
 gcs_tony_par = []
-
+time_hebe    = []
+time_tony    = []
 #Read df in triplets
 # Read df in triplets
 gcs_manual_par = []
 df_event = df[df['Event_Number']==Event_Number]
+
 #temp = readsav('/gehme/projects/2023_eeggl_validation/niemela_project/GCS_20130424/5.sav')
 for i in range(1, len(df_event), 3):
     print,i
@@ -231,14 +257,15 @@ for i in range(1, len(df_event), 3):
                         [float(str(df_event.iloc[i]['Height_H']).replace(",", "."))],
                         [float(str(df_event.iloc[i]['Ratio_H']).replace(",", "."))],
                         [float(str(df_event.iloc[i]['Half_Angle_H']).replace(",", "."))] ] )
-    
+    time_hebe.append(datetime.strptime(df_event.iloc[i]['Date'],'%Y-%m-%dT%H-%M'))  
     gcs_tony_par.append([[float(str(df_event.iloc[i]['Long']).replace(",", "."))],
                         [float(str(df_event.iloc[i]['Lat']).replace(",", "."))],
                         [float(str(df_event.iloc[i]['Tilt']).replace(",", "."))],
                         [float(str(df_event.iloc[i]['Height']).replace(",", "."))],
                         [float(str(df_event.iloc[i]['Ratio']).replace(",", "."))],
                         [float(str(df_event.iloc[i]['Half_Angle']).replace(",", "."))] ] )
-#breakpoint()
+    time_tony.append(datetime.strptime(df_event.iloc[i]['Date'],'%Y-%m-%dT%H-%M')) 
+gcs_manual_par = gcs_hebe_par
 #for f in gcs_files:
     #temp = readsav(os.path.join(manual_gcs, f))
     #breakpoint()
@@ -295,21 +322,44 @@ low_bounds= np.append(low_bounds, np.full(len(meas_masks), gcs_par_range[3][0]))
 ini_lon    = np.nanmean([gcs_hebe_par[i][0] for i in range(len(gcs_hebe_par))])
 ini_lat    = np.nanmean([gcs_hebe_par[i][1] for i in range(len(gcs_hebe_par))])
 ini_tilt   = np.nanmean([gcs_hebe_par[i][2] for i in range(len(gcs_hebe_par))])
-ini_height = np.nanmean([gcs_hebe_par[i][3] for i in range(len(gcs_hebe_par))])
+#ini_height = np.nanmean([gcs_hebe_par[i][3] for i in range(len(gcs_hebe_par))])
 ini_k      = np.nanmean([gcs_hebe_par[i][4] for i in range(len(gcs_hebe_par))])
 ini_ang    = np.nanmean([gcs_hebe_par[i][5] for i in range(len(gcs_hebe_par))])
 
+#gcs height vs time, second order fit
+altura  = [gcs_hebe_par[i][3][0] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
+tiempos = [time_hebe[i] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
+#TODO, remover de gcs_manual_par los mismos elementos que de tiempos.
+tiempos_to_fit = np.array([(date - tiempos[0]).total_seconds() for date in tiempos])
+coefs = np.polyfit(tiempos_to_fit,altura, 2)
+poly_func = np.poly1d(coefs)
 
+plot_gcs_height_fit = False
+if plot_gcs_height_fit:
+    # Generate fitted values for plotting
+    x_fit = np.linspace(tiempos_to_fit.min(), tiempos_to_fit.max(), 100)
+    y_fit = poly_func(x_fit)
+    plt.plot(tiempos_to_fit,altura,'o')
+    plt.plot(x_fit,y_fit,'x')
+    plt.savefig(os.path.join(opath, 'ajuste_altura2.png'))
+    plt.close()
 
-ini_cond = np.array([ini_lon, ini_lat, 0, ini_k, ini_ang]+ini_height).flatten()
+#height from masks estimated using the function poly_func "gcs_height(time)"
+
+ini_height = poly_func(np.array([( asd- tiempos[0]).total_seconds() for asd in dates]))
+
+#breakpoint()
+ini_cond_0 = np.array([ini_lon, ini_lat, ini_tilt, ini_k, ini_ang]+ini_height.tolist()).flatten()
 # if initial conditions are outside bounds use the closest
 #if np.any(ini_cond < low_bounds) or np.any(ini_cond > up_bounds):
 #    print('Warning: Initial conditions are outside bounds. Using closest bounds')
 #    ini_cond = np.clip(ini_cond, low_bounds, up_bounds)
-breakpoint()
-print('Fitting GCS model with initial conditions: ', ini_cond)
+#breakpoint()
+print('Fitting GCS model with initial conditions: ', ini_cond_0)
+
 #usar metodo lm
-fit=least_squares(gcs_mask_error, ini_cond , method='trf', 
+#TODO, ver xq no hay minimizacion.
+fit=least_squares(gcs_mask_error, ini_cond_0 , method='trf', 
                 kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'mask_total_px':mask_total_px, 'occ_size':occ_sizes}, 
                 verbose=2, bounds=(low_bounds,up_bounds), diff_step=.5, xtol=1e-15) #, x_scale=scales)
 ini_cond = fit.x
@@ -326,9 +376,11 @@ with open(os.path.join(opath, 'gcs_fit.pkl'), 'wb') as f:
 gcs_fit_par = []
 for i in range(len(meas_masks)):
     gcs_fit_par.append([fit.x[0], fit.x[1], -fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]]) # TODO the tilt signs seems to be OPOSITE in pyGCS???
-plot_gcs_param_vs_time(gcs_fit_par, gcs_manual_par, opath, ylim=gcs_par_range)
+plot_gcs_param_vs_time(gcs_fit_par, gcs_manual_par, dates,tiempos,opath, ylim=gcs_par_range)
+breakpoint()
 
 # plots the fit mask along with the original masks
+#TODO, hacer andar las mascaras de abajo, usar dates y tiempos.
 for i in range(len(meas_masks)):
     gcs_param = [fit.x[0], fit.x[1], fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]]
     mask = maskFromCloud_3d(gcs_param, satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
