@@ -330,14 +330,22 @@ class SiratsPlotter:
         par_loss_weight = par_loss_weight.cpu().detach().numpy()
         # read shape 0 of predictions and add the same shape to par_loss_weight
         par_loss_weight = np.tile(par_loss_weight, (predictions.shape[0], 1))
-        errors = par_loss_weight * (predictions - targets) ** 2
+        l1_err = predictions - targets
+        mean_square_err = np.mean(par_loss_weight * (predictions - targets) ** 2, axis=0)
+        mean = np.mean(l1_err, axis=0)
+        std = np.std(l1_err, axis=0)
+        std3 = 3 * std
+
 
         # Generate histograms
         fig, ax = plt.subplots(1, 6, figsize=(23, 7))
-        fig.tight_layout()
+        fig.tight_layout(pad=3.0) # Increase the padding between subplots
+        plt.subplots_adjust(top=0.85)  # Adjust the top of the plot to give more space for titles
+
         for i in range(6):
-            ax[i].hist(errors[:, i], bins=30)
-            ax[i].set_title(f'{titles[i]}')
+            ax[i].hist(l1_err[:, i], bins=30)
+            ax[i].set_title(f'{titles[i]}\nmean={mean[i]:.2f}, std={std[i]:.2f}\n3std={std3[i]:.2f}, MSE={mean_square_err[i]:.2f}', fontsize=10)
+            ax[i].set_yscale('log')
 
         # Save the figure
         opath = os.path.join(opath, 'infered_masks')
