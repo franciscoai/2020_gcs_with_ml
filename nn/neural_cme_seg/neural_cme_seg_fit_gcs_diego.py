@@ -115,17 +115,18 @@ def plot_to_png(ofile, fnames,omask, fitmask, manual_mask):
     nans = np.full(np.shape(omask[0]), np.nan)
     fig, axs = plt.subplots(3, 3, figsize=[10,10])
     axs = axs.ravel()
+    breakpoint()
     for i in range(len(fnames)):
         axs[i].imshow(omask[i], vmin=0, vmax=1, cmap='gray', origin='lower')
         axs[i].axis('off')
-        axs[i+3].imshow(fitmask[i], vmin=0, vmax=1, cmap='gray', origin='lower')        
-        axs[i+3].axis('off')   
-        axs[i+6].imshow(manual_mask[i], vmin=0, vmax=1, cmap='gray', origin='lower')  
-        axs[i+6].axis('off')
+        axs[i+2].imshow(fitmask[i], vmin=0, vmax=1, cmap='gray', origin='lower')        
+        axs[i+2].axis('off')   
+        axs[i+4].imshow(manual_mask[i], vmin=0, vmax=1, cmap='gray', origin='lower')  
+        axs[i+4].axis('off')
         # adds a cross to the center of the image
         axs[i].plot(np.shape(omask[i])[0]/2., np.shape(omask[i])[1]/2., 'x', color='r')
-        axs[i+3].plot(np.shape(omask[i])[0]/2., np.shape(omask[i])[1]/2., 'x', color='r')
-        axs[i+6].plot(np.shape(omask[i])[0]/2., np.shape(omask[i])[1]/2., 'x', color='r')
+        axs[i+2].plot(np.shape(omask[i])[0]/2., np.shape(omask[i])[1]/2., 'x', color='r')
+        axs[i+4].plot(np.shape(omask[i])[0]/2., np.shape(omask[i])[1]/2., 'x', color='r')
         # masked = nans.copy()
         # masked[:, :][omask[i] > 0.1] = 0              
         # axs[i].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
@@ -134,10 +135,51 @@ def plot_to_png(ofile, fnames,omask, fitmask, manual_mask):
         # axs[i+3].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
     axs[0].set_title(f'Cor A: {fnames[0]}')
     axs[1].set_title(f'Cor B: {fnames[1]}')
-    axs[2].set_title(f'Lasco: {fnames[2]}')   
+    #axs[2].set_title(f'Lasco: {fnames[2]}')   
     axs[0].set_ylabel('Neural mask')
-    axs[3].set_ylabel('Fit to neural mask')
-    axs[6].set_ylabel('Manual fit')
+    axs[2].set_ylabel('Fit to neural mask')
+    axs[4].set_ylabel('Manual fit')
+    #plt.tight_layout()
+    plt.savefig(ofile)
+    plt.close()
+
+def plot_to_png_diego(ofile, fnames,omask, fitmask, manual_mask):
+    """
+    plots the original mask and the fitted masks to a png file
+    """    
+    color=['b','r','g','k','y','m','c','w','b','r','g','k','y','m','c','w']
+    cmap = mpl.colors.ListedColormap(color)  
+    nans = np.full(np.shape(omask[0]), np.nan)
+    fig, axs = plt.subplots(nrows=3, ncols=2, figsize=[10,10])
+    axs = axs.ravel()
+    #j=0
+    for j in range(len(fnames)):
+        #axs[j].imshow(omask[j][0,:,:], vmin=0, vmax=1, cmap='gray', origin='lower')
+        fliped_image = np.flip(np.flip(omask[j][0,:,:],axis=0),axis=1)
+        axs[j].imshow(fliped_image, vmin=0, vmax=1, cmap='gray', origin='lower')
+        axs[j].axis('off')
+        axs[j+2].imshow(fitmask[j][0], vmin=0, vmax=1, cmap='Reds', origin='lower')        
+        axs[j+2].axis('off')   
+        axs[j+4].imshow(manual_mask[j][0], vmin=0, vmax=1, cmap='Blues', origin='lower')  
+        axs[j+4].axis('off')
+        #j=j+3
+        # adds a cross to the center of the image
+        #breakpoint()
+        axs[j].plot(  np.shape(omask[j][0,:,:])[0]/2., np.shape(omask[j][0,:,:])[1]/2., 'x', color='r')
+        axs[j+2].plot(np.shape(omask[j][0,:,:])[0]/2., np.shape(omask[j][0,:,:])[1]/2., 'x', color='r')
+        axs[j+4].plot(np.shape(omask[j][0,:,:])[0]/2., np.shape(omask[j][0,:,:])[1]/2., 'x', color='r')
+        # masked = nans.copy()
+        # masked[:, :][omask[i] > 0.1] = 0              
+        # axs[i].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
+        # masked = nans.copy()
+        # masked[:, :][fitmask[i] > 0.1] = 0
+        # axs[i+3].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
+    axs[0].set_title(f'Cor A: {fnames[0]}')
+    axs[1].set_title(f'Cor B: {fnames[1]}')
+    #axs[2].set_title(f'Lasco: {fnames[2]}')   
+    axs[0].set_ylabel('Neural mask')
+    axs[1].set_ylabel('Fit to neural mask')
+    #axs[4].set_ylabel('Manual fit')
     #plt.tight_layout()
     plt.savefig(ofile)
     plt.close()
@@ -156,7 +198,6 @@ def plot_gcs_param_vs_time(fit_par, gcs_manual_par,dates,tiempos, opath, ylim=No
     axs = axs.ravel()
     xfmt = mdates.DateFormatter('%H:%M')
     x_dates   = [mdates.date2num(dt) for dt in dates]
-    breakpoint()
     x_tiempos = [mdates.date2num(dt) for dt in tiempos]
     for t in range(len(fit_par)):
         for i in range(6):
@@ -168,13 +209,12 @@ def plot_gcs_param_vs_time(fit_par, gcs_manual_par,dates,tiempos, opath, ylim=No
                 axs[i].legend()
             axs[i].xaxis.set_major_formatter(xfmt)
 
-    #TODO, hacer andar esto de abajo.
     for t in range(len(gcs_manual_par)):
         for i in range(6):
             #axs[i].plot(x_dates[t], fit_par[t][i], 'o', color='r', label='fit')
             axs[i].plot(x_tiempos[t], gcs_manual_par[t][i], 'x', color='b', label='manual')
-            if ylim is not None:
-                axs[i].set_ylim(ylim[i])
+            #if ylim is not None:
+            #    axs[i].set_ylim(ylim[i])
             if t==0 and i==0:
                 axs[i].legend()
             axs[i].xaxis.set_major_formatter(xfmt)
@@ -207,10 +247,52 @@ def gcs_mask_error(gcs_par, satpos, plotranges, masks, mask_total_px, imsize, oc
         this_gcs_par = [gcs_par[0], gcs_par[1], gcs_par[2], gcs_par[5+i], gcs_par[3], gcs_par[4]] 
         mask = maskFromCloud_3d(this_gcs_par, satpos[i], imsize, plotranges[i], occ_size=occ_size[i])
         #breakpoint()
-        error.append(np.mean((np.array(mask) - masks[i]), axis=(1,2))**2 /mask_total_px[i])
-        #print(gcs_par, np.mean(error))
+        error.append(np.mean((np.array(mask) - masks[i]), axis=(1,2))**2)# /mask_total_px[i])
+        #agregar IOU
+        #agregar opcion de vector que permita pesar entre o y 1 cor2a - b y C2.
+        print(gcs_par, np.mean(error))
     return np.array(error).flatten()
 
+def gcs_mask_error_diego(gcs_par, satpos, plotranges, masks, mask_total_px, imsize, occ_size):
+    """
+    Computes the error between the input masks and the maks from GCS model
+    :param gcs_par: GCS model parameters. The param are: CMElon, CMElat, CMEtilt, k, ang, , height0, height1, height2, ...
+                    For all images they are all the same except for height, wich is different for each set of three images (time instant)
+    :param satpos: satellite position
+    :param plotranges: plot ranges
+    :param masks: masks to compare
+    :param mask_total_px: total number of px in each mask
+    :param imsize: image size
+    :param occ_size: occulter size
+    :return: error
+    """
+    error = []
+    
+    #Para cada par o triplete de imagenes, que conrresponden al mismo tiempo, asignarle la misma altura.
+    #En caso contrario se ajustan tantas alturas como satpos haya para ese mismo tiempo.
+    #breakpoint()
+    for i in range(len(masks)):
+        #this_gcs_par = [gcs_par[0], gcs_par[1], gcs_par[2], gcs_par[5+i], gcs_par[3], gcs_par[4]] 
+        this_gcs_par = [gcs_par[0], gcs_par[1], gcs_par[2], gcs_par[5], gcs_par[3], gcs_par[4]]
+        mask = maskFromCloud_3d(this_gcs_par, satpos[i], imsize, plotranges[i], occ_size=occ_size[i])
+        #breakpoint()
+        
+        #cuadrados minimos
+        #error.append(np.mean((np.array(mask) - masks[i]), axis=(1,2))**2)# /mask_total_px[i])
+        
+        #IOU
+        intersection = np.logical_and(mask, masks[i])
+        union = np.logical_or(mask, masks[i])
+        error.append(np.sum(intersection) / np.sum(union))
+        breakpoint()
+        # CHECK!!
+        #intersecciion da 0, hacer plot de las mascaras.
+        #hacer doble flip.
+        #fliped_image = np.flip(np.flip(omask[j][0,:,:],axis=0),axis=1)
+
+        #agregar opcion de vector que permita pesar entre o y 1 cor2a - b y C2.
+        print(gcs_par, np.mean(error))
+    return np.array(error).flatten()
 ############ Main
 '''
 Fits a filled masks created with GCS model to the data
@@ -218,15 +300,14 @@ Fits a filled masks created with GCS model to the data
 #Constants
 dpath =  '/gehme/projects/2023_eeggl_validation/niemela_project/gcs_20100403_mask'
 opath = dpath + '/gcs_fit'
-select = select=[2,3,4,5,6,7,8,9,10,11,12] #None # select the time instants to fit, in order as read from dpath
+select = select=[4,5]#4,5,7,8,11,12] #None # select the time instants to fit, in order as read from dpath
 manual_gcs_path = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/'
 imsize = [512, 512] # image size
-gcs_par_range = [[-180,180],[-90,90],[-90,90],[1,50],[0.1,0.9], [1,80]] # bounds for the fit gcs parameters
+gcs_par_range = [[-180,180],[-90,90],[-90,90],[4,20],[0.1,0.9], [1,80]] # bounds for the fit gcs parameters
 occ_size = [50,75,90] # Artifitial occulter radius in pixels. Use 0 to avoid. [Stereo-A C2, Stereo-B C2, Lasco-C2]
 Event_Number = 3
 # Load data
 meas_masks, fnames, satpos, plotranges, occ_sizes, masks_prop, dates= load_data(dpath, occ_size, select=select)
-#breakpoint()
 mask_total_px = [np.sum(m, axis=(1,2)) for m in meas_masks] # total number of positive pixels in the mask
 
 csv_file = 'Event_list.csv'
@@ -265,10 +346,8 @@ for i in range(1, len(df_event), 3):
                         [float(str(df_event.iloc[i]['Ratio']).replace(",", "."))],
                         [float(str(df_event.iloc[i]['Half_Angle']).replace(",", "."))] ] )
     time_tony.append(datetime.strptime(df_event.iloc[i]['Date'],'%Y-%m-%dT%H-%M')) 
-gcs_manual_par = gcs_hebe_par
 #for f in gcs_files:
     #temp = readsav(os.path.join(manual_gcs, f))
-    #breakpoint()
     #gcs_manual_par.append([np.degrees(float(temp['sgui']['lon'])), np.degrees(float(temp['sgui']['lat'])), np.degrees(float(temp['sgui']['rot'])),
     #            float(temp['sgui']['hgt']), float(temp['sgui']['rat']), np.degrees(float(temp['sgui']['han']))])
 # keeps only select
@@ -277,7 +356,8 @@ gcs_manual_par = gcs_hebe_par
 # read /gehme/projects/2023_eeggl_validation/niemela_project/gcs_events
 # guardar en gcs_manual
 
-
+select_hebe = [3]#[1,3,5]
+gcs_hebe_par = [gcs_hebe_par[index] for index in select_hebe]
 
 # crate opath
 os.makedirs(opath, exist_ok=True)
@@ -288,6 +368,10 @@ up_bounds= np.array([gcs_par_range[0][1], gcs_par_range[1][1], gcs_par_range[2][
 up_bounds= np.append(up_bounds, np.full(len(meas_masks), gcs_par_range[3][1]))
 low_bounds= np.array([gcs_par_range[0][0], gcs_par_range[1][0], gcs_par_range[2][0], gcs_par_range[4][0], gcs_par_range[5][0]])
 low_bounds= np.append(low_bounds, np.full(len(meas_masks), gcs_par_range[3][0]))
+
+up_bounds = np.array([gcs_par_range[0][1], gcs_par_range[1][1], gcs_par_range[2][1], gcs_par_range[4][1], gcs_par_range[5][1], gcs_par_range[3][1]])
+low_bounds= np.array([gcs_par_range[0][0], gcs_par_range[1][0], gcs_par_range[2][0], gcs_par_range[4][0], gcs_par_range[5][0], gcs_par_range[3][0]])
+
 #inital  conditions from masks_prop
 # gcs_param_ini = gcs_manual_par[-2]
 # ini_cond =  np.array([gcs_param_ini[0], gcs_param_ini[1], gcs_param_ini[2], gcs_param_ini[4], gcs_param_ini[5]])
@@ -326,30 +410,34 @@ ini_tilt   = np.nanmean([gcs_hebe_par[i][2] for i in range(len(gcs_hebe_par))])
 ini_k      = np.nanmean([gcs_hebe_par[i][4] for i in range(len(gcs_hebe_par))])
 ini_ang    = np.nanmean([gcs_hebe_par[i][5] for i in range(len(gcs_hebe_par))])
 
+
 #gcs height vs time, second order fit
 altura  = [gcs_hebe_par[i][3][0] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
-tiempos = [time_hebe[i] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
-#TODO, remover de gcs_manual_par los mismos elementos que de tiempos.
-tiempos_to_fit = np.array([(date - tiempos[0]).total_seconds() for date in tiempos])
-coefs = np.polyfit(tiempos_to_fit,altura, 2)
-poly_func = np.poly1d(coefs)
-
-plot_gcs_height_fit = False
-if plot_gcs_height_fit:
-    # Generate fitted values for plotting
-    x_fit = np.linspace(tiempos_to_fit.min(), tiempos_to_fit.max(), 100)
-    y_fit = poly_func(x_fit)
-    plt.plot(tiempos_to_fit,altura,'o')
-    plt.plot(x_fit,y_fit,'x')
-    plt.savefig(os.path.join(opath, 'ajuste_altura2.png'))
-    plt.close()
-
-#height from masks estimated using the function poly_func "gcs_height(time)"
-
-ini_height = poly_func(np.array([( asd- tiempos[0]).total_seconds() for asd in dates]))
-
-#breakpoint()
+if len(altura)>1:
+    tiempos = [time_hebe[i] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
+    gcs_manual_par = [gcs_hebe_par[i] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
+    tiempos_to_fit = np.array([(date - tiempos[0]).total_seconds() for date in tiempos])
+    breakpoint()
+    coefs = np.polyfit(tiempos_to_fit,altura, 2)
+    poly_func = np.poly1d(coefs)
+    plot_gcs_height_fit = False
+    if plot_gcs_height_fit:
+        # Generate fitted values for plotting
+        x_fit = np.linspace(tiempos_to_fit.min(), tiempos_to_fit.max(), 100)
+        y_fit = poly_func(x_fit)
+        plt.plot(tiempos_to_fit,altura,'o')
+        plt.plot(x_fit,y_fit,'x')
+        plt.savefig(os.path.join(opath, 'ajuste_altura2.png'))
+        plt.close()
+    #height from masks estimated using the function poly_func "gcs_height(time)"
+    ini_height = poly_func(np.array([( asd- tiempos[0]).total_seconds() for asd in dates]))
+if len(altura)==1:
+    tiempos = [time_hebe[i] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
+    gcs_manual_par = [gcs_hebe_par[i] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
+    ini_height = np.array(np.full(2,altura))
 ini_cond_0 = np.array([ini_lon, ini_lat, ini_tilt, ini_k, ini_ang]+ini_height.tolist()).flatten()
+ini_cond_0 = ini_cond_0[:-1]
+#breakpoint()
 # if initial conditions are outside bounds use the closest
 #if np.any(ini_cond < low_bounds) or np.any(ini_cond > up_bounds):
 #    print('Warning: Initial conditions are outside bounds. Using closest bounds')
@@ -358,16 +446,15 @@ ini_cond_0 = np.array([ini_lon, ini_lat, ini_tilt, ini_k, ini_ang]+ini_height.to
 print('Fitting GCS model with initial conditions: ', ini_cond_0)
 
 #usar metodo lm
-#TODO, ver xq no hay minimizacion.
-fit=least_squares(gcs_mask_error, ini_cond_0 , method='trf', 
+fit=least_squares(gcs_mask_error_diego, ini_cond_0 , method='trf', 
                 kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'mask_total_px':mask_total_px, 'occ_size':occ_sizes}, 
                 verbose=2, bounds=(low_bounds,up_bounds), diff_step=.5, xtol=1e-15) #, x_scale=scales)
 ini_cond = fit.x
-fit=least_squares(gcs_mask_error, ini_cond , method='trf', 
+fit=least_squares(gcs_mask_error_diego, ini_cond , method='trf', 
                 kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'mask_total_px':mask_total_px, 'occ_size':occ_sizes}, 
                 verbose=2, bounds=(low_bounds,up_bounds), diff_step=.5, xtol=1e-15) #, x_scale=scales)
 print('The fit parameters are: ', fit.x)
-breakpoint()
+#breakpoint()
 # saves to pickle
 with open(os.path.join(opath, 'gcs_fit.pkl'), 'wb') as f:
     pickle.dump(fit, f)
@@ -375,16 +462,43 @@ with open(os.path.join(opath, 'gcs_fit.pkl'), 'wb') as f:
 # plots manual and fit gcs param vs time
 gcs_fit_par = []
 for i in range(len(meas_masks)):
-    gcs_fit_par.append([fit.x[0], fit.x[1], -fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]]) # TODO the tilt signs seems to be OPOSITE in pyGCS???
+    #gcs_fit_par.append([fit.x[0], fit.x[1], fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]])
+    gcs_fit_par.append([fit.x[0], fit.x[1], fit.x[2], fit.x[5], fit.x[3], fit.x[4]]) # TODO the tilt signs seems to be OPOSITE in pyGCS???
 plot_gcs_param_vs_time(gcs_fit_par, gcs_manual_par, dates,tiempos,opath, ylim=gcs_par_range)
-breakpoint()
 
 # plots the fit mask along with the original masks
 #TODO, hacer andar las mascaras de abajo, usar dates y tiempos.
+gcs_manual_par_plot = [item for item in gcs_manual_par for _ in range(2)]
+#breakpoint()
+i=0
+for j in range(len(tiempos)):
+    #gcs_param = [fit.x[0], fit.x[1], fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]]
+    gcs_param = [fit.x[0], fit.x[1], fit.x[2], fit.x[5], fit.x[3], fit.x[4]]
+    mask_A = maskFromCloud_3d(gcs_param, satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
+    #gcs_param = [fit.x[0], fit.x[1], fit.x[2], fit.x[5+i+1], fit.x[3], fit.x[4]]
+    mask_B = maskFromCloud_3d(gcs_param, satpos[i+1], imsize, plotranges[i+1], occ_size=occ_sizes[i+1])
+    gcs_manual_par_plot_i = np.array(gcs_manual_par_plot[i]).flatten().tolist()
+    mask_manual_A = maskFromCloud_3d(gcs_manual_par_plot_i, satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
+    mask_manual_B = maskFromCloud_3d(gcs_manual_par_plot_i, satpos[i+1], imsize, plotranges[i+1], occ_size=occ_sizes[i+1])
+    #breakpoint()
+    cfname = fnames[i][0].split('_')[0] + '_' + fnames[i][0].split('_')[1]
+    ofile = os.path.join(opath, f'{cfname}_gcs_fit.png')
+    #breakpoint()
+    plot_to_png_diego(ofile, [fnames[i],fnames[i+1]], [meas_masks[i],meas_masks[i+1]], [mask_A,mask_B], [mask_manual_A,mask_manual_B])
+    i=i+2
+
+
+
+
+
+breakpoint()
+
 for i in range(len(meas_masks)):
     gcs_param = [fit.x[0], fit.x[1], fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]]
     mask = maskFromCloud_3d(gcs_param, satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
-    mask_manual = maskFromCloud_3d(gcs_manual_par[i], satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
+    gcs_manual_par_plot_i = np.array(gcs_manual_par_plot[i]).flatten().tolist()
+    mask_manual = maskFromCloud_3d(gcs_manual_par_plot_i, satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
     cfname = fnames[i][0].split('_')[0] + '_' + fnames[i][0].split('_')[1]
     ofile = os.path.join(opath, f'{cfname}_gcs_fit.png')
     plot_to_png(ofile, fnames[i], meas_masks[i], mask, mask_manual)
+breakpoint()    
