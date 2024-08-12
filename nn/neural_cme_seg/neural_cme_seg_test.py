@@ -9,17 +9,25 @@ from PIL import Image
 import matplotlib as mpl
 from astropy.io import fits
 mpl.use('Agg')
+import sys
 from neural_cme_seg import neural_cme_segmentation
 
-def plot_to_png(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_threshold=0.8 , title=None, labels=None, boxes=None, scores=None):
+def plot_to_png(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_threshold=0.3 , title=None, 
+                labels=None, boxes=None, scores=None, version='v4'):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
     """    
      # only detections with score larger than this value are considered
     color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
-    obj_labels = ['Back', 'Occ','CME','N/A']
-    #
+    if version=='v4':
+        obj_labels = ['Back', 'Occ','CME','N/A']
+    elif version=='v5':
+        obj_labels = ['Back', 'CME']
+    else:
+        print(f'ERROR. Version {version} not supported')
+        sys.exit()
+    #        
     cmap = mpl.colors.ListedColormap(color)  
     nans = np.full(np.shape(orig_img[0]), np.nan)
     fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
@@ -60,23 +68,28 @@ def plot_to_png(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_thres
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
 testDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_training'
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
-model_version="v4"
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5_fran"
+test_cases_file = model_path+"/validation_cases.csv"
+model_version="v5"
 opath= model_path+"/test_output"
 file_ext=".png"
-trained_model = '6000.torch'
+trained_model = '9.torch'
 imageSize=[512,512]
-test_ncases = 10
+test_ncases = 10000
 mask_thresholds = [0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99] # only px with scrore avobe this value are considered in the mask.
+gpu=1# GPU to use
+masks2use=[2] # index of the masks to read (should be the CME mask)
 
 #main
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unles its not available
+device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
-test_dirs = os.listdir(testDir)
-test_dirs= [d for d in test_dirs if not d.endswith(".csv")]
-imgs = [os.path.join(testDir, dir) for dir in test_dirs]
+#load image paths from test_cases_file
+imgs = []
+with open(test_cases_file, 'r') as f:
+    for line in f:
+        imgs.append(line.strip())
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
-rnd_idx = random.sample(range(len(test_dirs)), test_ncases)
+rnd_idx = random.sample(range(len(imgs)), test_ncases)
 all_scr = []
 all_loss = []
 for mask_threshold in mask_thresholds:
@@ -94,22 +107,25 @@ for mask_threshold in mask_thresholds:
         # reads mask
         maskDir=os.path.join(imgs[idx], "mask") #path to the mask iamge corresponding to the random image
         masks=[]
-        for mskName in os.listdir(maskDir):
-            vesMask = cv2.imread(maskDir+'/'+mskName,0) #reads the mask image in greyscale
-            vesMask = (vesMask > 0).astype(np.uint8) #The mask image is stored in 0–255 format and is converted to 0–1 format
-            vesMask=cv2.resize(vesMask,imageSize,cv2.INTER_NEAREST) #resizes the mask image to the same size of the random image
-
-        img, masks, scores, labels, boxes, loss  = nn_seg.test_mask(images, vesMask, mask_threshold=mask_threshold)
-
-        this_case_loss.append(loss) 
-        this_case_scr.append(scores)
-        # plot the predicted mask
-        if len(mask_thresholds)==1:
+        vesMask=os.listdir(maskDir) #all masks in the mask directory
+        vesMask.sort(key=lambda x: int(x.split("_")[-1].split(".")[0])) #sort masks files by the ending number
+        vesMask = [vesMask[i] for i in masks2use][0]
+        vesMask = cv2.imread(maskDir+'/'+vesMask, 0) #reads the mask image in greyscale 
+        vesMask = (vesMask > 0).astype(np.uint8) #The mask image is stored in 0–255 format and is converted to 0–1 format
+        if np.mean(vesMask) == 0 and np.max(vesMask) == 0:
+            print('Error: Full zero mask in path', maskDir, 'skipping')
             breakpoint()
-            os.makedirs(opath, exist_ok=True)
-            ofile = opath+"/img_"+str(idx)+'.png'
-            plot_to_png(ofile, [img], [[masks]], [vesMask], scores=[[scores]], labels=[[labels]], boxes=[[boxes]], mask_threshold=mask_threshold, scr_threshold=0.1)
-
+        # makes inference and returns only the mask with smallest loss
+        img, masks, scores, labels, boxes, loss  = nn_seg.test_mask(images, vesMask, mask_threshold=mask_threshold)
+        if masks is not None:
+            this_case_loss.append(loss) 
+            this_case_scr.append(scores)
+            # plot the predicted mask
+            if len(mask_thresholds)==1:
+                os.makedirs(opath, exist_ok=True)
+                ofile = opath+"/img_"+str(idx)+'.png'
+                plot_to_png(ofile, [img], [[masks]], [vesMask], scores=[[scores]], labels=[[labels]], boxes=[[boxes]], 
+                            mask_threshold=mask_threshold, scr_threshold=0.1, version=model_version)
     all_scr.append(this_case_scr)
     all_loss.append(this_case_loss)
 
@@ -122,7 +138,7 @@ for mask_threshold in mask_thresholds:
         ax.set_title(f'Mean scr: {np.mean(this_case_scr)} ; For mask threshold: {mask_threshold}  and test_ncases: {test_ncases} \n\
                      % of scr>0.8: {len(this_case_scr[this_case_scr>0.8])/len(this_case_scr)}')
         ax.set_yscale('log')
-        fig.savefig(model_path+"/test_scores.png")
+        fig.savefig(opath+"/test_scores.png")
 
         this_case_loss = np.array(this_case_loss)
         fig= plt.figure(figsize=(10, 5))
@@ -130,7 +146,7 @@ for mask_threshold in mask_thresholds:
         ax.hist(this_case_loss,bins=30)
         ax.set_title(f'Mean loss: {np.mean(this_case_loss)} ; For mask threshold: {mask_threshold} and test_ncases: {test_ncases}')
         ax.set_yscale('log')
-        fig.savefig(model_path+"/test_loss.png")
+        fig.savefig(opath+"/test_loss.png")
 
 # for many mask thresholds plots mean and std loss and scr vs mask threshold
 if len(mask_thresholds)>1:
@@ -142,7 +158,7 @@ if len(mask_thresholds)>1:
     ax.set_xlabel('mask threshold')
     ax.set_ylabel('Score')
     ax.grid()
-    fig.savefig(model_path+"/test_scr_vs_mask_threshold.png")
+    fig.savefig(opath+"/test_scr_vs_mask_threshold.png")
 
     all_loss = np.array(all_loss)
     fig= plt.figure(figsize=(10, 5))
@@ -152,7 +168,7 @@ if len(mask_thresholds)>1:
     ax.set_xlabel('mask threshold')
     ax.set_ylabel('Loss')
     ax.grid()
-    fig.savefig(model_path+"/test_mean_loss_vs_mask_threshold.png")
+    fig.savefig(opath+"/test_mean_loss_vs_mask_threshold.png")
 print('Done :-)')
 
 

@@ -13,7 +13,7 @@ import logging
 
 mpl.use('Agg')
 
-def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normalization_func=None, masks2use=None, rnd_rot=False):
+def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normalization_func=None, masks2use=None, rnd_rot=False, logger=logging):
     '''
     Loads random batchSize traning cases from paths avoiding training cases in used_idx
     paths: list of paths to use
@@ -41,14 +41,16 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
         if imageSize is not None:
             img = cv2.resize(img, imageSize, cv2.INTER_LINEAR) #rezise the image  
         if np.mean(img) == 0 and np.max(img) == 0:
-            print('Full zero image, skipping')
-            break
+            logging.warning('Full zero image in path', ok_paths[idx], 'loading a new batch')
+            return loadData(paths, batchSize, used_idx, imageSize=imageSize, file_ext=file_ext, 
+                            normalization_func=normalization_func, masks2use=masks2use, rnd_rot=rnd_rot)   
         if normalization_func is not None:
             img = normalization_func(img)
         check_for_nan_images= ''.join(filter(str.isdigit,str(np.nanmean(img)) ))
         if check_for_nan_images =='':
-            print('Full nan image, skipping')
-            break
+            logging.warning('Full nan image in path', ok_paths[idx], 'loading a new batch')
+            return loadData(paths, batchSize, used_idx, imageSize=imageSize, file_ext=file_ext, 
+                            normalization_func=normalization_func, masks2use=masks2use, rnd_rot=rnd_rot)            
         maskDir=os.path.join(ok_paths[idx], "mask") #path to the mask corresponding to the random image
         masks=[]
         labels = []
@@ -62,8 +64,9 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
             vesMask = cv2.imread(maskDir+'/'+mskName, 0) #reads the mask image in greyscale 
             vesMask = (vesMask > 0).astype(np.uint8) #The mask image is stored in 0–255 format and is converted to 0–1 format
             if np.mean(vesMask) == 0 and np.max(vesMask) == 0:
-                print('Full zero mask, skipping')
-                break
+                logging.warning('Full zero mask in path', maskDir, 'loading a new batch')
+                return loadData(paths, batchSize, used_idx, imageSize=imageSize, file_ext=file_ext, 
+                                normalization_func=normalization_func, masks2use=masks2use, rnd_rot=rnd_rot)               
             if imageSize is not None:
                 vesMask=cv2.resize(vesMask,imageSize,cv2.INTER_NEAREST) #resizes the mask image to the same size of the random image
             masks.append(vesMask) # get bounding box coordinates for each mask  
@@ -101,19 +104,22 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
 #---------------------------------------------------------Fine_tune the pretrained R-CNN----------------------------------------------------------
 #Constants
 trainDir = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240702'
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5_fran_cont"
 #full path of a model to use it as initial condition, use None to used the stadard pre-trained model 
-pre_trained_model= None # "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v2_running_diff/3999.torch"
-batchSize=12 #number of images used in each iteration
-epochs=5 #number of iterations of the full training dataset
+pre_trained_model= '/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5_fran/9.torch'
+batchSize=20 #number of images used in each iteration
+epochs=50 #number of iterations of the full training dataset
 train_dataset_prop=0.85 #proportion of the full dataset used for training. The rest is saved for validation
 random_rot = False # if True, the images are randomly rotated
 gpu=0 # GPU to use
 masks2use=[2] # list of masks to use, use None to use all masks found in the mask directory
 model_version='v5' # version of the model to use
 logfile=opath + "/training_logfile.txt" # log file
+enable_check_zeros = False # Check training dataset for errors (images with all 0) before training
 
 #main
+#opath
+os.makedirs(opath,exist_ok=True)
 # Configuration of the logger
 # set up logging to file
 logging.basicConfig(level=logging.INFO,
@@ -135,7 +141,6 @@ device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.dev
 logging.info(f'Using device:  {device}')
 #flush cuda device memory
 torch.cuda.empty_cache()
-os.makedirs(opath,exist_ok=True)
 # saves a copy of this file to opath
 os.system(f'cp {__file__} {opath}')
 # saves a copy of the model to opath
@@ -155,8 +160,6 @@ imgs_train = imgs[:int(len(imgs)*train_dataset_prop)]
 imgs_val = imgs[int(len(imgs)*train_dataset_prop):]
 
 #enter each folder on imgs_train. read the images and masks which filneame ends with _1.png
-#if the mean value is 0, the image is discarded from the list.
-enable_check_zeros = False
 if enable_check_zeros:
     for i in imgs_train:
         files=os.listdir(i+'/mask/')
@@ -200,7 +203,8 @@ for i in range(epochs):
     used_idx=[]
     for j in range(0,len(imgs_train),batchSize):
         images, targets, used_idx_batch = loadData(imgs_train, batchSize, used_idx, normalization_func=nn_seg.normalize, 
-                                                   masks2use=masks2use, rnd_rot=random_rot) # loads a batch of training data
+                                                   masks2use=masks2use, rnd_rot=random_rot, logger=logging) # loads a batch of training data
+        
         used_idx.extend(used_idx_batch)
         images = list(image.to(device) for image in images)
         targets=[{k: v.to(device) for k,v in t.items()} for t in targets]

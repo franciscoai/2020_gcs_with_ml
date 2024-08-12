@@ -62,23 +62,24 @@ class neural_cme_segmentation():
         '''
         self.device = device
         self.pre_trained_model = pre_trained_model    
-        self.imsize = imsize    
+        self.imsize = imsize   
+        self.version = version 
         # model param
-        if version == 'v3':
+        if  self.version  == 'v3':
             # First reasonably performing version of the model
             self.num_classes = 3 # background, CME, occulter
             # number of trainable layers in the backbone resnet, int in [0,5] range. Specifies the stage number.
             # Stages 2-5 are composed of 6 convolutional layers each. Stage 1 is more complex
             # See https://arxiv.org/pdf/1512.03385.pdf
             self.trainable_backbone_layers = 3
-        if version == 'v4':
+        if  self.version  == 'v4':
             # Second version of the model. Trainning more layers in the backbone
             self.labels=['Background','Occ','CME'] # labels for the different classes
             self.num_classes = 3 # background, CME, occulter
             self.trainable_backbone_layers = 4
             self.mask_threshold = 0.60 # value to consider a pixel belongs to the object
             self.scr_threshold = 0.51 # only detections with score larger than this value are considered
-        if version == 'v5':
+        if  self.version  == 'v5':
             # Third version of the model. Trainning with only 2 classes, CME and background, and all the backbone layers
             # Also updated the normalization routine
             self.labels=['Background','CME'] # labels for the different classes
@@ -389,8 +390,9 @@ class neural_cme_segmentation():
                 all_lbl.append(lbl)
                 msk=pred[0]['masks'][i,0].detach().cpu().numpy()
                 # eliminates px within the occulter for non -OCC masks
-                if occulter_size != None and lbl == self.labels.index('Occ'):
-                    msk = self.mask_occulter(msk, occulter_size,centerpix, repleace_value=0)
+                if self.version == 'v4':
+                    if occulter_size != None and lbl == self.labels.index('Occ'):
+                        msk = self.mask_occulter(msk, occulter_size,centerpix, repleace_value=0)
                 all_masks.append(msk)                
                 box = pred[0]['boxes'][i].detach().cpu().numpy()
                 all_boxes.append(box)              
@@ -421,7 +423,7 @@ class neural_cme_segmentation():
         return orig_img, all_masks[imin], all_scores[imin], all_lbl[imin], all_boxes[imin], all_loss[imin]
         
 
-    def _rec2pol(self, mask, center=[None,None]):
+    def _rec2pol(self, mask, center=None):
         '''
         Converts the x,y mask to polar coordinates
         Only pixels above the mask_threshold are considered
@@ -435,8 +437,8 @@ class neural_cme_segmentation():
         masked[:, :][mask > self.mask_threshold] = 0   
         #calculates geometric center of the image
         height, width = masked.shape
-        if not center[0]:
-            #case center is not defined (None). Calculates geometric center of the image
+        if center is None:
+            #case center is not defined. Calculates geometric center of the image
             center_x = width / 2
             center_y = height / 2
         else:
@@ -1083,8 +1085,8 @@ class neural_cme_segmentation():
         return all_dates,all_masks, all_scores, all_lbl, all_boxes,all_mask_prop
         
     def infer_event2(self, imgs, dates, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None,occulter_size_ext=None,
-                    centerpix=None, mask_threshold=None, 
-                    scr_threshold=None, plot_params=None, filter_halos=True,modified_masks=None,percentiles=[5,95],increase_contrast=None):
+                    centerpix=None, mask_threshold=None, scr_threshold=None, plot_params=None, filter_halos=True,modified_masks=None,
+                    percentiles=[5,95],increase_contrast=None):
         '''
         Updated version of infer_event, it recognices more than one CME per event.
         Infers masks for a temporal series of images belonging to the same event. It filters the masks found in the
@@ -1127,11 +1129,18 @@ class neural_cme_segmentation():
 
         if occulter_size_ext is not None:
             in_occulter_size_ext = [occulter_size_ext[i] for i in idx]
+        else:
+            in_occulter_size_ext = [None for i in idx]
 
         if plate_scl is not None:
             in_plate_scl = [plate_scl[i] for i in idx]
         else:
             in_plate_scl = [1 for i in idx]
+
+        if centerpix is not None:
+            in_centerpix = [centerpix[i] for i in idx]
+        else:
+            in_centerpix = [None for i in idx]
 
         #Get the mask for all images in imgs
         all_masks = []
@@ -1156,7 +1165,7 @@ class neural_cme_segmentation():
                 #infer masks
                 orig_img, mask, score, lbl, box = self.infer(in_imgs[i], model_param=model_param, resize=resize, 
                                                             occulter_size=in_occulter_size[i],occulter_size_ext=in_occulter_size_ext[i],
-                                                            centerpix=centerpix[i],increase_contrast=increase_contrast)
+                                                            centerpix=in_centerpix[i],increase_contrast=increase_contrast)
                 all_orig_img.append(orig_img)
                 #print(i,dates[i])
 
@@ -1170,9 +1179,9 @@ class neural_cme_segmentation():
             # compute cpa, aw and apex. Already filters by score and other aspects
             self.debug_flag = i
             mask_prop = self._compute_mask_prop(mask, score, lbl, box, plate_scl=in_plate_scl[i], 
-                                                filter_halos=filter_halos, occulter_size=in_occulter_size[i],centerpix=centerpix[i],percentiles=percentiles)
-            # appends results only if mask_prop[1] is not NaN, i.e., if it fulfills the filters in compute_mask_prop
+                                                filter_halos=filter_halos, occulter_size=in_occulter_size[i],centerpix=in_centerpix[i],percentiles=percentiles)
             
+            # appends results only if mask_prop[1] is not NaN, i.e., if it fulfills the filters in compute_mask_prop
             mask_prop_aux = []
             for j in range(len(mask_prop)):
                 mask_prop_aux.append(mask_prop[j][1])
@@ -1213,6 +1222,7 @@ class neural_cme_segmentation():
                 all_orig_img = [elemento for s, elemento in enumerate(all_orig_img) if s not in all_idx]      
                 df = df.dropna(subset=['MASK']) 
                 return all_orig_img,ok_dates, df
+        return  all_orig_img, all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop
                         
 
 

@@ -35,7 +35,7 @@ def get_paths_cme_exp_sources():
     Read all files for selected events of the CME exp sources project
     """
     data_path='/gehme/data' #Path to the dir containing /sdo ,/soho and /stereo data directories as well as the /Polar_Observations dir.
-    gcs_path='/gehme/projects/2019_cme_expansion/Polar_Observations/Polar_Documents/francisco/GCSs'     #Path with our GCS data directories
+    gcs_path='/gehme/projects/2019_cme_expansion/Polar_Observations/Polar_Documents/francisco_backup_20240812/GCSs'     #Path with our GCS data directories
     lasco_path=data_path+'/soho/lasco/level_1/c2'     #LASCO proc images Path
     secchipath=data_path+'/stereo/secchi/L0'
     level=0 # set the reduction level of the images
@@ -208,7 +208,7 @@ def save_png(array, ofile=None, range=None):
     else:
         return fig
     
-def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, scores=None, save_masks=None):
+def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, scores=None, save_masks=None, version='v4'):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
@@ -217,8 +217,13 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
     mask_threshold = 0.6 # value to consider a pixel belongs to the object
     scr_threshold = 0.25 # only detections with score larger than this value are considered
     color=['b','r','g','k','y','m','c','w','b','r','g','k','y','m','c','w']
-    obj_labels = ['Back', 'Occ','CME','N/A']
-    #
+    if version=='v4':
+        obj_labels = ['Back', 'Occ','CME','N/A']
+    elif version=='v5':
+        obj_labels = ['Back', 'CME']
+    else:
+        print(f'ERROR. Version {version} not supported')
+        sys.exit()
     cmap = mpl.colors.ListedColormap(color)  
     nans = np.full(np.shape(orig_img[0]), np.nan)
     fig, axs = plt.subplots(2, 3, figsize=[20,10])
@@ -308,7 +313,6 @@ def inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=T
         img = imga-read_fits(cprea, imageSize=imageSize)
         all_diff_img.append(img)
         all_dates.append(datetime.datetime.strptime(ha['DATE-OBS'], '%Y-%m-%dT%H:%M:%S.%f'))
-        
         if ha['NAXIS1'] != imageSize[0]:
             plt_scl = ha['CDELT1'] * ha['NAXIS1']/imageSize[0] 
         else:
@@ -317,16 +321,15 @@ def inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=T
         all_headers.append(ha)
     # inference of all images in the event
     #print(f'Running inference for {imgs_labels[0]} dates {all_dates}')
-    orig_img, dates, mask, scr, labels, boxes, mask_porp =  nn_seg.infer_event(all_diff_img, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=ev_opath+'/'+imgs_labels[0])
-    
+    orig_img, dates, mask, scr, labels, boxes, mask_porp =  nn_seg.infer_event2(all_diff_img, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=ev_opath+'/'+imgs_labels[0])
     # adds mask_prop to headers as keywords, [mask_id,score,cpa_ang, wide_ang, apex_dist]
     for i in range(len(all_headers)):
-        if mask_porp[i][1] is not None:
-            all_headers[i]['NN_SCORE'] = mask_porp[i][1]
-            all_headers[i]['NN_C_ANG'] = np.degrees(mask_porp[i][2])
-            all_headers[i]['NN_W_ANG'] = np.degrees(mask_porp[i][3])
+        if mask_porp[i][0][1] is not None:
+            all_headers[i]['NN_SCORE'] = mask_porp[i][0][1]
+            all_headers[i]['NN_C_ANG'] = np.degrees(mask_porp[i][0][2])
+            all_headers[i]['NN_W_ANG'] = np.degrees(mask_porp[i][0][3])
             # apex rom px to solar radii
-            apex_sr = mask_porp[i][4] * all_plate_scl[i] / all_headers[i]['RSUN']
+            apex_sr = mask_porp[i][0][4] * all_plate_scl[i] / all_headers[i]['RSUN']
             all_headers[i]['NN_APEX'] = apex_sr
         else:
             all_headers[i]['NN_SCORE'] = 'None'
@@ -338,17 +341,17 @@ def inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=T
 
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
-model_version="v4"
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5_fran"
+model_version="v5"
 opath= model_path + "/infer_neural_cme_seg_exp_paper_filtered"
 file_ext=".png"
-trained_model = '6000.torch'
+trained_model = '9.torch'
 do_run_diff = True # set to use running diff instead of base diff (False)
 occ_size = [90,35,75] # Artifitial occulter radius in pixels. Use 0 to avoid. [Stereo a/b C1, Stereo a/b C2, Lasco C2]
-filter = True 
+filter = False 
 
 #main
-gpu=0 # GPU to use
+gpu=1 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
 
@@ -363,7 +366,6 @@ file.close()
 
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
-
 for ev in event:
     print(f'Processing event {ev["date"]}')
     ev_opath = os.path.join(opath, ev['date'].split('/')[-1]) + '_filter_'+str(filter)   
