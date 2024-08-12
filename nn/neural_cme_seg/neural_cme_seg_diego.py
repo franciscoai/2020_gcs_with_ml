@@ -133,7 +133,7 @@ class neural_cme_segmentation():
         
         #median kernel, should be an odd value, default should be 3
         if median_kernel is not None:
-            oimage = cv2.medianBlur(oimage, median_kernel)
+            image_for_statistics = cv2.medianBlur(image_for_statistics, median_kernel)
         
         #remove NaN
         not_nan_values = image_for_statistics[~np.isnan(image_for_statistics)]    
