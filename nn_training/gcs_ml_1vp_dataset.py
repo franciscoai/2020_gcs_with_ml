@@ -42,7 +42,7 @@ def save_png(array, ofile=None, range=None):
 # CONSTANTS
 #paths
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240702'
+OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240814'
 opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
@@ -52,7 +52,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 100000 # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 1000 # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -206,7 +206,7 @@ for row in df.index:
 
         #Total intensity (Btot) figure from raytrace:           
         btot = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row],
-                             imsize=imsize, occrad=size_occ[sat], in_sig=0.5, out_sig=0.25, nel=1e5)
+                             imsize=imsize, occrad=size_occ[sat], in_sig=0.5, out_sig=0.1, nel=1e5)
 
         #diff intensity by adding a second, smaller GCS
         if diff_int_cme:
@@ -228,7 +228,7 @@ for row in df.index:
                 fr_lat = def_fac[1]*df['CMElat'][row]
             btot -= scl_fac*rtraytracewcs(headers[sat], fr_lon, fr_lat ,def_fac[2]*df['CMEtilt'][row],
                                           df['height'][row]-height_diff,df['k'][row]*exp_fac[0], df['ang'][row]*exp_fac[1], imsize=imsize, 
-                                          occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5)
+                                          occrad=size_occ[sat], in_sig=0.8, out_sig=0.15, nel=1e5)
         
         #adds a flux rope-like structure
         if add_flux_rope:

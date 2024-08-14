@@ -323,15 +323,18 @@ def inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=T
     #print(f'Running inference for {imgs_labels[0]} dates {all_dates}')
     orig_img, dates, mask, scr, labels, boxes, mask_porp =  nn_seg.infer_event2(all_diff_img, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=ev_opath+'/'+imgs_labels[0])
     # adds mask_prop to headers as keywords, [mask_id,score,cpa_ang, wide_ang, apex_dist]
-    for i in range(len(all_headers)):
-        if mask_porp[i][0][1] is not None:
-            all_headers[i]['NN_SCORE'] = mask_porp[i][0][1]
-            all_headers[i]['NN_C_ANG'] = np.degrees(mask_porp[i][0][2])
-            all_headers[i]['NN_W_ANG'] = np.degrees(mask_porp[i][0][3])
+    for cdate in all_dates:
+        i = all_dates.index(cdate)
+        #only if at least one mask was found
+        try:
+            j = dates.index(cdate)
+            all_headers[i]['NN_SCORE'] = mask_porp[j][0][1]
+            all_headers[i]['NN_C_ANG'] = np.degrees(mask_porp[j][0][2])
+            all_headers[i]['NN_W_ANG'] = np.degrees(mask_porp[j][0][3])
             # apex rom px to solar radii
-            apex_sr = mask_porp[i][0][4] * all_plate_scl[i] / all_headers[i]['RSUN']
+            apex_sr = mask_porp[j][0][4] * all_plate_scl[i] / all_headers[i]['RSUN']
             all_headers[i]['NN_APEX'] = apex_sr
-        else:
+        except:
             all_headers[i]['NN_SCORE'] = 'None'
             all_headers[i]['NN_C_ANG'] = 'None'
             all_headers[i]['NN_W_ANG'] = 'None'
@@ -382,6 +385,7 @@ for ev in event:
     orig_imgl, datesl, maskl, scrl, labelsl, boxesl, mask_porpl, hl  = inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=filter)
     datesl = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesl]    
     
+    os.makedirs(ev_opath, exist_ok=True)
     for t in range(len(ev['pro_files'])):
         ofile = os.path.join(ev_opath,os.path.basename(ev['pro_files'][t])+'.png')
         if filter:
