@@ -5,15 +5,16 @@ def center_rSun_pixel(headers, plotranges, sat):
     '''
     Gets the location of Suncenter in deg
     '''    
-    x_cS = (headers[sat]['CRPIX1']*plotranges[sat][sat]*2) / headers[sat]['NAXIS1'] - plotranges[sat][sat] #  headers[sat]['CRPIX1'] 
-    y_cS = (headers[sat]['CRPIX2']*plotranges[sat][sat]*2) / headers[sat]['NAXIS2'] - plotranges[sat][sat] #  headers[sat]['CRPIX2'] 
+    x_cS = headers[sat]['CRPIX1']*(plotranges[sat][1] - plotranges[sat][0])/headers[sat]['NAXIS1'] + plotranges[sat][0]
+    y_cS = headers[sat]['CRPIX2']*(plotranges[sat][3] - plotranges[sat][2])/headers[sat]['NAXIS2'] + plotranges[sat][2]
+            
     return x_cS, y_cS
 
 def deg2px(x,y,plotranges,imsize,sat):
     '''
     Computes spatial plate scale in both dimensions
     '''
-    #dischard points outside the plotranges
+    #discard points outside the plotranges
     mask = (x > plotranges[sat][0]) & (x < plotranges[sat][1]) & (y > plotranges[sat][2]) & (y < plotranges[sat][3])
     x_ok = x[mask]
     y_ok = y[mask]

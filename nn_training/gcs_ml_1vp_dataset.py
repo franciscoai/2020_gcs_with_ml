@@ -42,8 +42,8 @@ def save_png(array, ofile=None, range=None):
 # CONSTANTS
 #paths
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240814'
-opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240814'
+opath_fstructure='check' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
 # morphology
@@ -52,7 +52,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 1000 # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 10 # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -72,15 +72,29 @@ im_range=3 # range of the color scale of the output final syntethyc image in std
 # Output images to save
 otype="png" # set the ouput file type: 'png' or 'fits'
 imsize=np.array([512, 512], dtype='int32') # output image size
-mesh_only_image=False # set to also save a png with the GCSmesh (only for otype='png')
+add_mesh_image=False # adds the GCS mesh on top of the image (only for otype='png')
 cme_only_image=False # set to True to save an addditional image with only the cme without the background corona
 back_only_image = False # set to True to save an addditional image with only the background corona without the cme
 save_masks = True # set to True to save the masks images
+save_only_cme_mask = False # set to True to save only the cme mask and not the occulter masks. save_masks must be True
 inner_hole_mask=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
 mask_from_cloud=True #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
+show_middle_cross = False # set to show the middle cross of the image
 
 #### main
+if opath_fstructure=='check':
+    save_masks = False
+    cme_only_image = False
+    back_only_image = False
+    add_mesh_image = True
+    rnd_par=False 
+    save_only_cme_mask = True
+    diff_int_cme = False
+    par_rng[6]=[10,10]
+    show_middle_cross = True
+    add_flux_rope = False
+
 os.makedirs(OPATH, exist_ok=True)
 # saves a copy of this script to the output folder
 os.system("cp " + os.path.realpath(__file__) + " " + OPATH)
@@ -108,6 +122,7 @@ sceond_mask = None
 mask_aw = []
 halo_count = 0
 ok_cases = 0
+usr_center_off = None
 
 # generate views
 for row in df.index:
@@ -134,6 +149,7 @@ for row in df.index:
     satpos, plotranges = pyGCS.processHeaders(headers)
     mask_aw_sat = []
     print(f'Saving image pair {row} of {df.index.stop-1}')
+
     for sat in range(n_sat):
         # for sat==2 (LASCO) we divide the current height by 16/6 to match the scale of the other satellites
         if sat==2:
@@ -143,20 +159,38 @@ for row in df.index:
         y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
         xx, yy = np.meshgrid(x, y)
         x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat) 
-        # corrects for the occulter center
+        # ad hoc correction for the occulter center
         x_cS, y_cS = x_cS+occ_center[sat][0], y_cS+occ_center[sat][1]       
         r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
         phi = np.arctan2(yy - y_cS, xx - x_cS)
-        if mask_from_cloud:
+        if mask_from_cloud: 
             #mask for cme outer envelope
-            clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)                
+            clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row],
+                                    satpos, do_rotate_lat=[False, False, True])                         
             x = clouds[sat, :, 1]
-            y = clouds[0, :, 2]
+            y = clouds[sat, :, 2] # sat has always been 0 in this line, but why ???
+            
+            # # artifitially changes the center of plotranges
+            # if sat==1:
+            #     plotranges[sat][0] -= 0.3
+            #     plotranges[sat][1] -= 0.3
+            #     plotranges[sat][2] -= -0.6
+            #     plotranges[sat][3] -= -0.6
+            #     usr_center_off = [5, -15]
+            # elif sat==2:
+            #     plotranges[sat][0] -= 0.
+            #     plotranges[sat][1] -= 0.
+            #     plotranges[sat][2] -= -0.35
+            #     plotranges[sat][3] -= -0.35
+            #     usr_center_off = [0, 0]
+            # else:
+            #    usr_center_off = [0, 0]
+
             p_x,p_y=deg2px(x,y,plotranges,imsize, sat)
             mask=get_mask_cloud(p_x,p_y,imsize)
         else:
             btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row],
-                                      df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.1, nel=1e5)     
+                                      df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.1, nel=1e5, usr_center_off=usr_center_off)     
             cme_npix= len(btot_mask[btot_mask>0].flatten())
             if cme_npix<=0:
                 print("\033[93m WARNING: CME number {} raytracing did not work\033".format(row))                
@@ -175,7 +209,7 @@ for row in df.index:
             break
        
         # adds mask angluar width to list
-        aw = np.max(phi[mask==1])-np.min(phi[mask==1])
+        aw = np.percentile(phi[mask==1],95)-np.percentile(phi[mask==1],5)
         mask_aw_sat.append(aw)
         # check for halos, i.e. maks that have pixels with polar angles that span more than 120 deg
         if aw>2*np.pi/3:
@@ -204,9 +238,11 @@ for row in df.index:
             print('ERROR: opath_fstructure value not recognized')
             sys.exit(1)
 
-        #Total intensity (Btot) figure from raytrace:           
+        #Total intensity (Btot) figure from raytrace:      
+        print(headers[sat]['TELESCOP'], headers[sat]['CRPIX1'], headers[sat]['CRPIX2'],headers[sat]['INSTRUME'], 
+              headers[sat]['NAXIS1'], headers[sat]['NAXIS2'], headers[sat]['CRVAL1'], headers[sat]['CRVAL2'], headers[sat]['CROTA'])
         btot = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row],
-                             imsize=imsize, occrad=size_occ[sat], in_sig=0.5, out_sig=0.1, nel=1e5)
+                             imsize=imsize, occrad=size_occ[sat], in_sig=0.5, out_sig=0.1, nel=1e5, usr_center_off=usr_center_off)
 
         #diff intensity by adding a second, smaller GCS
         if diff_int_cme:
@@ -228,7 +264,7 @@ for row in df.index:
                 fr_lat = def_fac[1]*df['CMElat'][row]
             btot -= scl_fac*rtraytracewcs(headers[sat], fr_lon, fr_lat ,def_fac[2]*df['CMEtilt'][row],
                                           df['height'][row]-height_diff,df['k'][row]*exp_fac[0], df['ang'][row]*exp_fac[1], imsize=imsize, 
-                                          occrad=size_occ[sat], in_sig=0.8, out_sig=0.15, nel=1e5)
+                                          occrad=size_occ[sat], in_sig=0.8, out_sig=0.15, nel=1e5, usr_center_off=usr_center_off)
         
         #adds a flux rope-like structure
         if add_flux_rope:
@@ -239,12 +275,12 @@ for row in df.index:
             aspect_ratio_frope = np.random.uniform(low=0.4, high=0.8) # random aspect ratio
             scl_fac_fr = np.random.uniform(low=0, high=2) # int scaling factor
             btot += scl_fac_fr*rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*frope_height_diff,
-                                          df['k'][row]*aspect_ratio_frope, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5)    
+                                          df['k'][row]*aspect_ratio_frope, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)    
             # uses a differential flux rope
             if diff_int_cme:
                 btot -= scl_fac*scl_fac_fr*rtraytracewcs(headers[sat], fr_lon, fr_lat,def_fac[2]*df['CMEtilt'][row], 
                                               df['height'][row]*frope_height_diff-height_diff,df['k'][row]*aspect_ratio_frope*exp_fac[0],df['ang'][row]*exp_fac[1],
-                                              imsize=imsize, occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5)    
+                                              imsize=imsize, occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)    
         #background corona
         back = back_corona[sat]
         if back_rnd_rot:
@@ -298,7 +334,7 @@ for row in df.index:
         
         # adds row number at the begining of the file name
         if opath_fstructure=='check':
-            ofile_name = '{:04d}_'.format(row) + ofile_name
+            ofile_name = '{:09d}_'.format(row) + ofile_name
 
         # saves btot png image
         if cme_only_image:
@@ -345,29 +381,29 @@ for row in df.index:
                 #mask for cme
                 ofile = mask_folder +'/'+ofile_name+'_mask_2.png'
                 fig=save_png(mask,ofile=ofile, range=[0, 1])
-                if sceond_mask is not None:      
-                    ofile = mask_folder +'/'+ofile_name+'_mask_3.png'
-                    fig=save_png(sceond_mask,ofile=ofile, range=[0, 1])                      
-                #mask for occulter
-                ofile = mask_folder +'/'+ofile_name+'_mask_0.png'      
-                fig=save_png(occ_mask,ofile=ofile, range=[0, 1])
-                #mask for ext occulter
-                ofile = mask_folder +'/'+ofile_name+'_mask_1.png'
-                fig=save_png(occ_mask_ext,ofile=ofile, range=[0, 1])
+                if save_only_cme_mask == False:
+                    if sceond_mask is not None:      
+                        ofile = mask_folder +'/'+ofile_name+'_mask_3.png'
+                        fig=save_png(sceond_mask,ofile=ofile, range=[0, 1])                      
+                    #mask for occulter
+                    ofile = mask_folder +'/'+ofile_name+'_mask_0.png'      
+                    fig=save_png(occ_mask,ofile=ofile, range=[0, 1])
+                    #mask for ext occulter
+                    ofile = mask_folder +'/'+ofile_name+'_mask_1.png'
+                    fig=save_png(occ_mask_ext,ofile=ofile, range=[0, 1])
             #full image
             ofile=folder + '/' + ofile_name+'_btot.png'
-            fig=save_png(btot,ofile=ofile, range=[vmin_back, vmax_back])
+            # adds middle cross to btot
+            if show_middle_cross:
+                btot[imsize[0]//2-1:imsize[0]//2+1,:] = vmin_back
+                btot[:,imsize[1]//2-1:imsize[1]//2+1] = vmin_back
+            if add_mesh_image and otype=='png' and mask_from_cloud:     
+                arr_cloud=pnt2arr(x,y,plotranges,imsize, sat)       
+                fig=save_png(btot+arr_cloud*vmin_back,ofile=ofile, range=[vmin_back, vmax_back])
+            else:
+                fig=save_png(btot,ofile=ofile, range=[vmin_back, vmax_back])
         else:
             print("otype value not recognized")    
-
-        if mesh_only_image and otype=='png':
-            # overplot GCS mesh to cme figure
-            clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], satpos)                
-            x = clouds[sat, :, 1]
-            y = clouds[0, :, 2]         
-            arr_cloud=pnt2arr(x,y,plotranges,imsize, sat)
-            ofile = folder + '/' + ofile_name+'_mesh.png'
-            fig=save_png(arr_cloud,ofile=ofile, range=[0, 1]) 
         # saves ok case
         ok_cases += 1    
 

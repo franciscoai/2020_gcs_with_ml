@@ -20,8 +20,8 @@ INPUTS:
              correspond to obspos=[0,0,215] and obsang=[!pi,0,0]: this
              means that the Carrington coordinate origin on the Solar
              sphere (lon,lat,height)=(0,0,1) is located at (x,y,z)=(0,0,1), with
-             Ox pointing to solar north and Oy pointing to (lon,lat)=(3*!pi/2,0)
- obsang : [ax,ay,az] orientation of the observer, 
+             obsangOx pointing to solar north and Oy pointing to (lon,lat)=(3*!pi/2,0)
+  : [ax,ay,az] orientation of the observer, 
           z is the optical axis 
  rollang : allow to set the roll angle of the virtual instrument. 
            Works only if a preset instrument is requested.
@@ -160,7 +160,7 @@ def rtrotmat2rxryrz(r):
     return np.array([rx, ry, rz])
 
 def piximchangereso(pixim,reso):
-    pixccd = pixim * ( 2.**reso) + (2.**reso)/2.
+    pixccd = pixim * (2.**reso) + (2.**reso)/2.
     pixsidesize = 1.
     return pixccd/pixsidesize - 0.5
 
@@ -173,7 +173,10 @@ def rtsccguicloud_calcfeetheight(height,k,ang):
     return height*(1.-k)*np.cos(ang)/(1.+np.sin(ang))
 
 
-def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=30, in_sig=0.1, out_sig=0.1, nel=1e5, modelid=54, imsize=np.array([512, 512], dtype='int32'), occrad=0, losrange=np.array([-10., 10.], dtype='float32'), losnbp=64):
+def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=30, in_sig=0.1, out_sig=0.1, nel=1e5, modelid=54, 
+                  imsize=np.array([512, 512], dtype='int32'), occrad=0,usr_center_off=None, losrange=np.array([-10., 10.], dtype='float32'), losnbp=64):
+    # usr_center_off: user ad-hoc [x,y] offset of the Sun center in pixels
+
     obslonlatflag = 1
     CMElon = math.radians(CMElon)
     CMElat = math.radians(CMElat)
@@ -212,7 +215,11 @@ def rtraytracewcs(header, CMElon=60, CMElat=20, CMEtilt=70, height=6, k=3, ang=3
     adapthres = 0.
     maxsubdiv = 4
     limbdark = 0.58
-    crpix = piximchangereso(np.array([header['CRPIX1'] -1, header['CRPIX2'] -1], dtype='float32'),-math.log(imszratio)/math.log(2) )
+    if usr_center_off is None:
+        crpix = piximchangereso(np.array([header['CRPIX1'], header['CRPIX2']], dtype='float32'),-math.log(imszratio)/math.log(2))
+    else:
+        # changed by franciscoaiglesias@gmail.com on 15.08.2024 to fix center sifferences wrt pyGCS
+        crpix = piximchangereso(np.array([usr_center_off[0]+header['NAXIS1']//2, usr_center_off[1]+header['NAXIS2']//2], dtype='float32'),-math.log(imszratio)/math.log(2))
     pc = np.array([1, 8.687118e-14, -8.687118e-14, 1], dtype='float32')
 
     # set projection type
