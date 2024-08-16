@@ -328,8 +328,8 @@ running_difference = True
 
 #select instrument of event
 #instr='cor2_a'
-#instr='cor2_b'
-instr='lascoC2'
+instr='cor2_b'
+#instr='lascoC2'
 
 #select infer event
 infer_event2=True #True

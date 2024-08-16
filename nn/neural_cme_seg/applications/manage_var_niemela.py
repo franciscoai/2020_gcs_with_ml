@@ -31,9 +31,9 @@ def manage_variables_niemela(cme_date_event,btot=False,real_img=False,auxiliar='
 
         if modified_masks:
             if instr == 'cor2_a':
-                modified_masks = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/new_masks20100403_cor2a_v1.pkl'
+                modified_masks = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/new_masks20100403_cor2a_v4.pkl'
             if instr == 'cor2_b':
-                modified_masks = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/new_masks20100403_cor2b_v1.pkl'
+                modified_masks = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/new_masks20100403_cor2b_v6.pkl'
             if instr == 'lascoC2':
                 modified_masks = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/new_masks20100403_lascoc2_v1.pkl'
             opath = '/gehme/projects/2023_eeggl_validation/niemela_project/2010-04-03/output/'+instr+'/'+aux

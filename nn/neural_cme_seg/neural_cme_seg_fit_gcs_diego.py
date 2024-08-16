@@ -14,6 +14,7 @@ import pickle
 import pandas as pd
 from datetime import datetime
 import matplotlib.dates as mdates
+from sunpy.coordinates.sun import carrington_rotation_number
 mpl.use('Agg')
 
 __author__ = "Francisco Iglesias"
@@ -38,6 +39,7 @@ def load_data(dpath, occ_size, select=None):
     dates = []
     files = sorted(os.listdir(dpath))
     files =[f for f in files if f.endswith(".fits")]
+    #breakpoint()
     for f in files:
         filenames.append(f)
         hdu = fits.open(os.path.join(dpath, f))
@@ -115,7 +117,6 @@ def plot_to_png(ofile, fnames,omask, fitmask, manual_mask):
     nans = np.full(np.shape(omask[0]), np.nan)
     fig, axs = plt.subplots(3, 3, figsize=[10,10])
     axs = axs.ravel()
-    breakpoint()
     for i in range(len(fnames)):
         axs[i].imshow(omask[i], vmin=0, vmax=1, cmap='gray', origin='lower')
         axs[i].axis('off')
@@ -155,7 +156,8 @@ def plot_to_png_diego(ofile, fnames,omask, fitmask, manual_mask):
     #j=0
     for j in range(len(fnames)):
         #axs[j].imshow(omask[j][0,:,:], vmin=0, vmax=1, cmap='gray', origin='lower')
-        fliped_image = np.flip(np.flip(omask[j][0,:,:],axis=0),axis=1)
+        #fliped_image = np.flip(np.flip(omask[j][0,:,:],axis=0),axis=1)
+        fliped_image = np.flip(omask[j][0,:,:],axis=0)
         axs[j].imshow(fliped_image, vmin=0, vmax=1, cmap='gray', origin='lower')
         axs[j].axis('off')
         axs[j+2].imshow(fitmask[j][0], vmin=0, vmax=1, cmap='Reds', origin='lower')        
@@ -164,7 +166,7 @@ def plot_to_png_diego(ofile, fnames,omask, fitmask, manual_mask):
         axs[j+4].axis('off')
         #j=j+3
         # adds a cross to the center of the image
-        #breakpoint()
+        
         axs[j].plot(  np.shape(omask[j][0,:,:])[0]/2., np.shape(omask[j][0,:,:])[1]/2., 'x', color='r')
         axs[j+2].plot(np.shape(omask[j][0,:,:])[0]/2., np.shape(omask[j][0,:,:])[1]/2., 'x', color='r')
         axs[j+4].plot(np.shape(omask[j][0,:,:])[0]/2., np.shape(omask[j][0,:,:])[1]/2., 'x', color='r')
@@ -246,14 +248,22 @@ def gcs_mask_error(gcs_par, satpos, plotranges, masks, mask_total_px, imsize, oc
     for i in range(len(masks)):
         this_gcs_par = [gcs_par[0], gcs_par[1], gcs_par[2], gcs_par[5+i], gcs_par[3], gcs_par[4]] 
         mask = maskFromCloud_3d(this_gcs_par, satpos[i], imsize, plotranges[i], occ_size=occ_size[i])
-        #breakpoint()
         error.append(np.mean((np.array(mask) - masks[i]), axis=(1,2))**2)# /mask_total_px[i])
-        #agregar IOU
-        #agregar opcion de vector que permita pesar entre o y 1 cor2a - b y C2.
         print(gcs_par, np.mean(error))
     return np.array(error).flatten()
 
-def gcs_mask_error_diego(gcs_par, satpos, plotranges, masks, mask_total_px, imsize, occ_size):
+def rms_difference(array1, array2):
+    """Calculates the RMS value of the element-wise difference between two arrays.
+    Args:
+        array1: The first NumPy array.
+        array2: The second NumPy array.
+    Returns:
+        The RMS value of the difference.
+    """
+    diff = array1 - array2
+    return np.sqrt(np.mean(diff**2))
+
+def gcs_mask_error_diego(gcs_par, satpos, plotranges, masks, imsize, occ_size):
     """
     Computes the error between the input masks and the maks from GCS model
     :param gcs_par: GCS model parameters. The param are: CMElon, CMElat, CMEtilt, k, ang, , height0, height1, height2, ...
@@ -270,29 +280,80 @@ def gcs_mask_error_diego(gcs_par, satpos, plotranges, masks, mask_total_px, imsi
     
     #Para cada par o triplete de imagenes, que conrresponden al mismo tiempo, asignarle la misma altura.
     #En caso contrario se ajustan tantas alturas como satpos haya para ese mismo tiempo.
-    #breakpoint()
+    #
     for i in range(len(masks)):
         #this_gcs_par = [gcs_par[0], gcs_par[1], gcs_par[2], gcs_par[5+i], gcs_par[3], gcs_par[4]] 
         this_gcs_par = [gcs_par[0], gcs_par[1], gcs_par[2], gcs_par[5], gcs_par[3], gcs_par[4]]
         mask = maskFromCloud_3d(this_gcs_par, satpos[i], imsize, plotranges[i], occ_size=occ_size[i])
-        #breakpoint()
-        
-        #cuadrados minimos
-        #error.append(np.mean((np.array(mask) - masks[i]), axis=(1,2))**2)# /mask_total_px[i])
-        
-        #IOU
-        intersection = np.logical_and(mask, masks[i])
-        union = np.logical_or(mask, masks[i])
-        error.append(np.sum(intersection) / np.sum(union))
-        breakpoint()
-        # CHECK!!
-        #intersecciion da 0, hacer plot de las mascaras.
-        #hacer doble flip.
-        #fliped_image = np.flip(np.flip(omask[j][0,:,:],axis=0),axis=1)
 
+        #RMS
+        #error.append(np.mean((np.array(mask) - masks[i]), axis=(1,2))**2)# /mask_total_px[i])
+        #error.append( rms_difference( np.array(mask[0]), np.array(masks[i][0]) ) )
+        error.append( rms_difference( np.array(mask[0]), np.flip(masks[i][0],axis=0) ) )
+                
+        #IOU^-1
+        fliped_image = np.flip(masks[i][0],axis=0)
+        intersection = np.logical_and(mask[0], fliped_image)
+        union = np.logical_or(mask[0], fliped_image)
+        #error.append(np.sum(intersection) / np.sum(union))
+        #error.append(np.sum(union)/np.sum(intersection))
+        
         #agregar opcion de vector que permita pesar entre o y 1 cor2a - b y C2.
         print(gcs_par, np.mean(error))
     return np.array(error).flatten()
+
+def ckcarr_to_stony(carr_ck,observer_time):
+    #christina Kay carrington coordinate system es similar to carrington pero 
+    #observer_time = "2010-04-03T10:54:00"
+    observer_time = observer_time.isoformat()
+    #L0 = 360*(carrington_rotation_number(observer_time) - int(carrington_rotation_number(observer_time))) 
+    if carr_ck <0:
+        carr = carr_ck + 360 #solo si carr_ck es negativo
+    else:
+        carr = carr_ck
+    if carr >180:
+        L0 = 360*(carrington_rotation_number(observer_time) - int(carrington_rotation_number(observer_time))-1)
+    else:
+        L0 = 360*(carrington_rotation_number(observer_time) - int(carrington_rotation_number(observer_time)))
+    stony = carr + L0
+    return stony
+
+def stony_to_ckcarr(stony, observer_time):
+    #observer_time = "2010-04-03T10:54:00"
+    observer_time = observer_time.isoformat()
+    L0 = 360*(carrington_rotation_number(observer_time) - int(carrington_rotation_number(observer_time))-1)
+    carr = stony - L0
+    if carr >360:
+        carr = carr - 360
+    if carr>180:
+        carr_ck = carr - 360
+    else:
+        carr_ck = carr
+    return carr_ck
+
+def sensitivity_test(gcs_par_minimum, satpos, plotranges, masks, imsize, occ_size,aux):
+    fig, axs = plt.subplots(3, 2, figsize=[12,8])
+    axs = axs.ravel()
+    breakpoint()
+    label=['CMElon', 'CMElat', 'CMEtilt', 'k', 'ang', 'height']
+    for i in range(len(gcs_par_minimum)):
+        gcs_par = gcs_par_minimum.copy()
+        breakpoint()
+        #entender plot ranges, ver en el caso del ploteo de params vs tiempo, ver el eje y.
+        x = np.linspace(plotranges[0], plotranges[1], num=100)
+        y=[]
+        for j in x:
+            gcs_par[i] = j
+            y.append(np.median(gcs_mask_error_diego(gcs_par, satpos, plotranges, masks, imsize, occ_size)))
+        axs[i].plot(x, y, 'o', color='r', label=label[i])
+    plt.tight_layout()
+    plt.savefig(os.path.join(opath, aux+'.png'))
+    plt.close()
+
+
+
+
+
 ############ Main
 '''
 Fits a filled masks created with GCS model to the data
@@ -300,7 +361,13 @@ Fits a filled masks created with GCS model to the data
 #Constants
 dpath =  '/gehme/projects/2023_eeggl_validation/niemela_project/gcs_20100403_mask'
 opath = dpath + '/gcs_fit'
-select = select=[4,5]#4,5,7,8,11,12] #None # select the time instants to fit, in order as read from dpath
+#aux='' #if not using modified masks
+aux = '/modified_masks'
+dpath = dpath + aux
+opath = opath + aux
+
+#select=[4,5]#4,5,7,8,11,12] #None # select the time instants to fit, in order as read from dpath
+select=None
 manual_gcs_path = '/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/'
 imsize = [512, 512] # image size
 gcs_par_range = [[-180,180],[-90,90],[-90,90],[4,20],[0.1,0.9], [1,80]] # bounds for the fit gcs parameters
@@ -309,15 +376,12 @@ Event_Number = 3
 # Load data
 meas_masks, fnames, satpos, plotranges, occ_sizes, masks_prop, dates= load_data(dpath, occ_size, select=select)
 mask_total_px = [np.sum(m, axis=(1,2)) for m in meas_masks] # total number of positive pixels in the mask
-
 csv_file = 'Event_list.csv'
 df = pd.read_csv(manual_gcs_path+csv_file)
 
 #loads manual gcs for IDL .sav file
 #CMElon, CMElat, CMEtilt, height, k, ang
-#gcs_files= sorted(os.listdir(manual_gcs))
-#gcs_files =[f for f in gcs_files if f.endswith(".sav")]
-#gcs_files = sorted(gcs_files, key=lambda x: x[0] != 'm')
+
 gcs_hebe_par = []
 gcs_tony_par = []
 time_hebe    = []
@@ -327,7 +391,7 @@ time_tony    = []
 gcs_manual_par = []
 df_event = df[df['Event_Number']==Event_Number]
 
-#temp = readsav('/gehme/projects/2023_eeggl_validation/niemela_project/GCS_20130424/5.sav')
+
 for i in range(1, len(df_event), 3):
     print,i
     
@@ -346,31 +410,27 @@ for i in range(1, len(df_event), 3):
                         [float(str(df_event.iloc[i]['Ratio']).replace(",", "."))],
                         [float(str(df_event.iloc[i]['Half_Angle']).replace(",", "."))] ] )
     time_tony.append(datetime.strptime(df_event.iloc[i]['Date'],'%Y-%m-%dT%H-%M')) 
-#for f in gcs_files:
-    #temp = readsav(os.path.join(manual_gcs, f))
-    #gcs_manual_par.append([np.degrees(float(temp['sgui']['lon'])), np.degrees(float(temp['sgui']['lat'])), np.degrees(float(temp['sgui']['rot'])),
-    #            float(temp['sgui']['hgt']), float(temp['sgui']['rat']), np.degrees(float(temp['sgui']['han']))])
-# keeps only select
-#gcs_manual_par = [gcs_manual_par[i] for i in select]
+
 
 # read /gehme/projects/2023_eeggl_validation/niemela_project/gcs_events
 # guardar en gcs_manual
-
-select_hebe = [3]#[1,3,5]
+select_hebe = [1,3,5]#[1,3,5]
 gcs_hebe_par = [gcs_hebe_par[index] for index in select_hebe]
-
+time_hebe    = [time_hebe[index] for index in select_hebe]
 # crate opath
 os.makedirs(opath, exist_ok=True)
 
-# fits gcs model to all images simultaneosly
 # bounds
 up_bounds= np.array([gcs_par_range[0][1], gcs_par_range[1][1], gcs_par_range[2][1], gcs_par_range[4][1], gcs_par_range[5][1]])
-up_bounds= np.append(up_bounds, np.full(len(meas_masks), gcs_par_range[3][1]))
+#up_bounds= np.append(up_bounds, np.full(len(meas_masks), gcs_par_range[3][1]))
+up_bounds= np.append(up_bounds, np.full(int(len(meas_masks)/2), gcs_par_range[3][1]))
 low_bounds= np.array([gcs_par_range[0][0], gcs_par_range[1][0], gcs_par_range[2][0], gcs_par_range[4][0], gcs_par_range[5][0]])
-low_bounds= np.append(low_bounds, np.full(len(meas_masks), gcs_par_range[3][0]))
+#low_bounds= np.append(low_bounds, np.full(len(meas_masks), gcs_par_range[3][0]))
+low_bounds= np.append(low_bounds, np.full(int(len(meas_masks)/2), gcs_par_range[3][0]))
 
-up_bounds = np.array([gcs_par_range[0][1], gcs_par_range[1][1], gcs_par_range[2][1], gcs_par_range[4][1], gcs_par_range[5][1], gcs_par_range[3][1]])
-low_bounds= np.array([gcs_par_range[0][0], gcs_par_range[1][0], gcs_par_range[2][0], gcs_par_range[4][0], gcs_par_range[5][0], gcs_par_range[3][0]])
+#bound de abajo habian servido para 1 solo instante de tiempo.
+#up_bounds = np.array([gcs_par_range[0][1], gcs_par_range[1][1], gcs_par_range[2][1], gcs_par_range[4][1], gcs_par_range[5][1], gcs_par_range[3][1]])
+#low_bounds= np.array([gcs_par_range[0][0], gcs_par_range[1][0], gcs_par_range[2][0], gcs_par_range[4][0], gcs_par_range[5][0], gcs_par_range[3][0]])
 
 #inital  conditions from masks_prop
 # gcs_param_ini = gcs_manual_par[-2]
@@ -401,23 +461,13 @@ low_bounds= np.array([gcs_par_range[0][0], gcs_par_range[1][0], gcs_par_range[2]
 #else:
 #    ini_lon = -90
 
-#estimating initial conditions from gcs_hebe_par
-#breakpoint()
-ini_lon    = np.nanmean([gcs_hebe_par[i][0] for i in range(len(gcs_hebe_par))])
-ini_lat    = np.nanmean([gcs_hebe_par[i][1] for i in range(len(gcs_hebe_par))])
-ini_tilt   = np.nanmean([gcs_hebe_par[i][2] for i in range(len(gcs_hebe_par))])
-#ini_height = np.nanmean([gcs_hebe_par[i][3] for i in range(len(gcs_hebe_par))])
-ini_k      = np.nanmean([gcs_hebe_par[i][4] for i in range(len(gcs_hebe_par))])
-ini_ang    = np.nanmean([gcs_hebe_par[i][5] for i in range(len(gcs_hebe_par))])
-
-
 #gcs height vs time, second order fit
 altura  = [gcs_hebe_par[i][3][0] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
 if len(altura)>1:
     tiempos = [time_hebe[i] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
     gcs_manual_par = [gcs_hebe_par[i] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
     tiempos_to_fit = np.array([(date - tiempos[0]).total_seconds() for date in tiempos])
-    breakpoint()
+    #breakpoint()
     coefs = np.polyfit(tiempos_to_fit,altura, 2)
     poly_func = np.poly1d(coefs)
     plot_gcs_height_fit = False
@@ -429,76 +479,87 @@ if len(altura)>1:
         plt.plot(x_fit,y_fit,'x')
         plt.savefig(os.path.join(opath, 'ajuste_altura2.png'))
         plt.close()
-    #height from masks estimated using the function poly_func "gcs_height(time)"
-    ini_height = poly_func(np.array([( asd- tiempos[0]).total_seconds() for asd in dates]))
+    #height from masks estimated using the function poly_func "gcs_height(time)" Como quiero una altura por cada instante de tiempo, 
+    # me quedo unicamente con los valores impares
+    ini_height = poly_func(np.array([( asd- tiempos[0]).total_seconds() for index, asd in enumerate(dates) if (index%2)==0]))
 if len(altura)==1:
     tiempos = [time_hebe[i] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
     gcs_manual_par = [gcs_hebe_par[i] for i in range(len(gcs_hebe_par)) if np.isnan(gcs_hebe_par[i][3][0]) == False]
     ini_height = np.array(np.full(2,altura))
-ini_cond_0 = np.array([ini_lon, ini_lat, ini_tilt, ini_k, ini_ang]+ini_height.tolist()).flatten()
-ini_cond_0 = ini_cond_0[:-1]
-#breakpoint()
-# if initial conditions are outside bounds use the closest
-#if np.any(ini_cond < low_bounds) or np.any(ini_cond > up_bounds):
-#    print('Warning: Initial conditions are outside bounds. Using closest bounds')
-#    ini_cond = np.clip(ini_cond, low_bounds, up_bounds)
-#breakpoint()
-print('Fitting GCS model with initial conditions: ', ini_cond_0)
 
+#estimating initial conditions from gcs_hebe_par
+#breakpoint()
+ini_lon    = np.nanmean([gcs_hebe_par[i][0] for i in range(len(gcs_hebe_par))])
+#si csv usa stony, debo convertirlo a carrington de CK.
+ini_lon = stony_to_ckcarr(ini_lon, tiempos[0])
+
+ini_lat    = np.nanmean([gcs_hebe_par[i][1] for i in range(len(gcs_hebe_par))])
+ini_tilt   = np.nanmean([gcs_hebe_par[i][2] for i in range(len(gcs_hebe_par))])
+#ini_height = np.nanmean([gcs_hebe_par[i][3] for i in range(len(gcs_hebe_par))])
+ini_k      = np.nanmean([gcs_hebe_par[i][4] for i in range(len(gcs_hebe_par))])
+ini_ang    = np.nanmean([gcs_hebe_par[i][5] for i in range(len(gcs_hebe_par))])
+
+
+#Pensar que el input ahora esta siendo el ajuste de Hebe y esta en stony, debe pasar a carrington y de ahi a ckcarr.
+ini_cond_0 = np.array([ini_lon, ini_lat, ini_tilt, ini_k, ini_ang]+ini_height.tolist()).flatten()
+#ini_cond_0 = ini_cond_0[:-1]
+
+print('Fitting GCS model with initial conditions: ', ini_cond_0)
 #usar metodo lm
 fit=least_squares(gcs_mask_error_diego, ini_cond_0 , method='trf', 
-                kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'mask_total_px':mask_total_px, 'occ_size':occ_sizes}, 
+                kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'occ_size':occ_sizes}, 
                 verbose=2, bounds=(low_bounds,up_bounds), diff_step=.5, xtol=1e-15) #, x_scale=scales)
 ini_cond = fit.x
 fit=least_squares(gcs_mask_error_diego, ini_cond , method='trf', 
-                kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'mask_total_px':mask_total_px, 'occ_size':occ_sizes}, 
+                kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'occ_size':occ_sizes}, 
                 verbose=2, bounds=(low_bounds,up_bounds), diff_step=.5, xtol=1e-15) #, x_scale=scales)
 print('The fit parameters are: ', fit.x)
-#breakpoint()
+
 # saves to pickle
 with open(os.path.join(opath, 'gcs_fit.pkl'), 'wb') as f:
     pickle.dump(fit, f)
 
 # plots manual and fit gcs param vs time
 gcs_fit_par = []
+gcs_fit_par_ckunits = []
+j=0
 for i in range(len(meas_masks)):
     #gcs_fit_par.append([fit.x[0], fit.x[1], fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]])
-    gcs_fit_par.append([fit.x[0], fit.x[1], fit.x[2], fit.x[5], fit.x[3], fit.x[4]]) # TODO the tilt signs seems to be OPOSITE in pyGCS???
+    lon_stony = ckcarr_to_stony(fit.x[0],tiempos[j])
+    gcs_fit_par.append([lon_stony, fit.x[1], fit.x[2], fit.x[5+j], fit.x[3], fit.x[4]]) 
+    gcs_fit_par_ckunits.append([fit.x[0], fit.x[1], fit.x[2], fit.x[5+j], fit.x[3], fit.x[4]]) 
+    #breakpoint()
+    if i%2==1:
+        j=j+1
+#lon in gcs_par_range should be in the range 0,360 because it is carrington coordinate system and not carrington_CK.
 plot_gcs_param_vs_time(gcs_fit_par, gcs_manual_par, dates,tiempos,opath, ylim=gcs_par_range)
 
+for i in range(len(gcs_manual_par)):
+    gcs_manual_par[i][0] = stony_to_ckcarr(gcs_manual_par[i][0],tiempos[i])
+
 # plots the fit mask along with the original masks
-#TODO, hacer andar las mascaras de abajo, usar dates y tiempos.
 gcs_manual_par_plot = [item for item in gcs_manual_par for _ in range(2)]
-#breakpoint()
+
 i=0
 for j in range(len(tiempos)):
     #gcs_param = [fit.x[0], fit.x[1], fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]]
-    gcs_param = [fit.x[0], fit.x[1], fit.x[2], fit.x[5], fit.x[3], fit.x[4]]
+    gcs_param = [fit.x[0], fit.x[1], fit.x[2], fit.x[5+j], fit.x[3], fit.x[4]]
     mask_A = maskFromCloud_3d(gcs_param, satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
     #gcs_param = [fit.x[0], fit.x[1], fit.x[2], fit.x[5+i+1], fit.x[3], fit.x[4]]
     mask_B = maskFromCloud_3d(gcs_param, satpos[i+1], imsize, plotranges[i+1], occ_size=occ_sizes[i+1])
     gcs_manual_par_plot_i = np.array(gcs_manual_par_plot[i]).flatten().tolist()
     mask_manual_A = maskFromCloud_3d(gcs_manual_par_plot_i, satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
     mask_manual_B = maskFromCloud_3d(gcs_manual_par_plot_i, satpos[i+1], imsize, plotranges[i+1], occ_size=occ_sizes[i+1])
-    #breakpoint()
     cfname = fnames[i][0].split('_')[0] + '_' + fnames[i][0].split('_')[1]
     ofile = os.path.join(opath, f'{cfname}_gcs_fit.png')
-    #breakpoint()
     plot_to_png_diego(ofile, [fnames[i],fnames[i+1]], [meas_masks[i],meas_masks[i+1]], [mask_A,mask_B], [mask_manual_A,mask_manual_B])
     i=i+2
 
 
-
+breakpoint()
+gcs_par_minimum = gcs_fit_par_ckunits[0].copy()
+aux='testeo_sensibilidad_t0'
+sensitivity_test(gcs_par_minimum, [satpos[0][0],satpos[1][0]], [plotranges[0][0],plotranges[1][0]], [meas_masks[0][0],meas_masks[1][0]], [imsize], [occ_size[0]],[aux])
 
 
 breakpoint()
-
-for i in range(len(meas_masks)):
-    gcs_param = [fit.x[0], fit.x[1], fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]]
-    mask = maskFromCloud_3d(gcs_param, satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
-    gcs_manual_par_plot_i = np.array(gcs_manual_par_plot[i]).flatten().tolist()
-    mask_manual = maskFromCloud_3d(gcs_manual_par_plot_i, satpos[i], imsize, plotranges[i], occ_size=occ_sizes[i])
-    cfname = fnames[i][0].split('_')[0] + '_' + fnames[i][0].split('_')[1]
-    ofile = os.path.join(opath, f'{cfname}_gcs_fit.png')
-    plot_to_png(ofile, fnames[i], meas_masks[i], mask, mask_manual)
-breakpoint()    
