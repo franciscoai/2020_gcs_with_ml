@@ -280,10 +280,11 @@ def gcs_mask_error_diego(gcs_par, satpos, plotranges, masks, imsize, occ_size):
     
     #Para cada par o triplete de imagenes, que conrresponden al mismo tiempo, asignarle la misma altura.
     #En caso contrario se ajustan tantas alturas como satpos haya para ese mismo tiempo.
-    #
+    # usar gcs_par[5+j] con j=j+1 para los i pares. 
+    j=0
     for i in range(len(masks)):
         #this_gcs_par = [gcs_par[0], gcs_par[1], gcs_par[2], gcs_par[5+i], gcs_par[3], gcs_par[4]] 
-        this_gcs_par = [gcs_par[0], gcs_par[1], gcs_par[2], gcs_par[5], gcs_par[3], gcs_par[4]]
+        this_gcs_par = [gcs_par[0], gcs_par[1], gcs_par[2], gcs_par[5+j], gcs_par[3], gcs_par[4]]
         mask = maskFromCloud_3d(this_gcs_par, satpos[i], imsize, plotranges[i], occ_size=occ_size[i])
 
         #RMS
@@ -300,6 +301,8 @@ def gcs_mask_error_diego(gcs_par, satpos, plotranges, masks, imsize, occ_size):
         
         #agregar opcion de vector que permita pesar entre o y 1 cor2a - b y C2.
         print(gcs_par, np.mean(error))
+        if i%2==1:
+            j=j+1
     return np.array(error).flatten()
 
 def ckcarr_to_stony(carr_ck,observer_time):
@@ -332,23 +335,31 @@ def stony_to_ckcarr(stony, observer_time):
     return carr_ck
 
 def sensitivity_test(gcs_par_minimum, satpos, plotranges, masks, imsize, occ_size,aux):
-    fig, axs = plt.subplots(3, 2, figsize=[12,8])
+    fig, axs = plt.subplots(4, 2, figsize=[12,8])
     axs = axs.ravel()
-    breakpoint()
-    label=['CMElon', 'CMElat', 'CMEtilt', 'k', 'ang', 'height']
+    #breakpoint()
+    label=['CMElon', 'CMElat', 'CMEtilt', 'k', 'ang', 'height0', 'height1', 'height2']
+    #for por instantes de tiempo
+    minimum_error = np.sum(gcs_mask_error_diego(gcs_par_minimum, satpos, plotranges, masks, imsize, occ_size))
     for i in range(len(gcs_par_minimum)):
         gcs_par = gcs_par_minimum.copy()
-        breakpoint()
         #entender plot ranges, ver en el caso del ploteo de params vs tiempo, ver el eje y.
-        x = np.linspace(plotranges[0], plotranges[1], num=100)
+        x = np.linspace(gcs_par[i]*0.3, gcs_par[i]*1.7, num=200)
         y=[]
         for j in x:
             gcs_par[i] = j
-            y.append(np.median(gcs_mask_error_diego(gcs_par, satpos, plotranges, masks, imsize, occ_size)))
+            #breakpoint()
+            #y.append(np.mean(gcs_mask_error_diego(gcs_par, satpos, plotranges, masks, imsize, occ_size)))
+            y.append(np.sum(gcs_mask_error_diego(gcs_par, satpos, plotranges, masks, imsize, occ_size)))
         axs[i].plot(x, y, 'o', color='r', label=label[i])
+        axs[i].set_xlabel(label[i])
+        axs[i].axvline(x=gcs_par_minimum[i], color='blue')
+        axs[i].axhline(y=minimum_error, color='blue')
+        axs[i].axhline(y=minimum_error*1.10, color='blue', linestyle='--')
     plt.tight_layout()
     plt.savefig(os.path.join(opath, aux+'.png'))
     plt.close()
+    #breakpoint()
 
 
 
@@ -503,7 +514,7 @@ ini_ang    = np.nanmean([gcs_hebe_par[i][5] for i in range(len(gcs_hebe_par))])
 #Pensar que el input ahora esta siendo el ajuste de Hebe y esta en stony, debe pasar a carrington y de ahi a ckcarr.
 ini_cond_0 = np.array([ini_lon, ini_lat, ini_tilt, ini_k, ini_ang]+ini_height.tolist()).flatten()
 #ini_cond_0 = ini_cond_0[:-1]
-
+breakpoint()
 print('Fitting GCS model with initial conditions: ', ini_cond_0)
 #usar metodo lm
 fit=least_squares(gcs_mask_error_diego, ini_cond_0 , method='trf', 
@@ -514,7 +525,7 @@ fit=least_squares(gcs_mask_error_diego, ini_cond , method='trf',
                 kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'occ_size':occ_sizes}, 
                 verbose=2, bounds=(low_bounds,up_bounds), diff_step=.5, xtol=1e-15) #, x_scale=scales)
 print('The fit parameters are: ', fit.x)
-
+breakpoint()
 # saves to pickle
 with open(os.path.join(opath, 'gcs_fit.pkl'), 'wb') as f:
     pickle.dump(fit, f)
@@ -527,7 +538,7 @@ for i in range(len(meas_masks)):
     #gcs_fit_par.append([fit.x[0], fit.x[1], fit.x[2], fit.x[5+i], fit.x[3], fit.x[4]])
     lon_stony = ckcarr_to_stony(fit.x[0],tiempos[j])
     gcs_fit_par.append([lon_stony, fit.x[1], fit.x[2], fit.x[5+j], fit.x[3], fit.x[4]]) 
-    gcs_fit_par_ckunits.append([fit.x[0], fit.x[1], fit.x[2], fit.x[5+j], fit.x[3], fit.x[4]]) 
+    #gcs_fit_par_ckunits.append([fit.x[0], fit.x[1], fit.x[2], fit.x[5+j], fit.x[3], fit.x[4]]) 
     #breakpoint()
     if i%2==1:
         j=j+1
@@ -556,10 +567,33 @@ for j in range(len(tiempos)):
     i=i+2
 
 
+gcs_par_minimum = fit.x.copy() #gcs_fit_par_ckunits[0].copy()
+aux='testeo_sensibilidad_mean'
+aux='testeo_sensibilidad_sum'
+aux2=['t0','t1','t2']
+
+aux_file = aux
+
+
+sensitivity_test(gcs_par_minimum, satpos, plotranges, meas_masks, imsize, occ_sizes,aux_file)
+
+
+
+
+
+
+
 breakpoint()
-gcs_par_minimum = gcs_fit_par_ckunits[0].copy()
-aux='testeo_sensibilidad_t0'
-sensitivity_test(gcs_par_minimum, [satpos[0][0],satpos[1][0]], [plotranges[0][0],plotranges[1][0]], [meas_masks[0][0],meas_masks[1][0]], [imsize], [occ_size[0]],[aux])
-
-
+i=0
+for j in range(len(tiempos)):
+    gcs_par_aux = gcs_par_minimum[:-2]
+    gcs_par_aux[5] = gcs_par_minimum[5+int(i/2)]
+    satpos_aux     = satpos[i:i+1]
+    plotranges_aux = plotranges[i:i+1]
+    meas_masks_aux = meas_masks[i:i+1]
+    imsize_aux     = imsize
+    occ_size_aux   = occ_sizes[i:i+1]
+    aux_file = aux+aux2[j]
+    sensitivity_test(gcs_par_aux, satpos_aux, plotranges_aux, meas_masks_aux, imsize_aux, occ_size_aux,aux_file)
+    i=i+2
 breakpoint()
