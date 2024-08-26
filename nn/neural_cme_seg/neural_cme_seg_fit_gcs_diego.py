@@ -338,13 +338,16 @@ def sensitivity_test(gcs_par_minimum, satpos, plotranges, masks, imsize, occ_siz
     fig, axs = plt.subplots(4, 2, figsize=[12,8])
     axs = axs.ravel()
     #breakpoint()
-    label=['CMElon', 'CMElat', 'CMEtilt', 'k', 'ang', 'height0', 'height1', 'height2']
+    label=['Longitude [deg]', 'Latitude [deg]', 'Tilt [deg]', 'Aspect ratio', 'Half AW [deg]', 
+           'H front 10:54 UTC [Rsun]', 'H front 11:24 UTC [Rsun]', 'H front 11:54 UTC [Rsun]']
+    min_max_ranges = [[-110,-87],[-27.5,-22],[-27,22],[0.37,0.52],[0,55],[7.2,9.3],[9,12],[11.7,14.5]]
     #for por instantes de tiempo
     minimum_error = np.sum(gcs_mask_error_diego(gcs_par_minimum, satpos, plotranges, masks, imsize, occ_size))
     for i in range(len(gcs_par_minimum)):
         gcs_par = gcs_par_minimum.copy()
         #entender plot ranges, ver en el caso del ploteo de params vs tiempo, ver el eje y.
-        x = np.linspace(gcs_par[i]*0.3, gcs_par[i]*1.7, num=200)
+        #x = np.linspace(gcs_par[i]*0.3, gcs_par[i]*1.7, num=200)
+        x = np.linspace(min_max_ranges[i][0], min_max_ranges[i][1], num=100)
         y=[]
         for j in x:
             gcs_par[i] = j
@@ -353,6 +356,7 @@ def sensitivity_test(gcs_par_minimum, satpos, plotranges, masks, imsize, occ_siz
             y.append(np.sum(gcs_mask_error_diego(gcs_par, satpos, plotranges, masks, imsize, occ_size)))
         axs[i].plot(x, y, 'o', color='r', label=label[i])
         axs[i].set_xlabel(label[i])
+        axs[i].set_ylabel("Error")
         axs[i].axvline(x=gcs_par_minimum[i], color='blue')
         axs[i].axhline(y=minimum_error, color='blue')
         axs[i].axhline(y=minimum_error*1.10, color='blue', linestyle='--')
@@ -514,12 +518,13 @@ ini_ang    = np.nanmean([gcs_hebe_par[i][5] for i in range(len(gcs_hebe_par))])
 #Pensar que el input ahora esta siendo el ajuste de Hebe y esta en stony, debe pasar a carrington y de ahi a ckcarr.
 ini_cond_0 = np.array([ini_lon, ini_lat, ini_tilt, ini_k, ini_ang]+ini_height.tolist()).flatten()
 #ini_cond_0 = ini_cond_0[:-1]
+ini_cond_0 = [-98,-25,0,0.41,17,8.2,10.6,13]
 breakpoint()
 print('Fitting GCS model with initial conditions: ', ini_cond_0)
 #usar metodo lm
 fit=least_squares(gcs_mask_error_diego, ini_cond_0 , method='trf', 
                 kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'occ_size':occ_sizes}, 
-                verbose=2, bounds=(low_bounds,up_bounds), diff_step=.5, xtol=1e-15) #, x_scale=scales)
+                verbose=2, bounds=(low_bounds,up_bounds), diff_step=2.5, xtol=1e-15) #, x_scale=scales)
 ini_cond = fit.x
 fit=least_squares(gcs_mask_error_diego, ini_cond , method='trf', 
                 kwargs={'satpos': satpos, 'plotranges': plotranges, 'masks': meas_masks, 'imsize': imsize, 'occ_size':occ_sizes}, 
@@ -569,7 +574,7 @@ for j in range(len(tiempos)):
 
 gcs_par_minimum = fit.x.copy() #gcs_fit_par_ckunits[0].copy()
 aux='testeo_sensibilidad_mean'
-aux='testeo_sensibilidad_sum'
+aux='testeo_sensibilidad_sum4'
 aux2=['t0','t1','t2']
 
 aux_file = aux
