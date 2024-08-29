@@ -7,7 +7,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from pyGCS_raytrace import pyGCS
 from pyGCS_raytrace.rtraytracewcs import rtraytracewcs
-from nn_training.get_cme_mask import get_cme_mask,get_mask_cloud
+from nn_training.get_cme_mask import get_cme_mask,get_mask_cloud,get_cme_mask_diego
 from nn_training.corona_background.get_corona import get_corona
 import numpy as np
 import datetime
@@ -42,7 +42,7 @@ def save_png(array, ofile=None, range=None):
 # CONSTANTS
 #paths
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240814'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240814/test_diego'
 opath_fstructure='check' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
@@ -52,7 +52,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 10 # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 1000 # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -78,19 +78,19 @@ back_only_image = False # set to True to save an addditional image with only the
 save_masks = True # set to True to save the masks images
 save_only_cme_mask = False # set to True to save only the cme mask and not the occulter masks. save_masks must be True
 inner_hole_mask=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
-mask_from_cloud=True #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
+mask_from_cloud=False #True #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
 show_middle_cross = False # set to show the middle cross of the image
 
 #### main
 if opath_fstructure=='check':
-    save_masks = False
+    save_masks = True #False
     cme_only_image = False
     back_only_image = False
     add_mesh_image = True
-    rnd_par=False 
+    rnd_par=True 
     save_only_cme_mask = True
-    diff_int_cme = False
+    diff_int_cme = True #False
     par_rng[6]=[10,10]
     show_middle_cross = True
     add_flux_rope = False
@@ -98,7 +98,6 @@ if opath_fstructure=='check':
 os.makedirs(OPATH, exist_ok=True)
 # saves a copy of this script to the output folder
 os.system("cp " + os.path.realpath(__file__) + " " + OPATH)
-
 # generate param arrays
 par_num = [par_num] * len(par_rng)
 all_par = []
@@ -152,6 +151,12 @@ for row in df.index:
 
     for sat in range(n_sat):
         # for sat==2 (LASCO) we divide the current height by 16/6 to match the scale of the other satellites
+        if sat==0:
+            occ_size_1024 = 100
+        elif sat==1:
+            occ_size_1024 = 120
+        elif sat==2:
+            occ_size_1024 = 150
         if sat==2:
             df.loc[row, 'height'] = df.loc[row, 'height']/2.667
         #defining ranges and radius of the occulter
@@ -190,17 +195,17 @@ for row in df.index:
             mask=get_mask_cloud(p_x,p_y,imsize)
         else:
             btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row],
-                                      df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.1, nel=1e5, usr_center_off=usr_center_off)     
+                                      df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.001, nel=1e5, usr_center_off=usr_center_off)     
             cme_npix= len(btot_mask[btot_mask>0].flatten())
             if cme_npix<=0:
                 print("\033[93m WARNING: CME number {} raytracing did not work\033".format(row))                
                 break          
-            mask = get_cme_mask(btot_mask,inner_cme=inner_hole_mask)          
+            mask = get_cme_mask_diego(btot_mask,inner_cme=inner_hole_mask,occ_size=occ_size_1024)          
             mask_npix= len(mask[mask>0].flatten())
-            if mask_npix/cme_npix<0.9:                        
+            if mask_npix/cme_npix<0.5:                        
                 print("\033[93m WARNING: CME number {} mask is too small compared to cme brigthness image, skipping all views...\033".format(row))
                 break
-
+            #breakpoint()
         #adds occulter to the masks and checks for null masks
         mask[r <= size_occ[sat]] = 0  
         mask[r >= size_occ_ext[sat]] = 0
