@@ -7,7 +7,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from pyGCS_raytrace import pyGCS
 from pyGCS_raytrace.rtraytracewcs import rtraytracewcs
-from nn_training.get_cme_mask import get_cme_mask,get_mask_cloud,get_cme_mask_diego
+from nn_training.get_cme_mask import get_mask_cloud,get_cme_mask
 from nn_training.corona_background.get_corona import get_corona
 import numpy as np
 import datetime
@@ -42,8 +42,8 @@ def save_png(array, ofile=None, range=None):
 # CONSTANTS
 #paths
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240814/test_diego'
-opath_fstructure='check' # use 'check' to save all the ouput images in the same dir together for easier checkout
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240830'
+opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
 # morphology
@@ -52,7 +52,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 1000 # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 350000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -77,7 +77,7 @@ cme_only_image=False # set to True to save an addditional image with only the cm
 back_only_image = False # set to True to save an addditional image with only the background corona without the cme
 save_masks = True # set to True to save the masks images
 save_only_cme_mask = False # set to True to save only the cme mask and not the occulter masks. save_masks must be True
-inner_hole_mask=False #Set to True to make the cme mask excludes the inner void of the gcs (if visible) 
+inner_hole_mask=False #Set to True to produce a mask that contains the inner hole of the GCS (if visible)
 mask_from_cloud=False #True #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
 show_middle_cross = False # set to show the middle cross of the image
@@ -88,10 +88,10 @@ if opath_fstructure=='check':
     cme_only_image = False
     back_only_image = False
     add_mesh_image = True
-    rnd_par=True 
+    rnd_par=False 
     save_only_cme_mask = True
     diff_int_cme = True #False
-    par_rng[6]=[10,10]
+    par_rng = [[-0,0.1],[0,0.1],[90,90],[19,20],[0.15,0.15], [70,71],[10,10]] 
     show_middle_cross = True
     add_flux_rope = False
 
@@ -124,6 +124,7 @@ ok_cases = 0
 usr_center_off = None
 
 # generate views
+########### paralelize this for loop
 for row in df.index:
 #get background corona,headers and occulter size
     if same_corona==False or row==0:
@@ -174,22 +175,6 @@ for row in df.index:
                                     satpos, do_rotate_lat=[False, False, True])                         
             x = clouds[sat, :, 1]
             y = clouds[sat, :, 2] # sat has always been 0 in this line, but why ???
-            
-            # # artifitially changes the center of plotranges
-            # if sat==1:
-            #     plotranges[sat][0] -= 0.3
-            #     plotranges[sat][1] -= 0.3
-            #     plotranges[sat][2] -= -0.6
-            #     plotranges[sat][3] -= -0.6
-            #     usr_center_off = [5, -15]
-            # elif sat==2:
-            #     plotranges[sat][0] -= 0.
-            #     plotranges[sat][1] -= 0.
-            #     plotranges[sat][2] -= -0.35
-            #     plotranges[sat][3] -= -0.35
-            #     usr_center_off = [0, 0]
-            # else:
-            #    usr_center_off = [0, 0]
 
             p_x,p_y=deg2px(x,y,plotranges,imsize, sat)
             mask=get_mask_cloud(p_x,p_y,imsize)
@@ -200,7 +185,7 @@ for row in df.index:
             if cme_npix<=0:
                 print("\033[93m WARNING: CME number {} raytracing did not work\033".format(row))                
                 break          
-            mask = get_cme_mask_diego(btot_mask,inner_cme=inner_hole_mask,occ_size=occ_size_1024)          
+            mask = get_cme_mask(btot_mask,inner_cme=inner_hole_mask,occ_size=occ_size_1024)          
             mask_npix= len(mask[mask>0].flatten())
             if mask_npix/cme_npix<0.5:                        
                 print("\033[93m WARNING: CME number {} mask is too small compared to cme brigthness image, skipping all views...\033".format(row))
@@ -417,6 +402,9 @@ for row in df.index:
     plotranges_all.append(plotranges)
     # saves aw
     mask_aw.append(mask_aw_sat)
+
+########### end of paralelize
+
 print(f'Total Number of OK cases: {ok_cases}')
 print(f'Total Number of aborted cases: {df.index.stop*n_sat -1-ok_cases}')
 print(f'Total Number of halos: {halo_count}')
