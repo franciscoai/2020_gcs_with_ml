@@ -195,7 +195,7 @@ def main(configuration: Configuration):
                                       shuffle=True)
     cme_test_dataloader = DataLoader(test_dataset,
                                      batch_size=BATCH_SIZE,
-                                     shuffle=True)
+                                     shuffle=False)
     # Configurar el modelo
     if MODEL_ARQ == 'inception':
         model = SiratsInception(device=DEVICE,
@@ -334,18 +334,22 @@ def main(configuration: Configuration):
                     center_idxs = [
                         ((case.shape[0] - 1) // 2, (case.shape[1] - 1) // 2) for case in case_list]
                     # Occulters size for [sat1, sat2 ,sat3] in [Rsun]
-                    occulter_size = [2., 2., 4.3]
+                    occulter_size = [3., 3., 2.4]
                     # occ_center=[(30,-15),(0,-5),(0,0)] # [(38,-15),(0,-5),(0,0)] # (y,x)
                     r_values = [radius_to_px(
                         plotranges[i], case_list[i].shape, event_headers[i], i) for i in range(len(occulter_size))]
                     # case_list = [add_occulter(case, occulter_size[i], center_idxs[i]) for i, case in enumerate(case_list)]
                     for i in range(len(case_list)):
                         case = case_list[i]
-                        case[r_values[i] <= occulter_size[i]/2] = 0
+                        case[r_values[i] <= occulter_size[i]] = 0
                         case_list[i] = case
 
-                    # Normalize event images
-                    case_list = [real_img_normalization(case) for case in case_list]
+
+                    # Using synth images for testing
+                    for iteration, (img, targets, sat_masks, occulter_masks, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
+                        case = img[8] # Testing case 9
+                        case_list = [case[0], case[1], case[2]]
+                        break
 
                     # Resize event images
                     if case_list[0].shape[0] != IMG_SIZE[0] or case_list[0].shape[1] != IMG_SIZE[1]:
@@ -374,14 +378,13 @@ def main(configuration: Configuration):
 
                     # Infer event images and save losses
                     predictions = model.infer(event_img)
-                    fixed_satpos = "[[32.8937181611, 7.05123478188, 0.0], [300.081940747, 1.95463511752, 0.0], [274.2910293847356, -4.817368115630504, 0.0]]"
+                    fixed_satpos = "[[32.8937181611, 7.05123478188, 0.0], [300.081940747, 1.95463511752, 0.0], [170.0892,  -6.5866,   0.0000]]"
                     fixed_plotranges = "[[-16.6431925965469, 16.737728407985518, -16.84856349725838, 16.53235750727404], [-15.00659312775248, 15.050622251843686, -14.988981478115997, 15.068233901480168], [-6.338799715536909, 6.304081179329522, -6.388457593426707, 6.254423301439724]]"
 
                     fixed_satpos = torch.tensor(
                         eval(fixed_satpos), dtype=torch.float32)
                     fixed_plotranges = torch.tensor(
                         eval(fixed_plotranges), dtype=torch.float32)
-
                     # Plot infered masks
                     sirats_plotter.plot_real_infer(event_img, predictions, satpos, plotranges, OPATH,
                                     f'{filename}.png', fixed_satpos=fixed_satpos, fixed_plotranges=fixed_plotranges, use_fixed=True)

@@ -157,8 +157,7 @@ class SiratsPlotter:
 
             img_mean = np.mean(img[i, :, :])
             img_std = np.std(img[i, :, :])
-            ax[1][i].imshow(img[i, :, :], cmap="gray", vmin=img_mean -
-                            3 * img_std, vmax=img_mean + 3 * img_std)
+            ax[1][i].imshow(img[i, :, :], cmap="gray", vmin=0, vmax=1)
             # replace 0 for np.nan in arr_cloud
             arr_cloud[arr_cloud == 0] = np.nan
             arr_cloud[arr_cloud == 1] = img[i, :, :].max() + 1
@@ -172,7 +171,22 @@ class SiratsPlotter:
 
         return error
 
-    def plot_real_infer(imgs, prediction, satpos, plotranges, opath, namefile, fixed_satpos=None, fixed_plotranges=None, use_fixed=False):
+    def plot_real_infer(self, imgs, prediction, satpos, plotranges, opath, namefile, fixed_satpos=None, fixed_plotranges=None, use_fixed=False):
+        """
+        Plot the real and inferred images with overlaid cloud contours.
+
+        Args:
+            imgs (torch.Tensor): The input images.
+            prediction (torch.Tensor): The predicted cloud parameters.
+            satpos (np.ndarray): The satellite positions.
+            plotranges (np.ndarray): The plot ranges.
+            opath (str): The output path for saving the plot.
+            namefile (str): The name of the output file.
+            fixed_satpos (np.ndarray, optional): The fixed satellite positions. Defaults to None.
+            fixed_plotranges (np.ndarray, optional): The fixed plot ranges. Defaults to None.
+            use_fixed (bool, optional): Flag indicating whether to use fixed satellite positions and plot ranges. Defaults to False.
+        """
+
         # Convert tensors to numpy arrays
         imgs = imgs.squeeze().cpu().detach().numpy()
         prediction = np.squeeze(prediction.cpu().detach().numpy())
@@ -203,6 +217,7 @@ class SiratsPlotter:
         suptitle += f'lasco satpos: {", ".join([f"{x:.2f}" for x in satpos[2, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[2, :]])} -- plotranges: {
             ", ".join([f"{x:.2f}" for x in plotranges[2, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[2, :]])}\n\n'
         suptitle += f'Using fixed satpos = {use_fixed}'
+        suptitle += f'\n\nPrediction: {prediction}'
 
         fig.suptitle(suptitle, x=0.05, y=.95, horizontalalignment='left')
 
@@ -218,8 +233,6 @@ class SiratsPlotter:
                 x, y = clouds[0, :, 1], clouds[0, :, 2]
                 arr_cloud = pnt2arr(x, y, [plotranges[i, :]], IMG_SIZE[1:3], 0)
 
-                # Flip img
-                imgs[i, :, :] = np.flip(imgs[i, :, :], axis=0)
 
                 ax[i].imshow(imgs[i, :, :], cmap="gray", vmin=0, vmax=1)
                 ax[i].imshow(arr_cloud, cmap='Greens',
@@ -232,8 +245,8 @@ class SiratsPlotter:
                 arr_cloud = pnt2arr(
                     x, y, [fixed_plotranges[i, :]], IMG_SIZE[1:3], 0)
 
-                # Flip img
-                imgs[i, :, :] = np.flip(imgs[i, :, :], axis=0)
+                # flip arr_cloud in x
+                arr_cloud = np.flip(arr_cloud, axis=0)
 
                 ax[i].imshow(imgs[i, :, :], cmap="gray", vmin=0, vmax=1)
                 ax[i].imshow(arr_cloud, cmap='Greens',

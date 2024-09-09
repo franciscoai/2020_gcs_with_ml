@@ -101,6 +101,17 @@ def save_cases(params, succesful_cases, otype, iter_counter):
             ofile = folder +'/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_mesh.png'.format(
                 params[0], params[1], params[2], params[3], params[4], params[5], i+1)
             fig=save_png(arr_cloud,ofile=ofile, range=[0, 1])
+            # img + cloud mesh
+            if synth_int_image:
+                btot = succesful_cases[i][-1] 
+                m = np.mean(btot)
+                sd = np.std(btot)
+                btot = btot + arr_cloud
+                vmin=m-im_range*sd
+                vmax=m+im_range*sd
+                ofile=folder + '/{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}_btotWithMesh.png'.format(
+                    params[0], params[1], params[2], params[3], params[4], params[5], i+1)
+                fig=save_png(btot,ofile=ofile, range=[vmin, vmax])
             # occ mask
             occ_mask = succesful_cases[i][2]
             ofile = mask_folder +'/sat{}_occ.png'.format(i+1)
@@ -369,6 +380,8 @@ def process_img(idx, failed=False):
                 case_stuff.append(mask)
                 case_stuff.append(arr_cloud)
                 case_stuff.append(occ_mask)
+                if synth_int_image:
+                    case_stuff.append(btot)
             
             successful_cases.append(case_stuff)
             success_counter += 1
@@ -400,7 +413,7 @@ if __name__ == "__main__":
     # GLOBAL VARS
     #files
     DATA_PATH = '/gehme/data'
-    BASE_PATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_v3_redone'
+    BASE_PATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/test'
     OVERWRITE = False # set to True to overwrite existing files
     n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
     min_nviews = 3 # minimum number succesful views 
@@ -411,8 +424,8 @@ if __name__ == "__main__":
     par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme', 'satpos', 'plotranges'] # par names
     par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
     par_rng = [[-180,180],[-70,70],[-90,90],[3,10],[0.1,0.6],[10,60],[1e-1,1e1]] # min-max ranges of each parameter in par_names {2.5,7} heights
-    par_num = int(1e5)  # total number of samples that will be generated for each param (there are nsat images per param combination)
-    MAX_WORKERS = 20 # number of workers for parallel processing
+    par_num = 100 # int(1e5)  # total number of samples that will be generated for each param (there are nsat images per param combination)
+    MAX_WORKERS = 1 # number of workers for parallel processing
     rnd_par=False # when true it apllies a random seed to generate the same parameters for each run
     SEED = 72430 # seed to use when rnd_par is False
     same_corona=False # Set to True use a single corona back for all par_num cases
@@ -425,7 +438,7 @@ if __name__ == "__main__":
     level_occ=0. #mean level of the occulter relative to the background level
     cme_noise= [0,2.] #gaussian noise level of cme image. [mean, sd], both expressed in fractions of the cme-only image mean level. Set mean to None to avoid
     occ_noise = [None,None] # occulter gaussian noise. [mean, sd] both expressed in fractions of the abs mean background level. Set mean to None to avoid
-    mesh=False # set to also save a png with the GCSmesh (only for otype='png')
+    mesh=True # set to also save a png with the GCSmesh (only for otype='png')
     otype="png" # set the ouput file type: 'png' or 'fits'
     im_range=2. # range of the color scale of the output final syntethyc image in std dev around the mean
     back_rnd_rot=False # set to randomly rotate the background image around its center
