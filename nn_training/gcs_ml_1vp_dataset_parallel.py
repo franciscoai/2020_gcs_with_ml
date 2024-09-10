@@ -44,23 +44,23 @@ def save_png(array, ofile=None, range=None):
 #paths
 DATA_PATH = '/gehme/data'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240830'
-OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240830'
-opath_fstructure='check'#'run' # use 'check' to save all the ouput images in the same dir together for easier checkout
+OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_test'
+opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
 # morphology
 diff_int_cme=True # set to use a differential intensity CME image
-add_flux_rope = True # set to add a flux rope-like structure to the cme image
+add_flux_rope = False#True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 100#350000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 350000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 back_rnd_rot=False # set to randomly rotate the background image around its center
 same_corona=False # Set to True use a single corona back for all par_num cases
-same_position=True # Set to True to use the same set of satteite positions(not necesarly the same background image)
+same_position=True # Set to True to use the same set of satelite positions(not necesarly the same background image)
 rnd_int_occ=0.1 # set to randomly increase the internal occulter size by a max fraction of its size. Use None to keep the constant size given by get_corona
 rnd_ext_occ=0.1 # set to randomly reduce the external occulter size by a max fraction of its size. Use None to keep the constant size given by get_corona
 #noise
@@ -82,7 +82,7 @@ save_only_cme_mask = False # set to True to save only the cme mask and not the o
 inner_hole_mask=False #Set to True to produce a mask that contains the inner hole of the GCS (if visible)
 mask_from_cloud=False #True #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
-show_middle_cross = False # set to show the middle cross of the image
+show_middle_cross = True#False # set to show the middle cross of the image
 
 #### main
 if opath_fstructure=='check':
@@ -126,7 +126,7 @@ ok_cases = 0
 usr_center_off = None
 
 def create_sintetic_image(row):
-    global ok_cases, halo_count,satpos_all, plotranges_all, mask_aw
+    global ok_cases, halo_count,satpos_all, plotranges_all, mask_aw,sceond_mask
     #get background corona,headers and occulter size
     if same_corona==False or row==0:
         back_corona=[]
@@ -145,7 +145,6 @@ def create_sintetic_image(row):
             size_occ.append(c)
             size_occ_ext.append(d)
             occ_center.append(e)
-
     # Get the location of sats and gcs: 
     satpos, plotranges = pyGCS.processHeaders(headers)
     mask_aw_sat = []
@@ -305,7 +304,6 @@ def create_sintetic_image(row):
 
         # subtracts the mean value outside the mask
         btot = btot - np.mean(btot[mask==0])
-
         #Randomly adds the previous CME to have two in one image
         if two_cmes and np.random.choice([True,False,False]): # only for sat 0 for now
             if mask_prev is None:
@@ -347,7 +345,6 @@ def create_sintetic_image(row):
         else: 
             btot[r <= size_occ[sat]]     = level_occ*mean_back 
             btot[r >= size_occ_ext[sat]] = level_occ*mean_back 
-
         #saves images
         if otype=="fits":
             if save_masks:
@@ -372,8 +369,8 @@ def create_sintetic_image(row):
                 #mask for cme
                 ofile = mask_folder +'/'+ofile_name+'_mask_2.png'
                 fig=save_png(mask,ofile=ofile, range=[0, 1])
-                if save_only_cme_mask == False:
-                    if sceond_mask is not None:      
+                if save_only_cme_mask == False:   
+                    if sceond_mask is not None: 
                         ofile = mask_folder +'/'+ofile_name+'_mask_3.png'
                         fig=save_png(sceond_mask,ofile=ofile, range=[0, 1])                      
                     #mask for occulter
@@ -404,12 +401,13 @@ def create_sintetic_image(row):
     # saves aw
     #mask_aw.append(mask_aw_sat)
     return satpos, plotranges, mask_aw_sat, halo_count, ok_cases
-def print_stuffs():
-    global ok_cases, halo_count,satpos_all, plotranges_all, mask_aw
 
-    print(f'Total Number of OK cases: {ok_cases}')
-    print(f'Total Number of aborted cases: {df.index.stop*n_sat -1-ok_cases}')
-    print(f'Total Number of halos: {halo_count}')
+def print_stuffs():
+    global satpos_all, plotranges_all, mask_aw
+
+    print(f'Total Number of OK cases: {ok_cases_tot}')
+    print(f'Total Number of aborted cases: {df.index.stop*n_sat -1-ok_cases_tot}')
+    print(f'Total Number of halos: {halo_count_tot}')
     #add satpos and plotranges to dataframe and save csv
     df['satpos'] = satpos_all
     df['plotranges'] = plotranges_all
@@ -419,10 +417,13 @@ def print_stuffs():
 
 num_cpus = os.cpu_count()
 ########### end of paralelize
-MAX_WORKERS = num_cpus # number of workers for parallel processing
+MAX_WORKERS = num_cpus -2# number of workers for parallel processing
 futures = []
 index = 0
+halo_count_tot = 0
+ok_cases_tot = 0
 # generate views
+
 ########### paralelize this for loop
 with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
     #while len(futures) != MAX_WORKERS: # Task loader
@@ -432,7 +433,7 @@ with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor
         satpos_all.append(satpos_f)
         plotranges_all.append(plotranges_f)
         mask_aw.append(mask_aw_sat_f)
-        ok_cases = ok_cases + ok_cases_f
-        halo_count = halo_count + halo_count_f
+        halo_count_tot = halo_count_f +halo_count_tot
+        ok_cases_tot = ok_cases_f + ok_cases_tot
 print_stuffs()
-#breakpoint()
+breakpoint()
