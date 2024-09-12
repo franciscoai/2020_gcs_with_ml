@@ -43,18 +43,17 @@ def save_png(array, ofile=None, range=None):
 # CONSTANTS
 #paths
 DATA_PATH = '/gehme/data'
-#OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240830'
-OPATH = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_test'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
 opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
 # morphology
 diff_int_cme=True # set to use a differential intensity CME image
-add_flux_rope = False#True # set to add a flux rope-like structure to the cme image
+add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 350000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -67,7 +66,7 @@ rnd_ext_occ=0.1 # set to randomly reduce the external occulter size by a max fra
 cme_noise= True # set to add poissonian noise to the cme image
 #relative int levels
 level_occ='min' # level of the occulter relative to the background level. Note that png images are saved in 0-255 scale
-                # The image range is mapped to 0-255 suning the value given by im_range. 
+                # The image range is mapped to 0-255 using the value given by im_range. 
                 # Use 'min' to set the occulter to the minimum value, thus appearing as 0 in png images
 im_range=3 # range of the color scale of the output final syntethyc image in std dev around the mean
 
@@ -80,9 +79,9 @@ back_only_image = False # set to True to save an addditional image with only the
 save_masks = True # set to True to save the masks images
 save_only_cme_mask = False # set to True to save only the cme mask and not the occulter masks. save_masks must be True
 inner_hole_mask=False #Set to True to produce a mask that contains the inner hole of the GCS (if visible)
-mask_from_cloud=False #True #True to calculete mask from clouds, False to do it from ratraycing total brigthness image
+mask_from_cloud=False #True #True to calculete mask from clouds, False to do it from an independent ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
-show_middle_cross = True#False # set to show the middle cross of the image
+show_middle_cross = False #False # set to show the middle cross of the image
 
 #### main
 if opath_fstructure=='check':
@@ -436,4 +435,4 @@ with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor
         halo_count_tot = halo_count_f +halo_count_tot
         ok_cases_tot = ok_cases_f + ok_cases_tot
 print_stuffs()
-breakpoint()
+print('Finished :-)')
