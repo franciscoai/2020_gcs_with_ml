@@ -103,10 +103,10 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
 
 #---------------------------------------------------------Fine_tune the pretrained R-CNN----------------------------------------------------------
 #Constants
-trainDir = '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240702'
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5_fran_cont"
+trainDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
+opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
 #full path of a model to use it as initial condition, use None to used the stadard pre-trained model 
-pre_trained_model= '/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5_fran/9.torch'
+pre_trained_model= None
 batchSize=20 #number of images used in each iteration
 epochs=50 #number of iterations of the full training dataset
 train_dataset_prop=0.85 #proportion of the full dataset used for training. The rest is saved for validation
@@ -202,21 +202,23 @@ all_loss=[]
 for i in range(epochs):
     used_idx=[]
     for j in range(0,len(imgs_train),batchSize):
-        images, targets, used_idx_batch = loadData(imgs_train, batchSize, used_idx, normalization_func=nn_seg.normalize, 
-                                                   masks2use=masks2use, rnd_rot=random_rot, logger=logging) # loads a batch of training data
-        
-        used_idx.extend(used_idx_batch)
-        images = list(image.to(device) for image in images)
-        targets=[{k: v.to(device) for k,v in t.items()} for t in targets]
-        nn_seg.optimizer.zero_grad() 
-        loss_dict = nn_seg.model(images, targets)
-        losses = sum(loss for loss in loss_dict.values()) 
-        losses.backward()
-        nn_seg.optimizer.step()
-        all_loss.append(losses.item())
-        cn_img=j+i*len(imgs_train)
-        logging.info(f'Epoch {i} of {epochs}, batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), loss: {losses.item():.3f}')
-    
+        try:
+            images, targets, used_idx_batch = loadData(imgs_train, batchSize, used_idx, normalization_func=nn_seg.normalize, 
+                                                   masks2use=masks2use, rnd_rot=random_rot, logger=logging) # loads a batch of training data        
+            used_idx.extend(used_idx_batch)
+            images = list(image.to(device) for image in images)
+            targets=[{k: v.to(device) for k,v in t.items()} for t in targets]
+            nn_seg.optimizer.zero_grad() 
+            loss_dict = nn_seg.model(images, targets)
+            losses = sum(loss for loss in loss_dict.values()) 
+            losses.backward()
+            nn_seg.optimizer.step()
+            all_loss.append(losses.item())
+            cn_img=j+i*len(imgs_train)
+            logging.info(f'Epoch {i} of {epochs}, batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), loss: {losses.item():.3f}')
+        except Exception as e:
+            logging.info(f'ERROR in epoch {i}, batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), error: {e}', exc_info=True)
+            continue 
     #save training results after each epoch
     #model
     torch.save(nn_seg.model.state_dict(),opath + "/" + str(i)+".torch")
