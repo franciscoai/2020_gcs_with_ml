@@ -67,16 +67,16 @@ def plot_to_png(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_thres
     plt.close()
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-testDir =  '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240702'
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5_fran"
+testDir =  '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240912/'
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
 test_cases_file = model_path+"/validation_cases.csv"
 model_version="v5"
 opath= model_path+"/test_output"
 file_ext=".png"
-trained_model = '9.torch'
+trained_model = '22.torch'
 imageSize=[512,512]
 test_ncases = 100
-mask_thresholds = [0.9] #[0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99] # only px with scrore avobe this value are considered in the mask.
+mask_thresholds = [0.7] #[0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99] # only px with scrore avobe this value are considered in the mask.
 gpu=1# GPU to use
 masks2use=[2] # index of the masks to read (should be the CME mask)
 
@@ -169,6 +169,7 @@ if len(mask_thresholds)>1:
     ax.set_ylabel('Loss')
     ax.grid()
     fig.savefig(opath+"/test_mean_loss_vs_mask_threshold.png")
-print('Done :-)')
+print('Results saved in:', opath)
+print('Done :-D')
 
 
