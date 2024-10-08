@@ -11,24 +11,37 @@ def binary_mask_normalization(img: torch.Tensor):
     return img
 
 def real_img_normalization(img: torch.Tensor, excl_occulter_level = None):
+    """
+    Normalize the input image tensor using Sirats normalization method.
+
+    Args:
+        img (torch.Tensor): The input image tensor. Should have shape [3, x, y].
+        excl_occulter_level (int or str, optional): The value to exclude from normalization. 
+            If 'auto', the most frequent integer value in the image will be excluded. 
+            If an integer value is provided, that value and its adjacent value will be excluded. 
+            Defaults to None.
+
+    Returns:
+        torch.Tensor: The normalized image tensor.
+
+    """
     sd_range=1.5
-    # m = torch.mean(img)
-    # sd = torch.std(img)
     #exclude occulter values at excl_occulter_level
-    if excl_occulter_level is not None:
-        if excl_occulter_level == 'auto':
-            # finds the most frequent integer value in the image
-            occ_indx = (img != stats.mode(img.flatten(),keepdims=True)[0][0])
+    for i in range(3):
+        if excl_occulter_level is not None:
+            if excl_occulter_level == 'auto':
+                # finds the most frequent integer value in the image
+                occ_indx = (img[i] != stats.mode(img[i].flatten(),keepdims=True)[0][0])
+            else:
+                occ_indx = (img[i] != excl_occulter_level) & (img[i] != excl_occulter_level-1)
+            m = np.nanmean(img[i][occ_indx])
+            sd = np.nanstd(img[i][occ_indx])
         else:
-            occ_indx = (img != excl_occulter_level) & (img != excl_occulter_level-1)
-        m = np.nanmean(img[occ_indx])
-        sd = np.nanstd(img[occ_indx])
-    else:
-        m = np.nanmean(img)
-        sd = np.nanstd(img)
-    img = (img - m + sd_range * sd) / (2 * sd_range * sd)
-    img[img >1]=1
-    img[img <0]=0
+            m = np.nanmean(img[i])
+            sd = np.nanstd(img[i])
+        img[i] = (img[i] - m + sd_range * sd) / (2 * sd_range * sd)
+        img[i][img[i] >1]=1
+        img[i][img[i] <0]=0
     return img
 
 def normalize(self, image, excl_occulter_level='auto', sd_range=2, norm_limits=[None, None], increase_contrast=False, 

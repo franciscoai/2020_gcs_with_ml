@@ -333,23 +333,19 @@ def main(configuration: Configuration):
                     # Add occulter to images
                     center_idxs = [
                         ((case.shape[0] - 1) // 2, (case.shape[1] - 1) // 2) for case in case_list]
+                    
                     # Occulters size for [sat1, sat2 ,sat3] in [Rsun]
-                    occulter_size = [3., 3., 2.4]
+                    occulter_size = [3., 3., 2.4] # [0.3, 0.3, 2.4]
+
                     # occ_center=[(30,-15),(0,-5),(0,0)] # [(38,-15),(0,-5),(0,0)] # (y,x)
                     r_values = [radius_to_px(
                         plotranges[i], case_list[i].shape, event_headers[i], i) for i in range(len(occulter_size))]
+                    
                     # case_list = [add_occulter(case, occulter_size[i], center_idxs[i]) for i, case in enumerate(case_list)]
                     for i in range(len(case_list)):
                         case = case_list[i]
                         case[r_values[i] <= occulter_size[i]] = 0
                         case_list[i] = case
-
-
-                    # Using synth images for testing
-                    for iteration, (img, targets, sat_masks, occulter_masks, satpos, plotranges, idx) in enumerate(cme_test_dataloader, 0):
-                        case = img[8] # Testing case 9
-                        case_list = [case[0], case[1], case[2]]
-                        break
 
                     # Resize event images
                     if case_list[0].shape[0] != IMG_SIZE[0] or case_list[0].shape[1] != IMG_SIZE[1]:
@@ -369,6 +365,9 @@ def main(configuration: Configuration):
 
                     # join event images
                     event_img = torch.stack(case_list, dim=0)
+
+                    # Normalize event images
+                    event_img = real_img_normalization(event_img)
 
                     # Add batch dimension
                     event_img = event_img.unsqueeze(0)

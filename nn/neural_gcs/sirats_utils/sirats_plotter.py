@@ -216,7 +216,7 @@ class SiratsPlotter:
             ", ".join([f"{x:.2f}" for x in plotranges[1, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[1, :]])}\n\n'
         suptitle += f'lasco satpos: {", ".join([f"{x:.2f}" for x in satpos[2, :]])} -- fixed_satpos: {", ".join([f"{x:.2f}" for x in fixed_satpos[2, :]])} -- plotranges: {
             ", ".join([f"{x:.2f}" for x in plotranges[2, :]])} -- fixed_plotranges: {", ".join([f"{x:.2f}" for x in fixed_plotranges[2, :]])}\n\n'
-        suptitle += f'Using fixed satpos = {use_fixed}'
+        suptitle += f'Using fixed satpos and plotranges = {use_fixed}'
         suptitle += f'\n\nPrediction: {prediction}'
 
         fig.suptitle(suptitle, x=0.05, y=.95, horizontalalignment='left')
@@ -233,6 +233,11 @@ class SiratsPlotter:
                 x, y = clouds[0, :, 1], clouds[0, :, 2]
                 arr_cloud = pnt2arr(x, y, [plotranges[i, :]], IMG_SIZE[1:3], 0)
 
+                # flip arr_cloud in x
+                arr_cloud = np.flip(arr_cloud, axis=0)
+
+                imgs_mean = np.mean(imgs[i, :, :])
+                imgs_std = np.std(imgs[i, :, :])
 
                 ax[i].imshow(imgs[i, :, :], cmap="gray", vmin=0, vmax=1)
                 ax[i].imshow(arr_cloud, cmap='Greens',
@@ -248,7 +253,10 @@ class SiratsPlotter:
                 # flip arr_cloud in x
                 arr_cloud = np.flip(arr_cloud, axis=0)
 
-                ax[i].imshow(imgs[i, :, :], cmap="gray", vmin=0, vmax=1)
+                imgs_mean = np.mean(imgs[i, :, :])
+                imgs_std = np.std(imgs[i, :, :])
+
+                ax[i].imshow(imgs[i, :, :], cmap="gray", vmin=imgs_mean - imgs_std *3, vmax=imgs_mean + imgs_std *3)
                 ax[i].imshow(arr_cloud, cmap='Greens',
                              alpha=0.6, vmin=0, vmax=1)
 
