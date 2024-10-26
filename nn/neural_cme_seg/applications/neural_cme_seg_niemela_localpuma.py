@@ -309,7 +309,7 @@ model_path= extra_path+"/gehme/projects/2020_gcs_with_ml/output/neural_cme_seg_v
 #trained_model = '6000.torch'
 trained_model = '45.torch'
 #model_path= "/gehme/projects/2020_gcs_with_ml/output/neural_cme_seg_v5" #contiene oculter externo
-model_version="v4"
+model_version="v5"
 #trained_model = '66666.torch'
 
 #--------------------------
@@ -341,7 +341,8 @@ list_name = 'list.txt' #default with list_name = None
 
 #manage input and output paths
 ipath,opath,dir_modified_masks,list_name = manage_variables_niemela(cme_date_event,btot=btot,real_img=real_img,instr=instr,infer_event2=infer_event2,
-                                                                    modified_masks=modified_masks,list_name=list_name,extra_path=extra_path)
+                                                                    modified_masks=modified_masks,list_name=list_name,extra_path=extra_path,
+                                                                    model_version=model_version)
 #cor2_a mask_threshold = 0.88
 mask_threshold = 0.80 # value to consider a pixel belongs to the object
 scr_threshold  = 0.56 # only detections with score larger than this value are considered
@@ -360,6 +361,7 @@ print(f'Using device:  {device}')
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 
 nn_seg.mask_threshold = mask_threshold
+nn_seg.model_version = model_version
 os.makedirs(opath, exist_ok=True)
 #inference on all images
 

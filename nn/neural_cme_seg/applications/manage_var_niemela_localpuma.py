@@ -1,6 +1,6 @@
 
 def manage_variables_niemela(cme_date_event,btot=False,real_img=False,auxiliar='',instr='',infer_event2=False,modified_masks=None,
-                             list_name=None,extra_path=""):
+                             list_name=None,extra_path="",model_version="v4"):
     """
     This code is for managing the variables related to input path and outputh path
     simulation_run = 'run005'
@@ -17,13 +17,13 @@ def manage_variables_niemela(cme_date_event,btot=False,real_img=False,auxiliar='
             if instr[0:4] == 'cor2':
                 which_stereo = instr[-1]
                 ipath = extra_path+'/gehme/data/stereo/secchi/L1/'+which_stereo+'/img/cor2/20100403/'
-                aux = 'running_diff/neural_cme_seg_v4/'+auxiliar
+                aux = 'running_diff/neural_cme_seg_'+model_version+'/'+auxiliar
                 if infer_event2:
                     aux = aux+'infer2/'
                 opath = extra_path+'/gehme/projects/2023_eeggl_validation/niemela_project/2010-04-03/output/'+instr+'/'+aux
             if instr[0:5] == 'lasco':
                 ipath = extra_path+'/gehme/data/soho/lasco/level_1/c2/20100403/'
-                aux = 'running_diff/neural_cme_seg_v4/'
+                aux = 'running_diff/neural_cme_seg_'+model_version+'/'
                 if infer_event2:
                     aux = aux+'infer2/'
                 opath = extra_path+'/gehme/projects/2023_eeggl_validation/niemela_project/2010-04-03/output/'+instr+'/'+aux
@@ -37,7 +37,7 @@ def manage_variables_niemela(cme_date_event,btot=False,real_img=False,auxiliar='
             if instr == 'lascoC2':
                 modified_masks = extra_path+'/gehme/projects/2023_eeggl_validation/repo_diego/2020_gcs_with_ml/nn/neural_cme_seg/applications/niemela_proyect/new_masks20100403_lascoc2_v1.pkl'
             opath = extra_path+'/gehme/projects/2023_eeggl_validation/niemela_project/2010-04-03/output/'+instr+'/'+aux
-            opath = opath + 'modified_mask_v2/'
+            opath = opath + 'modified_mask_'+model_version+'/'
         if not list_name: 
             list_name = 'list.txt'
     #breakpoint()
