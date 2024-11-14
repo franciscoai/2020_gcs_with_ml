@@ -22,16 +22,19 @@ import logging
 
 
 def load_model(model: SiratsNet, model_folder: Path):
-    model_path = os.path.join(model_folder, 'model.pth')
-    os.makedirs(model_folder, exist_ok=True)  # Ensure directory exists
-    if os.path.isfile(model_path):
-        status = model.load_model(model_path)  # Load directly
-        if status:
-            copy_and_rename_existing_model(model_folder)
-            logging.info(f"Model loaded from: {model_path}\n")
+    models = os.listdir(model_folder)
+    #Get the pth with the highest number
+    if len(models) > 0:
+        model_number = [model.split('_')[1] for model in models]
+        model_number = [int(model.split('.')[0]) for model in model_number]
+        model_number = max(model_number)
+        model_path = os.path.join(model_folder, f"model_{model_number}")
+        status = model.load_model(model_path)
+        logging.info(f"Model loaded from: {model_path}\n")
+        breakpoint()
     else:
         logging.warning(
-            f"No model found at: {model_path}, starting from scratch\n")
+            f"No model found at: {model_folder}, starting from scratch\n")
 
 def copy_and_rename_existing_model(model_folder: Path):
     models_counter = len(os.listdir(model_folder))
@@ -77,15 +80,34 @@ def center_rSun_pixel(headers, plotranges, sat):
         headers['NAXIS2'] - plotranges[sat]  # headers['CRPIX2']
     return x_cS, y_cS
 
-def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, epochs, opath, par_loss_weights, save_model):
-    train_losses_per_batch = []
-    median_train_losses_per_batch = []
-    test_losses_per_batch = []
-    median_test_error_in_batch = []
+def save_data(train_losses_per_batch, median_train_losses_per_batch, test_losses_per_batch, median_test_error_in_batch, epoch, opath):
+    data_path = os.path.join(opath, 'data')
+    os.makedirs(data_path, exist_ok=True)
+    np.save(os.path.join(data_path, 'train_losses_per_batch.npy'), train_losses_per_batch)
+    np.save(os.path.join(data_path, 'median_train_losses_per_batch.npy'), median_train_losses_per_batch)
+    np.save(os.path.join(data_path, 'test_losses_per_batch.npy'), test_losses_per_batch)
+    np.save(os.path.join(data_path, 'median_test_error_in_batch.npy'), median_test_error_in_batch)
+    np.save(os.path.join(data_path, 'epoch.npy'), epoch)
+
+def run_training(model: SiratsNet, cme_train_dataloader, cme_test_dataloader, batch_size, epochs, opath, par_loss_weights, save_model):
+    #Try to load data
+    if os.path.exists(os.path.join(opath, 'data')):
+        train_losses_per_batch = np.load(os.path.join(opath, 'data', 'train_losses_per_batch.npy'))
+        median_train_losses_per_batch = np.load(os.path.join(opath, 'data', 'median_train_losses_per_batch.npy'))
+        test_losses_per_batch = np.load(os.path.join(opath, 'data', 'test_losses_per_batch.npy'))
+        median_test_error_in_batch = np.load(os.path.join(opath, 'data', 'median_test_error_in_batch.npy'))
+        start_epoch = np.load(os.path.join(opath, 'data', 'epoch.npy'))
+        logging.info("Data loaded\n")
+    else:
+        train_losses_per_batch = []
+        median_train_losses_per_batch = []
+        test_losses_per_batch = []
+        median_test_error_in_batch = []
+        start_epoch = 0
     epoch_list = []
     total_batches_per_epoch = 0
 
-    for epoch in range(epochs):
+    for epoch in range(start_epoch, epochs, 1):
         model.train()
         train_onlyepoch_losses = []
         test_onlyepoch_losses = []
@@ -129,7 +151,7 @@ def run_training(model, cme_train_dataloader, cme_test_dataloader, batch_size, e
 
         # Save model
         if save_model:
-            status = model.save_model(opath)
+            status = model.save_model(opath, epoch)
             logging.info(f"Model saved at: {status}\n")
 
 def main(configuration: Configuration):
@@ -390,5 +412,5 @@ def main(configuration: Configuration):
 
 if __name__ == '__main__':
     configuration = Configuration(Path(
-        "/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run6.ini"))
+        "/gehme-gpu2/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run7.ini"))
     main(configuration)

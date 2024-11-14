@@ -424,7 +424,7 @@ if __name__ == "__main__":
     par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme', 'satpos', 'plotranges'] # par names
     par_units = ['deg', 'deg', 'deg', 'Rsun','','deg',''] # par units
     par_rng = [[-180,180],[-70,70],[-90,90],[3,10],[0.1,0.6],[10,60],[1e-1,1e1]] # min-max ranges of each parameter in par_names {2.5,7} heights
-    par_num = 100 # int(1e5)  # total number of samples that will be generated for each param (there are nsat images per param combination)
+    par_num = int(1e5)  # total number of samples that will be generated for each param (there are nsat images per param combination)
     MAX_WORKERS = 1 # number of workers for parallel processing
     rnd_par=False # when true it apllies a random seed to generate the same parameters for each run
     SEED = 72430 # seed to use when rnd_par is False

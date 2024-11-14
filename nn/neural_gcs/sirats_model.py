@@ -29,32 +29,36 @@ class SiratsNet(nn.Module):
         self.to(self.device)
 
     def plot_loss(self, losses, epoch_list, batch_size, opath, plot_epoch=True, medianLoss=False):
+        fig, ax = plt.subplots(figsize=(12, 6))  # Create a figure with more horizontal space
         if not medianLoss:
-            plt.plot(np.arange(len(losses))*batch_size, losses)
-            plt.yscale('log')
-            plt.xlabel('# Image')
-            plt.ylabel('Loss')
-            plt.grid("both")
+            ax.plot(np.arange(len(losses)) * batch_size, losses)
+            ax.set_yscale('log')
+            ax.set_xlabel('# Image')
+            ax.set_ylabel('Loss')
+            ax.grid(which='both', axis='y')
+            ax.minorticks_on()
+            ax.grid(which='minor', axis='x', linestyle=':', linewidth='0.5')
+            ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))  # Make image ticker in the horizontal
             # add vertical line every epoch
             if plot_epoch:
                 for epoch in range(len(epoch_list)):
-                    plt.axvline(x=epoch*epoch_list[epoch]
-                                * batch_size, color='r', linestyle='--')
-            plt.savefig(opath)
-            plt.close()
+                    ax.axvline(x=epoch * epoch_list[epoch] * batch_size, color='r', linestyle='--')
         else:
-            plt.plot(losses)
-            plt.yscale('log')
-            plt.xlabel('# Epoch')
-            plt.ylabel('Mean Loss')
-            plt.grid("both")
-            plt.savefig(opath)
-            plt.close()
+            ax.plot(losses)
+            ax.set_yscale('log')
+            ax.set_xlabel('# Epoch')
+            ax.set_ylabel('Mean Loss')
+            ax.grid(which='both', axis='y')
+            ax.minorticks_on()
+            ax.grid(which='minor', axis='x', linestyle=':', linewidth='0.5')
+        
+        plt.savefig(opath)
+        plt.close(fig)
 
-    def save_model(self, opath):
+    def save_model(self, opath, epoch):
         models_path = os.path.join(opath, 'models')
         os.makedirs(models_path, exist_ok=True)
-        torch.save(self.state_dict(), models_path+'/model.pth')
+        torch.save(self.state_dict(), f"{models_path}/model_{epoch}.pth")
         return models_path+'/model.pth'
 
     def load_model(self, model_path):
