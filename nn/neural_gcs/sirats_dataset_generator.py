@@ -413,7 +413,7 @@ if __name__ == "__main__":
     # GLOBAL VARS
     #files
     DATA_PATH = '/gehme/data'
-    BASE_PATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/test'
+    BASE_PATH = '/gehme-gpu2/projects/2020_gcs_with_ml/data/sirats_debugging'
     OVERWRITE = False # set to True to overwrite existing files
     n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
     min_nviews = 3 # minimum number succesful views 
@@ -438,7 +438,7 @@ if __name__ == "__main__":
     level_occ=0. #mean level of the occulter relative to the background level
     cme_noise= [0,2.] #gaussian noise level of cme image. [mean, sd], both expressed in fractions of the cme-only image mean level. Set mean to None to avoid
     occ_noise = [None,None] # occulter gaussian noise. [mean, sd] both expressed in fractions of the abs mean background level. Set mean to None to avoid
-    mesh=True # set to also save a png with the GCSmesh (only for otype='png')
+    mesh=False # set to also save a png with the GCSmesh (only for otype='png')
     otype="png" # set the ouput file type: 'png' or 'fits'
     im_range=2. # range of the color scale of the output final syntethyc image in std dev around the mean
     back_rnd_rot=False # set to randomly rotate the background image around its center

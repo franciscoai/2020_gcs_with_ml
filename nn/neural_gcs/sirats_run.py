@@ -22,16 +22,15 @@ import logging
 
 
 def load_model(model: SiratsNet, model_folder: Path):
-    models = os.listdir(model_folder)
-    #Get the pth with the highest number
-    if len(models) > 0:
+    if os.path.exists(model_folder):
+        models = os.listdir(model_folder)
+        #Get the pth with the highest number
         model_number = [model.split('_')[1] for model in models]
         model_number = [int(model.split('.')[0]) for model in model_number]
         model_number = max(model_number)
         model_path = os.path.join(model_folder, f"model_{model_number}")
         status = model.load_model(model_path)
         logging.info(f"Model loaded from: {model_path}\n")
-        breakpoint()
     else:
         logging.warning(
             f"No model found at: {model_folder}, starting from scratch\n")
@@ -92,10 +91,10 @@ def save_data(train_losses_per_batch, median_train_losses_per_batch, test_losses
 def run_training(model: SiratsNet, cme_train_dataloader, cme_test_dataloader, batch_size, epochs, opath, par_loss_weights, save_model):
     #Try to load data
     if os.path.exists(os.path.join(opath, 'data')):
-        train_losses_per_batch = np.load(os.path.join(opath, 'data', 'train_losses_per_batch.npy'))
-        median_train_losses_per_batch = np.load(os.path.join(opath, 'data', 'median_train_losses_per_batch.npy'))
-        test_losses_per_batch = np.load(os.path.join(opath, 'data', 'test_losses_per_batch.npy'))
-        median_test_error_in_batch = np.load(os.path.join(opath, 'data', 'median_test_error_in_batch.npy'))
+        train_losses_per_batch = np.load(os.path.join(opath, 'data', 'train_losses_per_batch.npy')).tolist()
+        median_train_losses_per_batch = np.load(os.path.join(opath, 'data', 'median_train_losses_per_batch.npy')).tolist()
+        test_losses_per_batch = np.load(os.path.join(opath, 'data', 'test_losses_per_batch.npy')).tolist()
+        median_test_error_in_batch = np.load(os.path.join(opath, 'data', 'median_test_error_in_batch.npy')).tolist()
         start_epoch = np.load(os.path.join(opath, 'data', 'epoch.npy'))
         logging.info("Data loaded\n")
     else:
@@ -152,6 +151,7 @@ def run_training(model: SiratsNet, cme_train_dataloader, cme_test_dataloader, ba
         # Save model
         if save_model:
             status = model.save_model(opath, epoch)
+            save_data(train_losses_per_batch, median_train_losses_per_batch, test_losses_per_batch, median_test_error_in_batch, epoch + 1, opath)
             logging.info(f"Model saved at: {status}\n")
 
 def main(configuration: Configuration):
