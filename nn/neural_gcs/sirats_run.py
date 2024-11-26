@@ -28,9 +28,13 @@ def load_model(model: SiratsNet, model_folder: Path):
         model_number = [model.split('_')[1] for model in models]
         model_number = [int(model.split('.')[0]) for model in model_number]
         model_number = max(model_number)
-        model_path = os.path.join(model_folder, f"model_{model_number}")
+        model_path = os.path.join(model_folder, f"model_{model_number}.pth")
         status = model.load_model(model_path)
-        logging.info(f"Model loaded from: {model_path}\n")
+        if status:
+            logging.info(f"Model loaded from: {model_path}\n")
+        else:
+            logging.warning(
+                f"No model found at: {model_path}, starting from scratch\n")
     else:
         logging.warning(
             f"No model found at: {model_folder}, starting from scratch\n")
@@ -96,7 +100,13 @@ def run_training(model: SiratsNet, cme_train_dataloader, cme_test_dataloader, ba
         test_losses_per_batch = np.load(os.path.join(opath, 'data', 'test_losses_per_batch.npy')).tolist()
         median_test_error_in_batch = np.load(os.path.join(opath, 'data', 'median_test_error_in_batch.npy')).tolist()
         start_epoch = np.load(os.path.join(opath, 'data', 'epoch.npy'))
+        # Cut the data to the current epoch
+        train_losses_per_batch = train_losses_per_batch[:start_epoch]
+        median_train_losses_per_batch = median_train_losses_per_batch[:start_epoch]
+        test_losses_per_batch = test_losses_per_batch[:start_epoch]
+        median_test_error_in_batch = median_test_error_in_batch[:start_epoch]
         logging.info("Data loaded\n")
+        start_epoch = 99 # DELETE THIS LINE LATER
     else:
         train_losses_per_batch = []
         median_train_losses_per_batch = []
