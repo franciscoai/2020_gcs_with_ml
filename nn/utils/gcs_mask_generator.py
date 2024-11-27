@@ -13,6 +13,8 @@ def maskFromCloud(params, satpos, imsize, plotranges, sat=0):
     y = clouds[0, :, 2]
     p_x,p_y=deg2px(x,y,plotranges,imsize,sat)
     mask=get_mask_cloud(p_x,p_y,imsize)
+    if len(p_x)==0 or len(p_y)==0:
+        breakpoint()
     mask = np.flip(mask, axis=0)
     return mask
 
@@ -27,6 +29,11 @@ def maskFromCloud_3d(params, satpos, imsize, plotranges, occ_size=None):
         x = clouds[sat, :, 1]
         y = clouds[0, :, 2]
         p_x,p_y=deg2px(x,y,plotranges, imsize, sat)
+        #breakpoint()
+        #if len(p_x)==0 or len(p_y)==0:
+        #    breakpoint()
+        #Si p_x o p_y son vacios, entonces devolver mascara vacia??
+        #podria pasar que en la exploracion de valores de la minimizacion, la proyeccion caiga en el oculter??
         if occ_size is None:
             mask=get_mask_cloud(p_x,p_y,imsize)
         else:

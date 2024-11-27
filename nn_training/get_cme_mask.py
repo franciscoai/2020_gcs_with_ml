@@ -62,6 +62,11 @@ def get_mask_cloud(p_x,p_y,imsize, occ_size=None):
     occ_size: radius of the occulter [px]. Pixels within the occuler are set to 0. Center is assumed at imsize/2
     OPATH: output path for the image
     '''
+    if len(p_x)==0 or len(p_y)==0:
+        arr_mask =np.zeros(imsize)
+        return arr_mask
+        #breakpoint()
+
     if sum(p_x) == len(p_x) * p_x[0] or sum(p_y) == len(p_y) * p_y[0]:
         line = np.zeros(imsize)
         line[p_x, p_y] = 1
@@ -86,19 +91,22 @@ def get_mask_cloud(p_x,p_y,imsize, occ_size=None):
     y_len=box[1][1]-box[1][0]
     grid = np.indices((x_len,y_len))
     values = np.ones(len(p_x))
-    xi = np.transpose(np.array([grid[0].flatten()+box[0][0], grid[1].flatten()+box[1][0]]))
-    mask = scipy.interpolate.griddata(points, values, xi, method='linear',fill_value=0)
+    #if len(p_x)<10:
+        #breakpoint()
     arr_mask=np.zeros(imsize)
-
-    if occ_size is None:
-        for i in range(len(xi)):
-            arr_mask[int(xi[i][0]), int(xi[i][1])] = mask[i]
-    else:        
-        for i in range(len(xi)):
-            px_dist_to_center = np.sqrt((xi[i][0]-imsize[0]/2)**2 + (xi[i][1]-imsize[1]/2)**2)
-            if px_dist_to_center >= occ_size:
+    if len(p_x) > 10:
+        xi = np.transpose(np.array([grid[0].flatten()+box[0][0], grid[1].flatten()+box[1][0]]))
+        mask = scipy.interpolate.griddata(points, values, xi, method='linear',fill_value=0)
+        if occ_size is None:
+            for i in range(len(xi)):
                 arr_mask[int(xi[i][0]), int(xi[i][1])] = mask[i]
-    
+        else:        
+            for i in range(len(xi)):
+                px_dist_to_center = np.sqrt((xi[i][0]-imsize[0]/2)**2 + (xi[i][1]-imsize[1]/2)**2)
+                if px_dist_to_center >= occ_size:
+                    arr_mask[int(xi[i][0]), int(xi[i][1])] = mask[i]
+    else:
+        arr_mask =np.zeros(imsize)
     arr_mask[arr_mask>0]=1
     
     if np.sum(arr_mask) == 0:
