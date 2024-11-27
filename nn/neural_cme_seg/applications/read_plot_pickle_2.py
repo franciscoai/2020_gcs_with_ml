@@ -1,11 +1,13 @@
 import pickle
+import matplotlib
 import matplotlib.pyplot as plt
 import os
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 import cv2
-
+from scipy.interpolate import interp1d
+matplotlib.use('Agg')  # Use the Agg backend for headless environments
 """
 TODO: 
 - En lugar de generar plots individuales, generar un panel con los tres plots para todos los instrumentos. por ahora seria 3x3.
@@ -196,7 +198,15 @@ def plot_params(lista,param,opath,title,instrument,clockwise=False):
         if param == "APEX" or param == "AREA_SCORE" or param=="APEX_DIST_PER":
             y_global_units = y_global[contador]
         #line1, = ax.plot(x_global[contador], y_global_units, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador])
-        ax.plot(x_global[contador], y_global_units, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador])
+        #breakpoint()
+
+        if labels[contador] == 'Img':
+            ax.plot(x_global[contador], y_global_units, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador],zorder=50)
+            print("sale zorder")
+        elif labels[contador] =='GCS':
+            ax.plot(x_global[contador], y_global_units, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador],zorder=49)
+        else:
+            ax.plot(x_global[contador], y_global_units, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador])
         #create a list of legends
         #position = (0.22,1.0-contador*0.07)
         #list_legend.append(ax.legend(handles=[line1], bbox_to_anchor=position))
@@ -208,11 +218,124 @@ def plot_params(lista,param,opath,title,instrument,clockwise=False):
     ax.set_title(title)
     plt.grid()
     #save plot on opath directory
-    ending = '_'+title+'_plot'
+    ending = '_'+title+'_plot_test'
     fig.savefig(opath+'/'+str.lower(param)+ending+".png")
+    print("Figure save in: ",opath+'/'+str.lower(param)+ending+".png")
     
     return
 
+
+def plot_box_params(lista,param,opath,title,instrument,clockwise=False):
+    #TODO: check for repeated masks for same date_time. seleck the one with better SCR value
+    #check if param variable is a list
+    if type(param) != list:
+        x_global, y_global, labels = read_txt(lista,param)
+
+    if type(param) == list:#True CPA calculation
+        y_global =[]
+        #in case of params = [aw_max,aw_min], this part calculates the "true CPA" -> CPA=(AW_MAX-AW_MIN)/2 + AW_MIN
+        x_global0, y_global0, labels0 = read_txt(lista,param[0])
+        x_global1, y_global1, labels1 = read_txt(lista,param[1])
+        #sum each element of y_global0 and y_global1 and divide each element by 2
+        for contador in range(len(x_global0)):
+            #(a-b)/2 = distance, independet of axis, then is not necesarry to convert to counter-clockwise
+            d = [(a - b)/2 + b for a, b in zip(y_global0[contador], y_global1[contador])]
+            y_global.append(d)
+        labels = labels0
+        x_global = x_global0
+        param = "True_CPA"
+    list_legend=[]
+
+#    fig, ax = plt.subplots()
+#    ax.set_xlabel("Date and hour")
+#    if param == "AW" or param == "APEX_ANGL" or param == "AW_MIN" or param == "AW_MAX":
+#        ax.set_ylabel(param+" [deg]")
+#    if param =='APEX_ANGL_PER':
+#        ax.set_ylabel("Apex Angle"+" [deg]")
+#    if param == "True_CPA":
+#        ax.set_ylabel("CPA"+" [deg]")
+#    if param == "CPA":
+#        ax.set_ylabel("W"+param+" [deg]")
+#    if param == "APEX" or param=="APEX_DIST_PER":
+#        ax.set_ylabel("Apex"+" [Rsun]")   
+#    if param == "AREA_SCORE":
+#        ax.set_ylabel(param+"%")
+    
+    #colors in https://www.w3schools.com/colors/colors_picker.asp
+    colors=['k','g','r','b','y','m','c',
+            'tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:orange',
+            'tab:brown', 'tab:pink', 'tab:gray', '#ff4d94', '#b3b3ff',
+            'gold', 'coral', 'lime', 'magenta', 'teal', 'navy']
+    #instrument=['Cor2A','Cor2B','C2']
+    #use heach element of the x_global and y_global list to plot x vs y
+    x_global_sec = []
+    y_global_units_list = []
+    for contador in range(len(x_global)):
+        marker="*"
+        linestyle=''
+        if labels[contador].find('Img') != -1:
+            linestyle='dotted'            
+        #breakpoint()
+        if labels[contador].find('GCS') != -1:
+            linestyle='--'
+        if param == "AW" or param == "AW_MIN" or param == "AW_MAX" or param == "CPA" or param == "APEX_ANGL" or param =='APEX_ANGL_PER':
+            y_global_units = np.degrees(y_global[contador])
+            if clockwise == True:
+                if param == "AW_MAX" and instrument == "Cor2A":
+                    y_global_units = convert_to_clockwise(y_global_units,negative_angle=True)
+                else:
+                    y_global_units = convert_to_clockwise(y_global_units)
+
+        if param == "True_CPA":
+            y_global_units = np.degrees(y_global[contador])
+            if clockwise == True:
+                y_global_units = convert_to_clockwise(y_global_units)
+        if param == "APEX" or param == "AREA_SCORE" or param=="APEX_DIST_PER":
+            y_global_units = y_global[contador]
+
+        y_global_units_list.append(y_global_units)
+        x_global_sec.append([t.timestamp() for t in x_global[contador]])
+        #line1, = ax.plot(x_global[contador], y_global_units, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador])
+#        ax.plot(x_global[contador], y_global_units, label=labels[contador], marker=marker,linestyle=linestyle,color=colors[contador])
+        #create a list of legends
+        #position = (0.22,1.0-contador*0.07)
+        #list_legend.append(ax.legend(handles=[line1], bbox_to_anchor=position))
+    # Add legends to the plot
+    #for legend in list_legend:
+    #    ax.add_artist(legend)  # Add legend back to the plot  
+#    ax.legend(loc="best", prop={'size': 8})
+    # Add title using param
+#    ax.set_title(title)
+#    plt.grid()
+    #save plot on opath directory
+#    ending = '_'+title+'_plot_test'
+#    fig.savefig(opath+'/'+str.lower(param)+ending+".png")
+    #breakpoint()    
+    diff_estimator_list = []
+    linear_interp_func = interp1d(x_global_sec[0], y_global_units_list[0], kind='linear', fill_value="extrapolate")
+    for contador in range(1,len(x_global_sec)):
+        #usar la funcion con los datos posta
+        #usar el tiempo dado por las simulaciones.
+        y_interp = linear_interp_func(x_global_sec[contador])
+        diff_estimator = (y_global_units_list[contador] - y_interp )/ y_interp
+        diff_estimator_list.append(diff_estimator)
+    #la observacion es el intepolado, que tiene menos datos.p
+    fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(17, 6))
+    axs.boxplot(diff_estimator_list)
+    axs.set_title(param, fontsize=14)
+    axs.yaxis.grid(True)
+    #breakpoint()
+    axs.set_xticks([y + 1 for y in range(len(diff_estimator_list))], labels=labels[1:])
+    axs.set_xlabel('Model and Simulations', fontsize=14)
+    axs.set_ylabel('Diff Estimator', fontsize=14)
+    ending = '_'+title+'_estimator_box_plot'
+    fig.savefig(opath+'/'+str.lower(param)+ending+".png")
+
+    plt.close(fig)
+    print("Figure save in: ",opath+'/'+str.lower(param)+ending+".png")
+
+
+    return
 
 #Define a function that read 2 pickle files and use both mask to calculate Intersection over Union, and return the value
 def calculate_IOU(lista,opath,title=''):
@@ -233,9 +356,9 @@ def calculate_IOU(lista,opath,title=''):
             'tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:orange',
             'tab:brown', 'tab:pink', 'tab:gray', '#ff4d94', '#b3b3ff',
             'gold', 'coral', 'lime', 'magenta', 'teal', 'navy']
-    fig, ax = plt.subplots()
-    ax.set_xlabel("Date and hour")
-    ax.set_ylabel("IoU Score")
+    fig, ax = plt.subplots( figsize=(17, 6))
+    ax.set_xlabel("Time [Data and hour]", fontsize=14)
+    ax.set_ylabel("IoU Score", fontsize=14)
 
     #breakpoint()
     for contador in range(1,len(y_df)):
@@ -306,9 +429,10 @@ def calculate_IOU(lista,opath,title=''):
         #list_legend.append(ax.legend(handles=[line1], bbox_to_anchor=position,loc='upper right'))
     #for legend in list_legend:
     #    ax.add_artist(legend)  
-    ax.legend(loc="best", prop={'size': 8})
+    #ax.legend(loc="best", prop={'size': 8})
+    ax.legend(bbox_to_anchor=(1.0, 0.5), loc='center left', borderaxespad=0.)
     # Add title using param
-    ax.set_title(title)
+    ax.set_title(title, fontsize=14)
     plt.grid()
     #save plot on opath directory
     ending = 'iou_score'+title+'_plot'
@@ -317,7 +441,8 @@ def calculate_IOU(lista,opath,title=''):
 
 
 if __name__ == "__main__":
-    full_plot = True
+    full_plot = False
+
     if full_plot == True:
         plot_apex       = True
         plot_AW         = True
@@ -331,6 +456,7 @@ if __name__ == "__main__":
         plot_apex_angl_per = True
         plot_apex_dist_per = True
         plot_iou           = True
+        plot_box_plot = True
 
     if full_plot == False:
         plot_apex       = False
@@ -345,6 +471,7 @@ if __name__ == "__main__":
         plot_apex_angl_per = False
         plot_apex_dist_per = False
         plot_iou           = False
+        plot_box_plot = False
 
     #path and name of file including all the pickle files + labels
     dir_lista = '/gehme/projects/2023_eeggl_validation/output/2011-02-15/pickle/'
@@ -355,12 +482,24 @@ if __name__ == "__main__":
     #opath = dir_lista+'modified_version/'                  #modified version indicates real images modified by hand.
 
     #instrument = "Cor2A"
-    instrument = "Cor2B"
-    #lista = "2011_02_15_sta_contrast.txt"
-    lista = "2011_02_15_stb_contrast.txt"
-    #lista = "lista_test.txt"
+    instrument = "Cor2A"
+    lista = "2011_02_15_sta_contrast.txt"
+    #lista = "2011_02_15_stb_contrast.txt"
+    #lista = "2011_02_15_sta_contrast_shorted.txt"
     opath = dir_lista+'modified_version_higher_contrast/'+instrument.lower()   #modified by hand real img and higher contrast (specially eeggl)
     #opath = dir_lista+'modified_version_higher_contrast/test'  
+    plot_params(dir_lista+lista,"APEX_DIST_PER",opath,title=instrument,instrument=instrument)
+    breakpoint()
+    if plot_box_plot == True:
+        plot_box_params(dir_lista+lista,"APEX_DIST_PER",opath,title=instrument,instrument=instrument)
+        plot_box_params(dir_lista+lista,"AREA_SCORE",opath,title=instrument,instrument=instrument)   
+        plot_box_params(dir_lista+lista,"AW",opath,title=instrument,instrument=instrument)
+        plot_box_params(dir_lista+lista,"CPA",opath,title=instrument,instrument=instrument)
+        plot_box_params(dir_lista+lista,"APEX_ANGL",opath,title=instrument,instrument=instrument)
+        plot_box_params(dir_lista+lista,"APEX_ANGL_PER",opath,title=instrument,instrument=instrument)
+        plot_box_params(dir_lista+lista,"AW_MIN",opath,title=instrument,instrument=instrument)
+        plot_box_params(dir_lista+lista,"AW_MAX",opath,title=instrument,instrument=instrument)
+    ############################################################
     if plot_apex_dist_per == True:
         plot_params(dir_lista+lista,"APEX_DIST_PER",opath,title=instrument,instrument=instrument)
     
