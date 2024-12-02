@@ -314,7 +314,9 @@ def main(configuration: Configuration):
             sirats_plotter.plot_params_error_histogram(targets_list, predictions_list, PAR_LOSS_WEIGHTS, OPATH, 'params_histogram.png')
 
             # Save errors in a pickle file
-            with open(os.path.join(OPATH, 'errors.pkl'), 'wb') as f:
+            histogram_data_path = os.path.join(OPATH, 'histogram_data')
+            os.makedirs(histogram_data_path, exist_ok=True)
+            with open(os.path.join(histogram_data_path, "VP_errors.pkl"), 'wb') as f:
                 pickle.dump(errors, f)
                 f.close()
 
@@ -422,5 +424,5 @@ def main(configuration: Configuration):
 
 if __name__ == '__main__':
     configuration = Configuration(Path(
-        "/gehme-gpu2/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run7.ini"))
+        "/gehme-gpu/projects/2020_gcs_with_ml/repo_mariano/2020_gcs_with_ml/nn/neural_gcs/sirats_config/sirats_inception_run7.ini"))
     main(configuration)

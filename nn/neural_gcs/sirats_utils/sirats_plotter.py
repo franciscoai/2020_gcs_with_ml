@@ -20,29 +20,36 @@ class SiratsPlotter:
     def __init__(self) -> None:
         pass
 
-    def calculate_non_overlapping_area(self, mask1, mask2):
+    def calculate_non_overlapping_area(self, real_mask, infered_mask):
         # Combine masks to identify overlapping areas
-        non_overlapping_area_err = np.sum(
-            np.abs(mask1 - mask2)) / np.sum(mask1)
+        union = np.sum(np.logical_or(real_mask, infered_mask))
+        symetric_diff = np.sum(np.logical_xor(real_mask, infered_mask))
+        non_overlapping_area_err = symetric_diff / union if union > 0 else 0
         return non_overlapping_area_err
 
     def plot_overlap_err_histogram(self, errors, opath, namefile):
-        fig, ax = plt.subplots(1, 4, figsize=(14, 7))
-        flatten_errors = [item for sublist in errors for item in sublist]
-        ax[0].hist(flatten_errors, bins=30)
+        fig, ax = plt.subplots(1, 4, figsize=(20, 11))
+        errors = np.array(errors)
+        allvp_errors = np.mean(errors, axis=0)
+        ax[0].hist(allvp_errors, bins=30)
+        ax[0].set_yscale('log')
         ax[0].set_title(
-            f'AllVPs, mean: {np.around(np.mean(flatten_errors), 2)}, std: {np.around(np.std(flatten_errors), 2)}')
-        ax[1].hist(errors[0], bins=30)
-        ax[1].set_title(
-            f'VP1, mean: {np.around(np.mean(errors[0]), 2)}, std: {np.around(np.std(errors[0]), 2)}')
-        ax[2].hist(errors[1], bins=30)
-        ax[2].set_title(
-            f'VP2, mean: {np.around(np.mean(errors[1]), 2)}, std: {np.around(np.std(errors[1]), 2)}')
-        ax[3].hist(errors[2], bins=30)
-        ax[3].set_title(
-            f'VP3, mean: {np.around(np.mean(errors[2]), 2)}, std: {np.around(np.std(errors[2]), 2)}')
+            f'AllVPs, mean: {np.around(np.mean(allvp_errors), 2)}, std: {np.around(np.std(allvp_errors), 2)}')
+        ax[0].set_xlabel('Non-overlapping area error')
+        ax[0].set_ylabel('Frequency')
+        
+        for i in range(errors.shape[0]):
+            ax[i+1].hist(errors[i], bins=30)
+            ax[i+1].set_yscale('log')
+            ax[i+1].set_title(
+                f'VP{i+1}, mean: {np.around(np.mean(errors[i]), 2)}, std: {np.around(np.std(errors[i]), 2)}')
+            ax[i+1].set_xlabel('Non-overlapping area error')
+            ax[i+1].set_ylabel('Frequency')
 
-        masks_dir = os.path.join(opath, 'infered_masks')
+
+        plt.subplots_adjust(wspace=0.4)  # increment the space between subplots
+
+        masks_dir = os.path.join(opath, 'infered_synth_imgs')
 
         fig.savefig(os.path.join(masks_dir, namefile), dpi=300)
         plt.close(fig)
@@ -164,7 +171,7 @@ class SiratsPlotter:
             ax[1][i].imshow(arr_cloud, cmap='Greens', alpha=0.6,
                             vmin=0, vmax=1, interpolation='nearest')
 
-        masks_dir = os.path.join(opath, 'infered_masks')
+        masks_dir = os.path.join(opath, 'infered_synth_imgs')
         os.makedirs(masks_dir, exist_ok=True)
         plt.savefig(os.path.join(masks_dir, namefile), dpi=300)
         plt.close()
@@ -356,21 +363,27 @@ class SiratsPlotter:
         mean = np.mean(l1_err, axis=0)
         std = np.std(l1_err, axis=0)
         std3 = 3 * std
+        p1 = np.percentile(l1_err, 1, axis=0)
+        p10 = np.percentile(l1_err, 10, axis=0)
+        p90 = np.percentile(l1_err, 90, axis=0)
+        p99 = np.percentile(l1_err, 99, axis=0)
 
+        params_data_path = os.path.join(opath, 'histogram_data/params_histogram_data')
+        os.makedirs(params_data_path, exist_ok=True)
+        np.savez(os.path.join(params_data_path, "params_histogram_data"), l1_err=l1_err, mean=mean, std=std, std3=std3, mean_square_err=mean_square_err, p1=p1, p10=p10, p90=p90, p99=p99)
 
         # Generate histograms
-        fig, ax = plt.subplots(1, 6, figsize=(23, 7))
+        fig, ax = plt.subplots(1, 6, figsize=(23, 9))
         fig.tight_layout(pad=3.0) # Increase the padding between subplots
         plt.subplots_adjust(top=0.85)  # Adjust the top of the plot to give more space for titles
 
         for i in range(6):
             ax[i].hist(l1_err[:, i], bins=30)
-            ax[i].set_title(f'{titles[i]}\nmean={mean[i]:.2f}, std={std[i]:.2f}\n3std={std3[i]:.2f}, MSE={mean_square_err[i]:.2f}', fontsize=10)
+            ax[i].set_title(f'{titles[i]}\nmean={mean[i]:.2f}, std={std[i]:.2f}\n3std={std3[i]:.2f}, MSE={mean_square_err[i]:.2f}\np1={p1[i]:.2f}, p10={p10[i]:.2f}\np90={p90[i]:.2f}, p99={p99[i]:.2f}', fontsize=10)
             ax[i].set_yscale('log')
 
         # Save the figure
-        opath = os.path.join(opath, 'infered_masks')
+        opath = os.path.join(opath, 'infered_synth_imgs')
         os.makedirs(opath, exist_ok=True)
         plt.savefig(os.path.join(opath, namefile), dpi=300)
-
-        
+        plt.close()
