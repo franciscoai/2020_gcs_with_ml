@@ -10,7 +10,7 @@ def binary_mask_normalization(img: torch.Tensor):
     img[img < 0] = 0
     return img
 
-def real_img_normalization(img: torch.Tensor, excl_occulter_level = None):
+def real_img_normalization(img: torch.Tensor, sd_range=1.5, excl_occulter_level = None):
     """
     Normalize the input image tensor using Sirats normalization method.
 
@@ -25,7 +25,6 @@ def real_img_normalization(img: torch.Tensor, excl_occulter_level = None):
         torch.Tensor: The normalized image tensor.
 
     """
-    sd_range=1.5
     #exclude occulter values at excl_occulter_level
     for i in range(3):
         if excl_occulter_level is not None:

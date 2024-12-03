@@ -329,9 +329,9 @@ def main(configuration: Configuration):
                 for case in range(len(ev['ima1'])):
                     case_counter += 1
                     # Get event images
-                    ima = fits.getdata(ev['ima1'][case]) - fits.getdata(ev['ima0'][case])
-                    imb = fits.getdata(ev['imb1'][case]) - fits.getdata(ev['imb0'][case])
-                    lasco = fits.getdata(ev['lasco1'][case]) - fits.getdata(ev['lasco0'][case])
+                    ima = np.subtract(fits.getdata(ev['ima1'][case]), fits.getdata(ev['ima0'][case]))
+                    imb = np.subtract(fits.getdata(ev['imb1'][case]), fits.getdata(ev['imb0'][case]))
+                    lasco = np.subtract(fits.getdata(ev['lasco1'][case]), fits.getdata(ev['lasco0'][case]))
 
                     filename = os.path.basename(ev['ima1'][case]).replace('.fts', '')
 
@@ -369,7 +369,7 @@ def main(configuration: Configuration):
                         ((case.shape[0] - 1) // 2, (case.shape[1] - 1) // 2) for case in case_list]
                     
                     # Occulters size for [sat1, sat2 ,sat3] in [Rsun]
-                    occulter_size = [3., 3., 2.4] # [0.3, 0.3, 2.4]
+                    occulter_size = [3.5, 3.5, 2.4] # [0.3, 0.3, 2.4]
 
                     # occ_center=[(30,-15),(0,-5),(0,0)] # [(38,-15),(0,-5),(0,0)] # (y,x)
                     r_values = [radius_to_px(
@@ -382,20 +382,16 @@ def main(configuration: Configuration):
                         case_list[i] = case
 
                     # Resize event images
-                    if case_list[0].shape[0] != IMG_SIZE[0] or case_list[0].shape[1] != IMG_SIZE[1]:
-                        resize = torchvision.transforms.Resize(
-                            IMG_SIZE[1:3], torchvision.transforms.InterpolationMode.BILINEAR)
-                        resize_scale_factor = [
-                            case_list[i].shape[1] / IMG_SIZE[1] for i in range(len(case_list))]
-                        case_list = [resize(case.unsqueeze(0)) for case in case_list]
-                        case_list = [case.squeeze(0) for case in case_list]
-                        for i in range(len(event_headers)):
-                            h = event_headers[i]
-                            h['CDELT1'] = resize_scale_factor[i] * h['CDELT1']
-                            h['CDELT2'] = resize_scale_factor[i] * h['CDELT2']
-                            event_headers[i] = h
+                    for i in range(len(case_list)):
+                        if case_list[i].shape[0] != IMG_SIZE[1] or case_list[i].shape[1] != IMG_SIZE[2]:
+                            resize = torchvision.transforms.Resize(
+                                IMG_SIZE[1:3], torchvision.transforms.InterpolationMode.BICUBIC)
+                            resize_scale_factor = case_list[i].shape[1] / IMG_SIZE[1]
+                            case_list[i] = resize(case_list[i].unsqueeze(0)).squeeze(0)
+                            event_headers[i]['CDELT1'] = resize_scale_factor * event_headers[i]['CDELT1']
+                            event_headers[i]['CDELT2'] = resize_scale_factor * event_headers[i]['CDELT2']
 
-                        satpos, plotranges = pyGCS.processHeaders(event_headers)
+                    satpos, plotranges = pyGCS.processHeaders(event_headers)
 
                     # join event images
                     event_img = torch.stack(case_list, dim=0)

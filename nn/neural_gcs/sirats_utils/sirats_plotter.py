@@ -259,13 +259,47 @@ class SiratsPlotter:
 
                 # flip arr_cloud in x
                 arr_cloud = np.flip(arr_cloud, axis=0)
+                
+                cloud_cmap = mpl.colors.ListedColormap(['none', '#49704F'])
+
 
                 imgs_mean = np.mean(imgs[i, :, :])
                 imgs_std = np.std(imgs[i, :, :])
 
-                ax[i].imshow(imgs[i, :, :], cmap="gray", vmin=imgs_mean - imgs_std *3, vmax=imgs_mean + imgs_std *3)
-                ax[i].imshow(arr_cloud, cmap='Greens',
-                             alpha=0.6, vmin=0, vmax=1)
+                ax[i].imshow(imgs[i, :, :], cmap="gray", vmin=0, vmax=1)
+
+                ax[i].imshow(arr_cloud, cmap=cloud_cmap,
+                             alpha=1, vmin=0, vmax=1)
+
+        masks_dir = os.path.join(opath, 'real_img_infer')
+        os.makedirs(masks_dir, exist_ok=True)
+        plt.savefig(os.path.join(masks_dir, namefile), dpi=300)
+        plt.close()
+
+    def plot_triplet_images(self, img, opath, namefile):
+        img = img.cpu().detach().numpy()
+        fig, ax = plt.subplots(1, 3, figsize=(18, 8))
+        for i in range(3):
+            ax[i].imshow(img[i], cmap="gray", vmin=0, vmax=1)
+            ax[i].set_title(f'VP {i+1}')
+        masks_dir = os.path.join(opath, 'real_img_infer')
+        os.makedirs(masks_dir, exist_ok=True)
+        plt.savefig(os.path.join(masks_dir, namefile), dpi=300)
+        plt.close()
+
+    def plot_img_histogram(self, img, sd_range, opath, namefile):
+        img = img.cpu().detach().numpy()
+        mean = np.mean(img, axis=(1, 2))
+        std = np.std(img, axis=(1, 2))
+
+        fig, ax = plt.subplots(1, 3, figsize=(18, 8))
+        for i in range(3):
+            ax[i].hist(img[i].flatten(), bins=30)
+            ax[i].set_title(
+                f'mean: {mean[i]:.2f}, std: {std[i]:.2f}, sd_range: {sd_range}')
+            ax[i].set_yscale('log')
+            ax[i].set_xlabel('Pixel value')
+            ax[i].set_ylabel('Frequency')
 
         masks_dir = os.path.join(opath, 'real_img_infer')
         os.makedirs(masks_dir, exist_ok=True)
