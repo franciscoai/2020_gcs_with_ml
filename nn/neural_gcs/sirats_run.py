@@ -333,6 +333,11 @@ def main(configuration: Configuration):
                     imb = np.subtract(fits.getdata(ev['imb1'][case]), fits.getdata(ev['imb0'][case]))
                     lasco = np.subtract(fits.getdata(ev['lasco1'][case]), fits.getdata(ev['lasco0'][case]))
 
+                    # Fip the images in x because astropy doesn´t know how to read them >:(
+                    ima = np.flip(ima, axis=0)
+                    imb = np.flip(imb, axis=0)
+                    lasco = np.flip(lasco, axis=0)
+
                     filename = os.path.basename(ev['ima1'][case]).replace('.fts', '')
 
                     # Get event headers
@@ -343,25 +348,10 @@ def main(configuration: Configuration):
 
                     satpos, plotranges = pyGCS.processHeaders(event_headers)
 
-                    # synth_img_path = '/gehme-gpu/projects/2020_gcs_with_ml/data/gcs_ml_3VP_size_100000_seed_72430'
-                    # synth_img_list = os.listdir(synth_img_path)
-                    # random_img = random.choice(synth_img_list)
-                    # synth_img_list = os.listdir(os.path.join(synth_img_path, random_img))
-                    # for img in synth_img_list:
-                    #     if img.find('sat1') != -1:
-                    #         ima = read_image(os.path.join(synth_img_path, random_img, img), mode=torchvision.io.image.ImageReadMode.GRAY)
-                    #         ima = ima.squeeze(0)
-                    #     if img.find('sat2') != -1:
-                    #         imb = read_image(os.path.join(synth_img_path, random_img, img), mode=torchvision.io.image.ImageReadMode.GRAY)
-                    #         imb = imb.squeeze(0)
-                    #     if img.find('sat3') != -1:
-                    #         lasco = read_image(os.path.join(synth_img_path, random_img, img), mode=torchvision.io.image.ImageReadMode.GRAY)
-                    #         lasco = lasco.squeeze(0)
-
                     case_list = [imb, ima, lasco]
 
                     # make events as tensors
-                    case_list = [torch.tensor(case, dtype=torch.float32)
+                    case_list = [torch.tensor(case.copy(), dtype=torch.float32)
                                   for case in case_list]
 
                     # Add occulter to images
@@ -390,8 +380,6 @@ def main(configuration: Configuration):
                             case_list[i] = resize(case_list[i].unsqueeze(0)).squeeze(0)
                             event_headers[i]['CDELT1'] = resize_scale_factor * event_headers[i]['CDELT1']
                             event_headers[i]['CDELT2'] = resize_scale_factor * event_headers[i]['CDELT2']
-
-                    satpos, plotranges = pyGCS.processHeaders(event_headers)
 
                     # join event images
                     event_img = torch.stack(case_list, dim=0)
