@@ -36,8 +36,9 @@ def get_NN(odir,sat):
         odir_filter=odir+ext_folder+"/filtered"
         if os.path.exists(odir_filter):
             csv_path=odir_filter+"/"+ext_folder+"_filtered_stats"
-            df=pd.read_csv(csv_path)
-            df_list.append(df)
+            if os.path.exists(csv_path):
+                df=pd.read_csv(csv_path)
+                df_list.append(df)
     
     df_full = pd.concat(df_list, ignore_index=True)
     return df_full
@@ -172,9 +173,9 @@ def plot_masks(img,parameters, satpos, plotranges,imsize, opath, namefile):
 ###################################################################################### MAIN #########################################################################################
 repo_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 kincat_orig_dir=repo_dir+"/nn_training/kincat/helcatslist_20160601.txt"
-odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1/"
+odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5/infer_neural_cme_seg_kincat_L1/"
 
-sat="cor2_a"#cor2_b
+sat="cor2_b_short_version"#cor2_b
 imageSize=[512,512]
 mod_scale=True
 mask_threshold=0.6 # value to consider a pixel belongs to the objec

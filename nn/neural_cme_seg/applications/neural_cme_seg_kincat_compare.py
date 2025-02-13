@@ -10,39 +10,47 @@ from scipy.optimize import least_squares
 from scipy.io import readsav
 
 def get_NN(iodir,sat):
-    column_names=["DATE_TIME","MASK","SCORE","CPA_ANG","WIDE_ANG","APEX",'LABEL', 'BOX', 'CME_ID', 'APEX_DIST', 'CPA_DIST', 'WA_DIST', 'ERROR']
+    column_names=["DATE_TIME","MASK","SCORE","CPA_ANG","WIDE_ANG","APEX",'LABEL', 'BOX', 'APEX_ANGL', 'AW_MIN', 'AW_MAX', 'AREA_SCORE', 'APEX_DIST_PER','APEX_ANGL_PER', 'CME_ID', 'CPA_DIST', 'WA_DIST', 'APEX_DIST', 'ERROR']
+    short_event_col_names=['DATE_TIME', 'MASK_ID', 'SCR', 'CPA', 'AW', 'APEX', 'LABEL', 'BOX','APEX_ANGL', 'AW_MIN', 'AW_MAX', 'AREA_SCORE', 'APEX_DIST_PER','APEX_ANGL_PER', 'CME_ID']
     df_list=[]
-    odir=iodir+'/'+sat+"/"
+    odir=iodir+'/'+sat+"_short_version/"
     ext_folders = os.listdir(odir)
     for ext_folder in ext_folders:
         odir_filter=odir+ext_folder+"/filtered"
         if os.path.exists(odir_filter):
             csv_path=odir_filter+"/"+ext_folder+"_filtered_stats"
             if  os.path.exists(csv_path):
-                df=pd.read_csv(csv_path, names=column_names)
-                if len(df["CME_ID"].unique())>1:
-                    predominant_cme = df["CME_ID"].value_counts().idxmax()
-                    event= df.loc[df["CME_ID"]==predominant_cme]
+                df_nn=pd.read_csv(csv_path, header=0)
+
+                try:
+                    df_nn.columns=column_names
+                except:
+                    df_nn.columns=short_event_col_names
+                if len(df_nn["CME_ID"].unique())>1:
+                    predominant_cme = df_nn["CME_ID"].value_counts().idxmax()
+                    event = df_nn[df_nn["CME_ID"] == predominant_cme]  # Usar .copy() para evitar problemas de referencias
                     df_list.append(event)
 
                 else:
-                    df_list.append(df)
+                    df_list.append(df_nn)
     df_full = pd.concat(df_list, ignore_index=True)
+ 
     return df_full
 
 def get_GCS(iodir,sat):
     df_list=[]
-    odir=iodir+'/'+sat+"/"
+    odir=iodir+'/'+sat+"_short_version/"
     ext_folders = os.listdir(odir)
     for ext_folder in ext_folders:
         odir_filter=odir+ext_folder+"/gcs_masks"
         if os.path.exists(odir_filter):
             csv_path=odir_filter+"/GCS_mask_stats"
-            try:
+            if os.path.exists(csv_path):
                 df=pd.read_csv(csv_path)
                 df_list.append(df)
-            except:
-                continue
+                #except:
+                 #   continue
+
     df_full = pd.concat(df_list, ignore_index=True)
     return df_full
 
@@ -278,6 +286,8 @@ def comparator(NN,seeds,vourlidas,gcs,cactus):
                 compare.append([NN_date,seeds_data["DATE_TIME"],np.nan,cactus_data["DATE_TIME"],df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,np.nan,cpa_ang_cactus,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,np.nan,wide_ang_cactus,cpa_ang_gcs,wide_ang_gcs])
             elif (NN_prev<=vourlidas_data["Date_Time"]<=NN_post)and(NN_prev<=seeds_data["DATE_TIME"]<=NN_post)and not(NN_prev<=cactus_data["DATE_TIME"]<=NN_post):
                 compare.append([NN_date,seeds_data["DATE_TIME"],vourlidas_data["Date_Time"],np.nan,df["CPA_ANG"]["median"][i],df["CPA_ANG"]["std"][i],cpa_ang_seeds,cpa_ang_vourlidas,np.nan,df["WIDE_ANG"]["min"][i],df["WIDE_ANG"]["std"][i],wide_ang_seeds,wide_ang_vourlidas,np.nan,cpa_ang_gcs,wide_ang_gcs])
+        else:
+            breakpoint()    
     compare = pd.DataFrame(compare, columns=columns)
     return compare
 
@@ -405,13 +415,13 @@ def plot_one_per_one(df,plot_dir,x_axis,y_axis,line):
 
 
 ################################################################################### MAIN ######################################################################################
-odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1"
+odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5/infer_neural_cme_seg_kincat_L1"
 folder="/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications"
-sat="cor2_b"#cor2_a/cor2_b/lasco_c2
+sat="cor2_b"#cor2_a/cor2_b
 correlation_cords=[[[[0,350],[0,350]],[[0,150],[0,150]]],[[[0,350],[0,350]],[[0,250],[0,250]]]]#[cor2_A[CPA,WA],cor2_b[CPA,WA]]
 
 #-----------------
-plot_dir=odir+'/'+sat+'_comparison'
+plot_dir=odir+'/'+sat+'_comparison_short_version'
 os.makedirs(plot_dir, exist_ok=True)
 
 if sat=='cor2_a':
