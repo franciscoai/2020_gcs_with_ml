@@ -34,6 +34,7 @@ def get_NN(iodir,sat):
                         df_list.append(df)
     
     df_full = pd.concat(df_list, ignore_index=True)
+    breakpoint()
     return df_full
 
 
@@ -83,11 +84,12 @@ def get_cactus(folder,sat):
 
 def comparator(NN,cdaw,cactus=None):
     columns=["NN_DATE_TIME","CDAW_DATE_TIME","CACTUS_DATE_TIME","NN_MEDIAN_CPA_ANG","NN_STD_CPA_ANG","CDAW_CPA_MEDIAN","CDAW_WA_MEDIAN","CACTUS_CPA_ANG","NN_MEDIAN_WA","NN_STD_WA","CDAW_CPA_STD","CDAW_WA_STD","CACTUS_WA"]
-    NN_ang_col=['CPA', 'WA']
+    NN_ang_col=['CPA', 'AW']
     compare=[]
 
     #converts to datetime objs and sort the df
     NN['DATE_TIME'] = pd.to_datetime(NN['DATE_TIME'])
+    breakpoint()
     NN.sort_values(by='FOLDER_NAME', inplace=True)
     NN['DATE'] = NN['DATE_TIME'].dt.date
     NN['TIME'] = pd.to_datetime(NN['DATE_TIME']).dt.time
@@ -96,14 +98,14 @@ def comparator(NN,cdaw,cactus=None):
 
     #adjust the 0 degree to the nort
     for i in NN_ang_col:
-        if i=="WA":
+        if i=="AW":
             NN[i]=np.degrees([float(num) for num in NN[i]])
         else:
             NN[i]= np.degrees([float(num) for num in NN[i]])-90
         NN.loc[NN[i] < 0, i] += 360  
     
     #goups all the hours in each day and calculates medain a std of cpa_ang and wide_ang
-    NN_stats = NN.groupby(['FOLDER_NAME','DATE']).agg({'WA': ['min', 'std'],'CPA': ['median', 'std'],})
+    NN_stats = NN.groupby(['FOLDER_NAME','DATE']).agg({'AW': ['min', 'std'],'CPA': ['median', 'std'],})
     NN_stats = NN_stats.reset_index()
     #calculate the unique dates in NN and conservs only those ones in other catalogues
     unique_dates_NN = NN['DATE_TIME'].dt.date.unique()
@@ -124,13 +126,13 @@ def comparator(NN,cdaw,cactus=None):
         NN_max['DATE_TIME'] = NN_max.apply(lambda row: datetime.combine(row['DATE'], row['TIME']), axis=1)
         NN_date=NN_min["DATE_TIME"][i]
         cme_event=NN_min["FOLDER_NAME"].loc[i]
-        cdaw_cme_event=cdaw.loc[cdaw["FOLDER_NAME"]==cme_event]
+        cdaw_cme_event = cdaw.loc[cdaw["FOLDER_NAME"] == cme_event].copy()
         
 
         if cactus != None:
             cactus['TIME_DIFF'] = cactus['DATE_TIME'] - pd.to_datetime(NN_date)
             time_diff_cactus = cactus[cactus['TIME_DIFF'] >= pd.Timedelta(0)]
-        
+    
         cdaw_cme_event['CPA'] = pd.to_numeric(cdaw_cme_event['CPA'], errors='coerce')
         cdaw_cme_event['WA'] = pd.to_numeric(cdaw_cme_event['WA'], errors='coerce')
         
@@ -148,14 +150,14 @@ def comparator(NN,cdaw,cactus=None):
                 cpa_ang_cactus=cactus_data["CPA"]
                 wide_ang_cactus=cactus_data["WA"]
                 if (NN_prev<=cdaw_data["DATE_TIME"]<=NN_post)and(NN_prev<=cactus_data["DATE_TIME"]<=NN_post):
-                    compare.append([NN_date,cdaw_data["DATE_TIME"],cactus_data["DATE_TIME"],NN_stats["CPA"]["median"][i],NN_stats["CPA"]["std"][i],cpa_ang_cdaw,cpa_ang_cactus,NN_stats["WA"]["min"][i],NN_stats["WA"]["std"][i],wide_ang_cdaw,wide_ang_cactus])
+                    compare.append([NN_date,cdaw_data["DATE_TIME"],cactus_data["DATE_TIME"],NN_stats["CPA"]["median"][i],NN_stats["CPA"]["std"][i],cpa_ang_cdaw,cpa_ang_cactus,NN_stats["AW"]["min"][i],NN_stats["AW"]["std"][i],wide_ang_cdaw,wide_ang_cactus])
                 elif not(NN_prev<=cdaw_data["DATE_TIME"]<=NN_post)and(NN_prev<=cactus_data["DATE_TIME"]<=NN_post):
-                    compare.append([NN_date,np.nan,cactus_data["DATE_TIME"],NN_stats["CPA"]["median"][i],NN_stats["CPA"]["std"][i],np.nan,cpa_ang_cactus,NN_stats["WA"]["min"][i],NN_stats["WA"]["std"][i],np.nan,wide_ang_cactus])
+                    compare.append([NN_date,np.nan,cactus_data["DATE_TIME"],NN_stats["CPA"]["median"][i],NN_stats["CPA"]["std"][i],np.nan,cpa_ang_cactus,NN_stats["AW"]["min"][i],NN_stats["AW"]["std"][i],np.nan,wide_ang_cactus])
                 elif (NN_prev<=cdaw_data["DATE_TIME"]<=NN_post)and not(NN_prev<=cactus_data["DATE_TIME"]<=NN_post):
-                    compare.append([NN_date,NN_date,np.nan,NN_stats["CPA"]["median"][i],NN_stats["CPA"]["std"][i],cpa_ang_cdaw,np.nan,NN_stats["WA"]["min"][i],NN_stats["WA"]["std"][i],wide_ang_cdaw,np.nan])
+                    compare.append([NN_date,NN_date,np.nan,NN_stats["CPA"]["median"][i],NN_stats["CPA"]["std"][i],cpa_ang_cdaw,np.nan,NN_stats["AW"]["min"][i],NN_stats["AW"]["std"][i],wide_ang_cdaw,np.nan])
         else:
             
-            compare.append([NN_date,NN_date,np.nan,NN_stats["CPA"]["median"][i],NN_stats["CPA"]["std"][i],cpa_median_cdaw,wa_median_cdaw,np.nan,NN_stats["WA"]["min"][i],NN_stats["WA"]["std"][i],cpa_std_cdaw,wa_std_cdaw,np.nan])
+            compare.append([NN_date,NN_date,np.nan,NN_stats["CPA"]["median"][i],NN_stats["CPA"]["std"][i],cpa_median_cdaw,wa_median_cdaw,np.nan,NN_stats["AW"]["min"][i],NN_stats["AW"]["std"][i],cpa_std_cdaw,wa_std_cdaw,np.nan])
     
     compare = pd.DataFrame(compare, columns=columns)
     return compare
@@ -312,7 +314,7 @@ def plot_one_per_one(df,plot_dir,x_axis,y_axis,line):
 
 
 ################################################################################### MAIN ######################################################################################
-odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/infer_neural_cme_seg_kincat_L1"
+odir="/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5/infer_neural_cme_seg_kincat_L1"
 folder="/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications"
 cdaw_path='/gehme/data/catalogues/soho/lasco/'
 
@@ -330,7 +332,6 @@ cdaw =get_cdaw(cdaw_path,sat)
 df = comparator(NN,cdaw)#cactus is an optional arg
 cpa_corr=correlation_cords[0]
 wa_corr=correlation_cords[1]
-
 plot_all_in_one(df,plot_dir,"NN_MEDIAN_CPA_ANG",["CDAW"],cpa_corr)# plot_all_in_one(df,plot_dir,"NN_MEDIAN_CPA_ANG",["CDAW","CACTUS"],cpa_corr)
 plot_all_in_one(df,plot_dir,"NN_MEDIAN_WA",["CDAW"],wa_corr)
 plot_one_per_one(df,plot_dir,"NN_MEDIAN_CPA_ANG",["CDAW"],cpa_corr)

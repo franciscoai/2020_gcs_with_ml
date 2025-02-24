@@ -364,7 +364,6 @@ class neural_cme_segmentation():
             images = self.get_mask(images, hdr)
 
         #if np.mean(images[:,:,0]) == 0:
-        #    breakpoint()
         images = self.normalize(images,histogram_names=histogram_names,path=path,increase_contrast=increase_contrast) # normalize to 0,1
         
         oimages = images.copy()                                   
@@ -494,6 +493,7 @@ class neural_cme_segmentation():
 
         prop_list=[]
         for i in range(len(masks)):
+            
             if filter_halos:
                 box_center = np.array([boxes[i][0]+(boxes[i][2]-boxes[i][0])/2, boxes[i][1]+(boxes[i][3]-boxes[i][1])/2])
                 if centerpix is not None:
@@ -542,7 +542,7 @@ class neural_cme_segmentation():
                         apex_dist_percentile = np.percentile(distance, 98) 
                         apex_dist_per = [d * plate_scl for d,a in zip(distance,angulos) if d >= apex_dist_percentile and d<=apex_dist_percentile+0.5]
                         apex_angl_per = [a for d,a in zip(distance,angulos) if d >= apex_dist_percentile and d<=apex_dist_percentile+0.5]
-                        #breakpoint()
+                
                         if filter_halos:
                             if wide_ang < self.max_wide_ang:
                                 prop_list.append([i,float(scores[i]),cpa_ang, wide_ang, apex_dist, apex_angl, aw_min, aw_max, area_score,apex_dist_per,apex_angl_per])  
@@ -606,50 +606,81 @@ class neural_cme_segmentation():
 
 
 
-    def _plot_mask_prop2(self, df, opath, ending='_filtered', x_title='Date and hour', style='*', save=True,save_pickle=False):
+    def _plot_mask_prop2(self, df, opath, ending='_filtered', x_title='Date and hour', style='*', save=True,save_pickle=False, iou=False):
             '''
             plots the evolution of the cpa, aw and apex radius for all the masks found and the filtered ones
             dates: list of datetime objects with the date of each event
             param: 3d list with the mask properties for all masks found in each image. 
             Each maks's has the following prop: [id,float(scores[i]),cpa_ang, wide_ang, apex_dist]
             '''
+            iou_parameters=['MASK_ID', 'SCR','CPA', 'AW', 'APEX','AW_MAX','AW_MIN','APEX_ANGL','AREA_SCORE','APEX_DIST_PER','APEX_ANGL_PER']     
             parameters= ['CPA', 'MASK_ID', 'SCR', 'AW', 'APEX', 'CME_ID','AW_MAX','AW_MIN','APEX_ANGL','AREA_SCORE','APEX_DIST_PER','APEX_ANGL_PER']
             colors=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w'] 
-        
+
             df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"], format='%H:%M')
-            dict={}
-            #df["DATE_TIME"]=df["DATE_TIME"].dt.strftime('%H:%M')
-            optimal_n_clusters=int(df["CME_ID"].max())+1
-            for par in parameters:
-                fig, ax = plt.subplots()
-                dt_list=[]
-                for k in range(optimal_n_clusters):
-                    cluster_data=df.loc[(df["CME_ID"])==k]
-                    x_points=cluster_data["DATE_TIME"].tolist()
-                    y_points=cluster_data[par].tolist() 
+            if iou:
+                for idx, par in enumerate(iou_parameters):
+                    fig, ax = plt.subplots()
+                    dt_list=[]
+                    x_points=df["DATE_TIME"].tolist()
+                    y_points=df[par].tolist() 
                     y_title = par
                     dt_list.extend(x_points)
                     if par == 'APEX_DIST_PER' or par == 'APEX_ANGL_PER':
                         y_points_mean = [np.mean(i) for i in y_points]
-                        ax.plot(x_points, y_points_mean, style,color=colors[k])
+                        ax.plot(x_points, y_points_mean, style,color=colors[idx])
                     else:
-                        ax.plot(x_points, y_points, style,color=colors[k])
+                        ax.plot(x_points, y_points, style,color=colors[idx])
                 
-                hours = [str(timestamp.time()) for timestamp in dt_list]
-                hours1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in hours]
-                hours2 = [timestamp.strftime("%H:%M") for timestamp in hours1]
+                    hours = [str(timestamp.time()) for timestamp in dt_list]
+                    hours1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in hours]
+                    hours2 = [timestamp.strftime("%H:%M") for timestamp in hours1]
 
-                ax.set_title(y_title)    
-                ax.set_xlabel(x_title)
-                plt.xticks(dt_list,hours2,rotation=90)
-                plt.grid()
-                plt.tight_layout()
-                if save:
-                    os.makedirs(opath, exist_ok=True)
-                    fig.savefig(opath+'/'+str.lower(y_title)+ending+".png")
-                    plt.close()
-                else:
-                    return fig, ax 
+                    ax.set_title(y_title)    
+                    ax.set_xlabel(x_title)
+                    plt.xticks(dt_list,hours2,rotation=90)
+                    plt.grid()
+                    plt.tight_layout()
+                    if save:
+                        os.makedirs(opath, exist_ok=True)
+                        fig.savefig(opath+'/'+str.lower(y_title)+ending+".png")
+                        plt.close()
+                    else:
+                        return fig, ax   
+            else:
+                dict={}
+                #df["DATE_TIME"]=df["DATE_TIME"].dt.strftime('%H:%M')
+                optimal_n_clusters=int(df["CME_ID"].max())+1
+                for par in parameters:
+                    fig, ax = plt.subplots()
+                    dt_list=[]
+                    for k in range(optimal_n_clusters):
+                        cluster_data=df.loc[(df["CME_ID"])==k]
+                        x_points=cluster_data["DATE_TIME"].tolist()
+                        y_points=cluster_data[par].tolist() 
+                        y_title = par
+                        dt_list.extend(x_points)
+                        if par == 'APEX_DIST_PER' or par == 'APEX_ANGL_PER':
+                            y_points_mean = [np.mean(i) for i in y_points]
+                            ax.plot(x_points, y_points_mean, style,color=colors[k])
+                        else:
+                            ax.plot(x_points, y_points, style,color=colors[k])
+                    
+                    hours = [str(timestamp.time()) for timestamp in dt_list]
+                    hours1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in hours]
+                    hours2 = [timestamp.strftime("%H:%M") for timestamp in hours1]
+
+                    ax.set_title(y_title)    
+                    ax.set_xlabel(x_title)
+                    plt.xticks(dt_list,hours2,rotation=90)
+                    plt.grid()
+                    plt.tight_layout()
+                    if save:
+                        os.makedirs(opath, exist_ok=True)
+                        fig.savefig(opath+'/'+str.lower(y_title)+ending+".png")
+                        plt.close()
+                    else:
+                        return fig, ax 
                
             
             
@@ -792,7 +823,7 @@ class neural_cme_segmentation():
             if condition:
                 silhouette_avg = silhouette_score(data, km_labels)
                 silhouette_scores.append(silhouette_avg)
-
+        
         #gets the optimal amount of clusters
         if len(silhouette_scores)>0:
             optimal_n_clusters = n_clusters_range[np.argmax(silhouette_scores)]
@@ -828,12 +859,19 @@ class neural_cme_segmentation():
         dist=[]
         for k in range(optimal_n_clusters):
             filtered_df = df[df['CME_ID'] == k]
-            
             #filtering small events (less than 3 images per event with one cluster), we keep all the masks for this event
-            if (optimal_n_clusters==1) & (len(filtered_df["CME_ID"])<=3):
-                for i in range(len(filtered_df)):
-                    min_error.append(filtered_df.iloc[i])
+            if (optimal_n_clusters==1) & (len(filtered_df["CME_ID"])<3):
+                unique_dates = filtered_df["DATE_TIME"].unique()
+                #filtering cases with more than one mask per day per cluster, keeps one per cluster (the one with the minimal error)
+                for m in unique_dates:
+                    event = filtered_df[filtered_df['DATE_TIME'] == str(m)]
+                    frec_id = filtered_df["MASK_ID"].mode()[0]
+                    #keeps one mask per date, here the filtering includes the mask id and keeps the predominant id in the event
+                    filtered_mask = event.loc[event["MASK_ID"] == frec_id]
+                    if len(filtered_mask)>0:
+                        min_error.append(filtered_mask.iloc[0])
                 min_error_df = pd.DataFrame(min_error)
+                
             
             else:
                 x_points =np.array([i.timestamp() for i in filtered_df["DATE_TIME"]])
@@ -856,7 +894,7 @@ class neural_cme_segmentation():
                 axs[1].scatter(x_points, filtered_df["AW"], color=colors[k])
                 axs[2].scatter(x_points, filtered_df["APEX"], color=colors[k])    
 
-        if len(filtered_df["CME_ID"])>=3:        
+        if len(filtered_df["CME_ID"])>=3:   
             #filtering cases where all apex parabolas are negative
             parabola_criterion = [filter_criterion[v][0] for v in range(optimal_n_clusters)]
             count = all(valor is True for valor in parabola_criterion)
@@ -864,7 +902,16 @@ class neural_cme_segmentation():
                 velocity_criterion = [filter_criterion[v][1] for v in range(optimal_n_clusters)]
                 optimal_vel_idx = np.argmax(np.abs(velocity_criterion))
                 selected_cluster= df[df['CME_ID'] == optimal_vel_idx]
-                min_error_df = pd.DataFrame(selected_cluster)
+                unique_dates = selected_cluster["DATE_TIME"].unique()
+                #filtering cases with more than one mask per day per cluster, keeps one per cluster (the one with the minimal error)
+                for m in unique_dates:
+                    event = selected_cluster[selected_cluster['DATE_TIME'] == str(m)]
+                    frec_id = selected_cluster["MASK_ID"].mode()[0]
+                    #keeps one mask per date, here the filtering includes the mask id and keeps the predominant id in the event
+                    filtered_mask = event.loc[event["MASK_ID"] == frec_id]
+                    if len(filtered_mask)>0:
+                        min_error.append(filtered_mask.iloc[0])
+                        min_error_df = pd.DataFrame(min_error)
 
             #filtering cases where at least one apex parabola is positive 
             else:
@@ -886,59 +933,62 @@ class neural_cme_segmentation():
                         #filtering disperse masks according to cpa distance criterion 
                         filter_cpa = filtered_df.loc[filtered_df["CPA_DIST"]>MAX_CPA_DIST]
                         filtered_df = filtered_df[~filtered_df.isin(filter_cpa)].dropna()
-                        unique_dates = filtered_df["DATE_TIME"].unique()
-                        #filtering cases with more than one mask per day per cluster, keeps one per cluster (the one with the minimal error)
-                        for m in unique_dates:
-                            event = filtered_df[filtered_df['DATE_TIME'] == str(m)]
-                            filtered_mask = event.loc[event['ERROR'].idxmin()]
-                            min_error.append(filtered_mask)
-                            
+                        if len(filtered_df)>0:
+                            unique_dates = filtered_df["DATE_TIME"].unique()
+                            #filtering cases with more than one mask per day per cluster, keeps one per cluster (the one with the minimal error)
+                            for m in unique_dates:
+                                event = filtered_df[filtered_df['DATE_TIME'] == str(m)]
+                                filtered_mask = event.loc[event['ERROR'].idxmin()]
+                                min_error.append(filtered_mask)
+                        else:
+                            print("All masks droped due to cpa filtering criterion")    
         
                 min_error_df = pd.DataFrame(min_error)
         min_error_df = min_error_df.reset_index(drop=True)
-        
-        hours1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in hours]
-        hours2 = [timestamp.strftime("%H:%M") for timestamp in hours1]
-        axs[0].set_xticks(dt_list,hours2,rotation=45)
-        axs[1].set_xticks(dt_list,hours2,rotation=45)
-        axs[2].set_xticks(dt_list,hours2,rotation=45)
-        axs[0].grid()
-        axs[1].grid()
-        axs[2].grid()
-        axs[0].set_title("CPA")
-        axs[1].set_title("AW")
-        axs[2].set_title("APEX")
-        plt.tight_layout()
-        fig.savefig(opath+"/fitted_data.png")
-        #ploting filtered data
-        min_error_df['CME_ID'] = min_error_df['CME_ID'].astype(int)
-        clusters = min_error_df['CME_ID'].unique()
-        fig2,ax= plt.subplots(1,3, figsize=(12, 4))
-        x_ax=[]
-        time=[]
-        for l in clusters:
-            filtered_event=min_error_df[min_error_df['CME_ID'] == l]
-            x=np.array([i.timestamp() for i in filtered_event["DATE_TIME"]])
-            x_ax.extend(x)
-            time.extend([str(i.time()) for i in filtered_event["DATE_TIME"]])
-            ax[0].scatter(x, filtered_event["CPA"], color=colors[l])
-            ax[1].scatter(x, filtered_event["AW"], color=colors[l])
-            ax[2].scatter(x, filtered_event["APEX"], color=colors[l])
-        time1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in time]
-        time2 = [timestamp.strftime("%H:%M") for timestamp in time1]
-        ax[0].set_xticks(x_ax,time2,rotation=45)
-        ax[1].set_xticks(x_ax,time2,rotation=45)
-        ax[2].set_xticks(x_ax,time2,rotation=45)
-        ax[0].grid()
-        ax[1].grid()
-        ax[2].grid()
-        ax[0].set_title("CPA")
-        ax[1].set_title("AW")
-        ax[2].set_title("APEX")
+        if len(min_error_df)>0:
+            hours1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in hours]
+            hours2 = [timestamp.strftime("%H:%M") for timestamp in hours1]
+            axs[0].set_xticks(dt_list,hours2,rotation=45)
+            axs[1].set_xticks(dt_list,hours2,rotation=45)
+            axs[2].set_xticks(dt_list,hours2,rotation=45)
+            axs[0].grid()
+            axs[1].grid()
+            axs[2].grid()
+            axs[0].set_title("CPA")
+            axs[1].set_title("AW")
+            axs[2].set_title("APEX")
+            plt.tight_layout()
+            fig.savefig(opath+"/fitted_data.png")
+            
+            #ploting filtered data
+            min_error_df['CME_ID'] = min_error_df['CME_ID'].astype(int)
+            clusters = min_error_df['CME_ID'].unique()
+            fig2,ax= plt.subplots(1,3, figsize=(12, 4))
+            x_ax=[]
+            time=[]
+            for l in clusters:
+                filtered_event=min_error_df[min_error_df['CME_ID'] == l]
+                x=np.array([i.timestamp() for i in filtered_event["DATE_TIME"]])
+                x_ax.extend(x)
+                time.extend([str(i.time()) for i in filtered_event["DATE_TIME"]])
+                ax[0].scatter(x, filtered_event["CPA"], color=colors[l])
+                ax[1].scatter(x, filtered_event["AW"], color=colors[l])
+                ax[2].scatter(x, filtered_event["APEX"], color=colors[l])
+            time1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in time]
+            time2 = [timestamp.strftime("%H:%M") for timestamp in time1]
+            ax[0].set_xticks(x_ax,time2,rotation=45)
+            ax[1].set_xticks(x_ax,time2,rotation=45)
+            ax[2].set_xticks(x_ax,time2,rotation=45)
+            ax[0].grid()
+            ax[1].grid()
+            ax[2].grid()
+            ax[0].set_title("CPA")
+            ax[1].set_title("AW")
+            ax[2].set_title("APEX")
 
-        plt.tight_layout()
-        fig2.savefig(opath+"/filtered_fitted_data.png")
-        plt.close() 
+            plt.tight_layout()
+            fig2.savefig(opath+"/filtered_fitted_data.png")
+            plt.close() 
         return min_error_df
         
 
@@ -1084,6 +1134,138 @@ class neural_cme_segmentation():
         
         return all_dates,all_masks, all_scores, all_lbl, all_boxes,all_mask_prop
         
+
+
+    def _intersection(self, dates, masks, scores, labels, boxes, mask_prop,plate_scl,opath,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS):
+        data=[]
+        for i in range(len(dates)):
+            for j in range(len(masks[i])):
+                mask_id=mask_prop[i][j][0]
+                scr=mask_prop[i][j][1]
+                cpa = mask_prop[i][j][2]
+                wa=mask_prop[i][j][3]
+                date= dates[i]
+                label=labels[i][j]
+                box=boxes[i][j]
+                mask=masks[i][j]
+                apex = mask_prop[i][j][4]  #apex in same Units as calculated in compute_mask_prop (based on plate_scl)
+                apex_angl = mask_prop[i][j][5]
+                aw_min    = mask_prop[i][j][6]
+                aw_max    = mask_prop[i][j][7]
+                area_score= mask_prop[i][j][8]
+                apex_dist_per = mask_prop[i][j][9]
+                apex_angl_per = mask_prop[i][j][10]
+                data.append((date,mask_id,scr,cpa,wa,apex,label,box,mask,apex_angl,aw_min,aw_max,area_score,apex_dist_per,apex_angl_per))
+        df = pd.DataFrame(data, columns=["DATE_TIME","MASK_ID","SCR","CPA","AW","APEX","LABEL","BOX","MASK","APEX_ANGL","AW_MIN","AW_MAX", "AREA_SCORE","APEX_DIST_PER","APEX_ANGL_PER"])
+        unique_dates=df["DATE_TIME"].unique()
+        df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"])
+
+        
+        results_df = pd.DataFrame()  
+        for date in range(len(unique_dates) - 1):  
+            event1 = df.loc[df["DATE_TIME"] == unique_dates[date]]
+            event2 = df.loc[df["DATE_TIME"] == unique_dates[date + 1]]
+            
+            # Crear nombres dinámicos para las columnas de máscara de eventos
+            event1_col = f"EVENT_{date}"
+            event2_col = f"EVENT_{date + 1}"
+            iou_col=f"IOU_{date}_{date + 1}"
+            # Crear una lista temporal para almacenar resultados de esta fecha
+            temp_results = []
+
+            for s in range(len(event1)):
+                mask1 = event1.iloc[s]["MASK"]
+                maskid1 = event1.iloc[s]["MASK_ID"]  # Suponiendo que 'MASKID' es el ID del evento en 'event1'
+
+                for r in range(len(event2)):
+                    mask2 = event2.iloc[r]["MASK"]
+                    maskid2 = event2.iloc[r]["MASK_ID"]  # Suponiendo que 'MASKID' es el ID del evento en 'event2'
+
+                    # Calcular la intersección y la unión
+                    intersection = np.logical_and(mask1, mask2).sum()
+                    union = np.logical_or(mask1, mask2).sum()
+                    iou = intersection / union if union > 0 else 0
+
+                    # Añadir los resultados en la lista temporal
+                    temp_results.append({
+                        event1_col: maskid1,
+                        event2_col: maskid2,
+                        iou_col: iou
+                    })
+            
+            # Convertir la lista temporal en un DataFrame y añadirlo a results_df
+            temp_df = pd.DataFrame(temp_results)
+            results_df = pd.concat([results_df, temp_df], ignore_index=True)
+        print(results_df)
+
+
+
+
+        # dt_event1= df.loc[df["DATE_TIME"]==unique_dates[0]]
+        # dt_event2=df.loc[df["DATE_TIME"]==unique_dates[1]]
+        
+        #intersections = []
+
+        # for i in range(len(dt_event1)):
+        #     for j in range(len(dt_event2)):
+        #         # Extraer máscaras y otros datos necesarios
+        #         mask1 = dt_event1.iloc[i]["MASK"]
+        #         mask2 = dt_event2.iloc[j]["MASK"]
+        #         mask_id1 = dt_event1.iloc[i]["MASK_ID"]
+        #         mask_id2 = dt_event2.iloc[j]["MASK_ID"]
+        #         date_time1 = dt_event1.iloc[i]["DATE_TIME"]
+        #         date_time2 = dt_event2.iloc[j]["DATE_TIME"]
+
+        #         # Calcular intersección y unión
+        #         intersection = np.logical_and(mask1, mask2).sum()
+        #         union = np.logical_or(mask1, mask2).sum()
+        #         iou = intersection / union if union > 0 else 0
+
+        #         # Agregar los datos a la lista
+        #         intersections.append({
+        #             "DATE_TIME_EVENTO1": date_time1,
+        #             "DATE_TIME_EVENTO2": date_time2,
+        #             "MASK_ID_EVENTO1": mask_id1,
+        #             "MASK_ID_EVENTO2": mask_id2,
+        #             "INTERSECCION": intersection,
+        #             "IoU": iou
+        #         })
+        # interseccion = pd.DataFrame(intersections)
+        # # looks for IoU max
+        # max_iou_row = interseccion.loc[interseccion["IoU"].idxmax()]
+        # event1_info = dt_event1.loc[dt_event1["MASK_ID"] == max_iou_row["MASK_ID_EVENTO1"]]
+        # event2_info = dt_event2.loc[dt_event2["MASK_ID"] == max_iou_row["MASK_ID_EVENTO2"]]
+        # full_event = pd.concat([event1_info, event2_info])
+
+        # for k in range(2,len(unique_dates)):
+        #     intersections = []
+        #     dt_event3=df.loc[df["DATE_TIME"]==unique_dates[k]]
+        #     for j in range(len(dt_event3)):
+        #         mask1 = full_event.iloc[-1]["MASK"]
+        #         mask3 = dt_event3.iloc[j]["MASK"]
+        #         mask_id3 = dt_event3.iloc[j]["MASK_ID"]
+        #         date_time3 = dt_event3.iloc[j]["DATE_TIME"]
+
+        #         # Calcular intersección y unión
+        #         intersection = np.logical_and(mask1, mask3).sum()
+        #         union = np.logical_or(mask1, mask3).sum()
+        #         iou = intersection / union if union > 0 else 0
+
+        #         # Agregar los datos a la lista
+        #         intersections.append({
+        #             "DATE_TIME_EVENTO3": date_time2,
+        #             "MASK_ID_EVENTO3": mask_id2,
+        #             "INTERSECCION": intersection,
+        #             "IoU": iou
+        #         })
+        #     interseccion = pd.DataFrame(intersections)
+        #     # Buscar el IoU máximo
+        #     max_iou_row = interseccion.loc[interseccion["IoU"].idxmax()]
+        #     event3_info = dt_event3.loc[dt_event3["MASK_ID"] == max_iou_row["MASK_ID_EVENTO3"]]
+        #     full_event = pd.concat([full_event, event3_info])
+
+        # return full_event
+
     def infer_event2(self, imgs, dates, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None,occulter_size_ext=None,
                     centerpix=None, mask_threshold=None, scr_threshold=None, plot_params=None, filter_halos=True,modified_masks=None,
                     percentiles=[5,95],increase_contrast=None):
@@ -1107,6 +1289,7 @@ class neural_cme_segmentation():
         returns the filtered original images and a dataframe with the parameters of the CME including the CME ID.  
         
         '''
+
         MAX_CPA_DIST=np.radians(30) #max disctance between a point and the cpa median in one cluster
         MIN_CLUSTER_POINTS=5 # minimum amount of points in every cluster
         MIN_CPA_DIFF = 0.35 # minimal difference between two posible CMEs in radians
@@ -1158,7 +1341,6 @@ class neural_cme_segmentation():
             in_imgs = data["OK_ORIG_IMG"].copy()
             all_orig_img = data["OK_ORIG_IMG"].copy()
             dates = data["OK_DATES"]
-            #breakpoint()
 
         for i in range(len(in_imgs)):
             if modified_masks is None:
@@ -1167,7 +1349,6 @@ class neural_cme_segmentation():
                                                             occulter_size=in_occulter_size[i],occulter_size_ext=in_occulter_size_ext[i],
                                                             centerpix=in_centerpix[i],increase_contrast=increase_contrast)
                 all_orig_img.append(orig_img)
-                #print(i,dates[i])
 
             if modified_masks is not None:
                 #Usefull in case of using modified masks in real images. Ask D. Lloveras.
@@ -1178,6 +1359,7 @@ class neural_cme_segmentation():
                 #print(i,dates[i])
             # compute cpa, aw and apex. Already filters by score and other aspects
             self.debug_flag = i
+
             mask_prop = self._compute_mask_prop(mask, score, lbl, box, plate_scl=in_plate_scl[i], 
                                                 filter_halos=filter_halos, occulter_size=in_occulter_size[i],centerpix=in_centerpix[i],percentiles=percentiles)
             
@@ -1199,30 +1381,44 @@ class neural_cme_segmentation():
         if len(all_masks)>=2:
             # keeps only one mask per img based on cpa, aw and apex radius evolution consistency
             if filter:
+                # iou_df = self._intersection(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,
+                #                         all_plate_scl,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS)
+                # if len(iou_df)>0:      
+                #     if plot_params is not None:
+                #         self._plot_mask_prop2(iou_df, self.plot_params , ending='_filtered_iou',save_pickle=True, iou=True)
+
+                    
                 df = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,
                                         all_plate_scl,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS)
-                # plot parameters
-                if plot_params is not None:
-                    self._plot_mask_prop2(df, self.plot_params , ending='_filtered',save_pickle=True)
-                #ok_dates=sorted(df['DATE_TIME'].unique())
-                ok_dates=df['DATE_TIME'].unique() 
-                #no aplico un sort ya que al hacerlo puede que el index del df no coincida con el de all_orig_img. Creo que es mas robusto asi.
-                #En realidad era necesario xq se mete un reset index al df en filter_masks2.
-                for m in ok_dates:
-                    event = df[df['DATE_TIME'] == m]
-                    if event["MASK"].isnull().all():
-                        idx = dates.index(m)
-                        all_orig_img.pop(idx)
 
-                all_idx=[]
-                for date in dates:
-                    if date not in ok_dates:
-                        idx = dates.index(date)
-                        all_idx.append(idx) #sin esta linea el for no cummple ningun roll, ni la linea posterior
-                all_orig_img = [elemento for s, elemento in enumerate(all_orig_img) if s not in all_idx]      
-                df = df.dropna(subset=['MASK']) 
-                return all_orig_img,ok_dates, df
-        return  all_orig_img, all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop
+                if len(df)>0:                        
+                    # plot parameters
+                    if plot_params is not None:
+                        self._plot_mask_prop2(df, self.plot_params , ending='_filtered',save_pickle=True)
+                    #ok_dates=sorted(df['DATE_TIME'].unique())
+                    ok_dates=df['DATE_TIME'].unique() 
+                    #no aplico un sort ya que al hacerlo puede que el index del df no coincida con el de all_orig_img. Creo que es mas robusto asi.
+                    #En realidad era necesario xq se mete un reset index al df en filter_masks2.
+                    for m in ok_dates:
+                        event = df[df['DATE_TIME'] == m]
+                        if event["MASK"].isnull().all():
+                            idx = dates.index(m)
+                            all_orig_img.pop(idx)
+
+                    all_idx=[]
+                    for date in dates:
+                        if date not in ok_dates:
+                            idx = dates.index(date)
+                            all_idx.append(idx) #sin esta linea el for no cummple ningun roll, ni la linea posterior
+                    all_orig_img = [elemento for s, elemento in enumerate(all_orig_img) if s not in all_idx]      
+                    df = df.dropna(subset=['MASK']) 
+                    return all_orig_img,ok_dates, df
+                else:#que pasa si no cumple los criterios de filtrado? que quieren devolver?
+                    return  all_orig_img, all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop
+            else:#que pasa si filter es false?que quieren devolver?
+                return  all_orig_img, all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop
+        else:
+            return  all_orig_img, all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop
                         
 
 
