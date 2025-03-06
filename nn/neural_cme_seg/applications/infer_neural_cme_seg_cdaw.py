@@ -169,6 +169,7 @@ lasco_path='/gehme/data/soho/lasco/level_05/'
 cdaw_catalogue='/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications/cdaw_catalogue/'
 
 level = 'L1' # fits reduction level
+sat='lasco'
 filter_pol_images = True
 exclude_mult=False
 exclude_poor_events=True
@@ -183,15 +184,15 @@ occ_center=[[256,256]]
 smooth_kernel=[2,2] #changes the gaussian filter size
 MAX_TIME_DIFF= timedelta(minutes=15)
 MAX_TIME_DIFF_IMAGE_L1=timedelta(minutes=60)
-sat='lasco'
+
 
 
 #nn model parameters
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
-model_version="v5"
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
+model_version="v4"
 opath= model_path + "/infer_neural_cme_seg_kincat_"+level+"/"+sat
 file_ext=".fits"
-trained_model = '49.torch'
+trained_model = '9999.torch'
 mask_threshold = 0.6 # value to consider a pixel belongs to the object
 scr_threshold = 0.25 # only detections with score larger than this value are considered
 
@@ -203,7 +204,6 @@ os.makedirs(opath, exist_ok=True)
 results = []
 
 #loads nn model
-
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 
 # Create the output directory
@@ -212,7 +212,6 @@ os.makedirs(odir, exist_ok=True)
 
 #gets catalogues
 found_events, cdaw_full  = get_cdaw(cdaw_repo,lasco_path, cdaw_catalogue)
-
 if exclude_poor_events:
     cdaw_full['QUALITY_INDEX'] = cdaw_full['QUALITY_INDEX'].str.extract(r'(\d+)').astype(int)
     cdaw_full=cdaw_full.loc[cdaw_full['QUALITY_INDEX']>quality_idx]
@@ -250,7 +249,7 @@ yht_files=cdaw_full["FOLDER_NAME"].unique()
 #cdaw_unique_values = cdaw_full[cdaw_full["FOLDER_NAME"].isin(yht_files)].drop_duplicates(subset="FOLDER_NAME", keep="first")
 
 # Process the lasco data
-for i in tqdm(range(len(yht_files)), desc="Processing lasco data"):
+for i in tqdm(range(3200,len(yht_files)), desc="Processing lasco data"):
     #if yht_files[i]=="20021110.083005.w068n.v0290.p097s.yht":
     all_images=[]
     all_dates=[]
@@ -312,9 +311,7 @@ for i in tqdm(range(len(yht_files)), desc="Processing lasco data"):
                         # if not os.path.exists(final_path):
                         #     os.makedirs(final_path)
                         if not os.path.exists(props_path):
-                             os.makedirs(props_path)
-                        
-                        
+                            os.makedirs(props_path)
                         
                         all_center.append(occ_center[0])
                         all_plate_scl.append(plt_scl)                    
@@ -326,7 +323,6 @@ for i in tqdm(range(len(yht_files)), desc="Processing lasco data"):
                         all_ofiles.append(ofile)
             
         if len(all_images)>=2:
-            
             data_list =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=props_path)
             if len(data_list)==3:
                 ok_orig_img,ok_dates,df =data_list
@@ -379,7 +375,7 @@ for i in tqdm(range(len(yht_files)), desc="Processing lasco data"):
 
                 else:
                     print("WARNING: COULD NOT PROCESS EVENT "+ str(date)+", LESS THAN TWO IMAGES IN THE EVENT")
-        
+            
 directory= model_path+"/"+"infer_neural_cme_seg_kincat_L1/lasco"
 elements = os.listdir(directory)
 for element in elements:
