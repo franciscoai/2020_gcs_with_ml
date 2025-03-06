@@ -414,7 +414,7 @@ class neural_cme_segmentation():
         # compute loss for all masks
         all_loss = []
         for i in range(len(all_masks)):
-            msk = all_masks[i]
+            msk = all_masks[i].copy() #This is mandatory to avoid changing the original mask!!!!!!!
             msk[msk > self.mask_threshold] = 1
             msk[msk <= self.mask_threshold] = 0
             all_loss.append(np.sum(np.abs(msk - target))/np.sum(target))

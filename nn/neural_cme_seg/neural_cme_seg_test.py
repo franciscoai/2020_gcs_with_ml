@@ -71,15 +71,15 @@ testDir =  '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240912/'
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
 test_cases_file = model_path+"/validation_cases.csv"
 model_version="v5"
-opath= model_path+"/test_output"
+opath= model_path+"/test_output_diego"
 file_ext=".png"
-trained_model = '22.torch'
+trained_model = '49.torch'
 imageSize=[512,512]
-test_ncases = 100
+test_ncases = 10
 mask_thresholds = [0.7] #[0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99] # only px with scrore avobe this value are considered in the mask.
-gpu=1# GPU to use
+gpu=0# GPU to use
 masks2use=[2] # index of the masks to read (should be the CME mask)
-
+breakpoint()
 #main
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
@@ -117,6 +117,8 @@ for mask_threshold in mask_thresholds:
             breakpoint()
         # makes inference and returns only the mask with smallest loss
         img, masks, scores, labels, boxes, loss  = nn_seg.test_mask(images, vesMask, mask_threshold=mask_threshold)
+        breakpoint()
+
         if masks is not None:
             this_case_loss.append(loss) 
             this_case_scr.append(scores)

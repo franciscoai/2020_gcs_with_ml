@@ -1,0 +1,450 @@
+
+import random
+import numpy as np
+import torch.utils.data
+import cv2
+import torch
+import os
+import matplotlib.pyplot as plt
+from PIL import Image
+import matplotlib as mpl
+from astropy.io import fits
+mpl.use('Agg')
+import sys
+from neural_cme_seg import neural_cme_segmentation
+import matplotlib.gridspec as gridspec
+
+def calculate_gradients(image):
+    """
+    Calculates the gradients (Sobel operator) of intensity in a 2D intensity image.
+    Args:
+    image: A 2D NumPy array representing the intensity image.
+    Returns:
+    A tuple containing two NumPy arrays:
+        - gx: Gradients in the x-direction (horizontal).
+        - gy: Gradients in the y-direction (vertical).
+    """
+    kernel_size = (5, 5)
+    sigma = 1
+    blurred_image = cv2.GaussianBlur(image, kernel_size, sigma)
+
+    # Sobel filter kernels
+    sobel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+    sobel_y = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
+
+    # Pad the image for edge handling (optional)
+    # padded_image = np.pad(image, (1, 1), mode='edge')
+
+    # Calculate gradients using convolution
+    gx = cv2.filter2D(blurred_image, -1, sobel_x, borderType=cv2.BORDER_REPLICATE)
+    gy = cv2.filter2D(blurred_image, -1, sobel_y, borderType=cv2.BORDER_REPLICATE)
+    
+    # You can calculate the magnitude and direction of the gradient:
+    gxx = np.where(np.isnan(gx), 0, gx)
+    gyy = np.where(np.isnan(gy), 0, gy)
+    magnitude = np.sqrt(gxx**2 + gyy**2)
+    direction = np.arctan2(gyy, gxx) * 180 / np.pi
+
+    return gx, gy,magnitude, direction
+
+def calculate_metrics(mask1, mask2):
+    """
+    Calculates precision, recall, dice coefficient, and intersection over union (IoU) 
+    between two binary masks.
+
+    Args:
+        mask1: The first binary mask (numpy array).
+        mask2: The second binary mask (numpy array). Ground truth mask.
+    """
+
+    # Flatten the masks for efficient calculations
+    mask1_flat = mask1#.flatten()
+    mask2_flat = mask2#.flatten()
+
+    # Calculate true positives (TP), true negatives (TN), false positives (FP), and false negatives (FN)
+    TP = np.sum(np.logical_and(mask1_flat, mask2_flat))
+    FP = np.sum(np.logical_and(mask1_flat, np.logical_not(mask2_flat)))
+    FN = np.sum(np.logical_and(np.logical_not(mask1_flat), mask2_flat))
+    TN = np.sum(np.logical_and(np.logical_not(mask1_flat), np.logical_not(mask2_flat)))
+
+    # Calculate precision, recall, dice coefficient, and IoU
+    precision = TP / (TP + FP) if TP + FP > 0 else 0
+    recall = TP / (TP + FN) if TP + FN > 0 else 0
+    dice = (2 * TP) / (2 * TP + FP + FN) if 2 * TP + FP + FN > 0 else 0
+    iou = TP / (TP + FP + FN) if TP + FP + FN > 0 else 0
+
+    return precision, recall, dice, iou
+
+def best_mask_treshold(masks, orig_img, vesMask, mask_thresholds_list=np.arange(0.2, 0.95, 0.05).tolist()):
+    #nans = np.full(np.shape(orig_img[0]), np.nan)
+    zero = np.full(np.shape(orig_img[0]), 0)
+    iou_list = []
+    dice_list = []
+    prec_list = []
+    rec_list = []
+    
+    for mask_thresholds in mask_thresholds_list:
+        masked = zero.copy()
+        #masked[vesMask > 0] = 1
+        masked[:, :][masks > mask_thresholds] = 1
+        #intersection = np.logical_and(masked, vesMask)
+        #union = np.logical_or(masked, vesMask)
+        #iou_score = np.sum(intersection) / np.sum(union)
+        precision, recall, dice, iou = calculate_metrics(vesMask, masked)
+        dice_list.append(dice)
+        prec_list.append(precision)
+        rec_list.append(recall)
+        iou_list.append(iou)
+        
+
+    best_mask_threshold_iou  = mask_thresholds_list[np.argmax(iou_list)]
+    max_iou = np.max(iou_list)
+    best_mask_threshold_dice = mask_thresholds_list[np.argmax(dice_list)]
+    max_dice = np.max(dice_list)
+    best_mask_threshold_prec = mask_thresholds_list[np.argmax(prec_list)]
+    max_prec = np.max(prec_list)
+    best_mask_threshold_rec  = mask_thresholds_list[np.argmax(rec_list)]
+    max_rec = np.max(rec_list)
+    
+    return best_mask_threshold_iou, best_mask_threshold_dice, best_mask_threshold_prec, best_mask_threshold_rec, max_iou, max_dice, max_prec, max_rec
+
+def image_to_polar(image):
+    """
+    Converts a square image to polar coordinates.
+    """
+    # Get image dimensions
+    height, width = image.shape
+    # Calculate center of the image
+    center_x = width // 2 #definir con crpix1 y2
+    center_y = height // 2
+    # Create meshgrid for x and y coordinates
+    x, y = np.meshgrid(np.arange(width) - center_x, np.arange(height) - center_y)
+    # Calculate radius and angle
+    r = np.sqrt(x**2 + y**2)
+    theta = np.arctan2(y, x)
+    # Create polar image
+    polar_image = np.zeros_like(image)
+    for i in range(height):
+        for j in range(width):
+            r_index = int(r[i, j])
+            theta_index = int(theta[i, j] * (width / (2 * np.pi)))
+            polar_image[r_index, theta_index] = image[i, j]
+    #polar_image[r>280] =1
+    #polar_image[r<60 ] =1 #definir con los valores reales del oculter.
+    #polar_image = np.fliplr(polar_image)
+    polar_image = polar_image[50:280, :]
+    polar_image = np.flip(polar_image, (0, 1))
+    return polar_image
+
+
+def plot_to_png2(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_threshold=0.3 , title=None, 
+                labels=None, boxes=None, scores=None, version='v4'):
+    """
+    Plot the input images (orig_img) along with the infered masks, labels and scores
+    in a single image saved to ofile
+    """    
+    # only detections with score larger than this value are considered
+    color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
+    if version=='v4':
+        obj_labels = ['Back', 'Occ','CME','N/A']
+    elif version=='v5':
+        obj_labels = ['Back', 'CME']
+    else:
+        print(f'ERROR. Version {version} not supported')
+        sys.exit()
+    #        
+    cmap = mpl.colors.ListedColormap(color)  
+    nans = np.full(np.shape(orig_img[0]), np.nan)
+    
+    fig = plt.figure(figsize=(30, 20))
+    gs0 = gridspec.GridSpec(2, 3, figure=fig)
+    gs00 = gridspec.GridSpecFromSubplotSpec(4, 4, subplot_spec=gs0[0])
+    gs01 = gs0[1].subgridspec(4, 4)
+    gs02 = gs0[2].subgridspec(4, 4)
+    ax1 = fig.add_subplot(gs00[:, :])
+    ax2 = fig.add_subplot(gs01[:, :])
+    ax3 = fig.add_subplot(gs02[:-2, :])
+    ax4 = fig.add_subplot(gs02[-2:, :])
+    gs03 = gs0[3].subgridspec(4, 4)
+    gs04 = gs0[4].subgridspec(4, 4)
+    gs05 = gs0[5].subgridspec(4, 4)
+    ax5 = fig.add_subplot(gs03[:, :])
+    ax6 = fig.add_subplot(gs04[:, :])
+    ax7 = fig.add_subplot(gs05[:, :])
+    #fig, axs = plt.subplots(1, len(orig_img)*3, figsize=(30, 10))
+    #axs = axs.ravel()
+    for i in range(len(orig_img)):
+        ax1.imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
+        ax1.axis('off')
+        ax2.imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
+        ax2.axis('off')        
+        #add true mask
+        masked = nans.copy()
+        masked[true_mask[i] > 0] = 3 
+        ax2.imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=4)
+        if boxes is not None:
+            nb = 0
+            for b in boxes[i]:
+                if scores is not None:
+                    scr = scores[i][nb]
+                else:
+                    scr = 0   
+                if scr > scr_threshold:             
+                    best_iou, best_dice, best_prec, best_rec,max_iou, max_dice, max_prec, max_rec = best_mask_treshold(masks[i][nb], orig_img, true_mask[i])                    
+                    masked = nans.copy()
+                    #masked[:, :][masks[i][nb] > mask_threshold] = nb
+                    masked[:, :][masks[i][nb] > best_iou] = nb
+                    ax2.imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
+                    box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
+                    ax2.add_patch(box)
+                    if labels is not None:
+                        ax2.annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
+                    #calculate metrics
+                    #add iou_score as an annotation in the image
+                    ax2.annotate('IoU : '+'{:.2f}'.format(best_iou) ,xy=[10,20], fontsize=30, color=color[nb])
+                    ax2.annotate(''+'{:.2f}'.format(max_iou)        ,xy=[150,20], fontsize=30, color=color[nb])
+                    ax2.annotate('Dice: '+'{:.2f}'.format(best_dice),xy=[10,50], fontsize=30, color=color[nb])
+                    ax2.annotate(''+'{:.2f}'.format(max_dice)       ,xy=[150,50], fontsize=30, color=color[nb])
+                    ax2.annotate('Prec: '+'{:.2f}'.format(best_prec),xy=[10,80], fontsize=30, color=color[nb])
+                    ax2.annotate(''+'{:.2f}'.format(max_prec)       ,xy=[150,80], fontsize=30, color=color[nb])
+                    ax2.annotate('Rec : '+'{:.2f}'.format(best_rec) ,xy=[10,110], fontsize=30, color=color[nb])
+                    ax2.annotate(''+'{:.2f}'.format(max_rec)        ,xy=[150,110], fontsize=30, color=color[nb])
+                    #convert x,y image coordinates into r,theta coordinates
+                    polar_image = image_to_polar(orig_img[i])
+                    #plot image in r, theta
+                    #ax2.imshow(masked_polar, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1)
+                    ax3.imshow(polar_image, vmin=0, vmax=1, cmap='gray')        
+                    ax3.axis('off')
+                    #convert masked with the treshold into polar coordinates. then plot a countour of the masked image in ax3
+                    masked_polar = nans.copy()
+                    polar_masked = image_to_polar(masks[i][nb])
+                    ax3.contour(polar_masked, levels=[best_iou], colors='r')
+                    #in ax4 plot an histogram of  the image between the a box of the mask
+                    zero = np.full(np.shape(orig_img[0]), 0)
+                    zero[round(b[0]):round(b[2]), round(b[1]):round(b[3])] = 1
+                    data_for_histo = zero * orig_img[i]
+                    #breakpoint()
+                    #from data_for_histo remove the zeros
+                    data_for_histo = data_for_histo[data_for_histo != 0]
+                    ax4.hist(data_for_histo.flatten(), bins=50)
+                    ax4.set_title('Histogram of the image inside the bounding box, non zero values')
+                    gx, gy, magn, direc = calculate_gradients(orig_img[i])
+                    ax5.imshow(gx, cmap='gray')
+                    ax5.contour(masks[i][nb], levels=[best_iou], colors='r', alpha=0.4)
+                    ax5.axis('off')
+                    ax5.set_title('Gradient in x')
+                    #ax6.imshow(gy, cmap='gray')
+                    ax6.imshow(magn, cmap='gray')
+                    #ax6.contour(masks[i][nb], levels=[best_iou], colors='r', alpha=0.7)
+                    ax6.axis('off')
+                    ax6.set_title('Magnitude of the gradient')
+                    ax6.set_title('Gradient in y')
+                    ax7.imshow(magn, cmap='gray')
+                    ax7.contour(masks[i][nb], levels=[best_iou], colors='r', alpha=0.5)
+                    ax7.axis('off')
+                    ax7.set_title('Magnitude of the gradient')
+                nb+=1
+
+    plt.tight_layout()
+    plt.savefig(ofile)
+    plt.close()
+
+
+def plot_to_png(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_threshold=0.3 , title=None, 
+                labels=None, boxes=None, scores=None, version='v4'):
+    """
+    Plot the input images (orig_img) along with the infered masks, labels and scores
+    in a single image saved to ofile
+    """    
+    # only detections with score larger than this value are considered
+    color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
+    if version=='v4':
+        obj_labels = ['Back', 'Occ','CME','N/A']
+    elif version=='v5':
+        obj_labels = ['Back', 'CME']
+    else:
+        print(f'ERROR. Version {version} not supported')
+        sys.exit()
+    #        
+    cmap = mpl.colors.ListedColormap(color)  
+    nans = np.full(np.shape(orig_img[0]), np.nan)
+    #fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
+    fig, axs = plt.subplots(1, len(orig_img)*3, figsize=(30, 10))
+    axs = axs.ravel()
+    for i in range(len(orig_img)):
+        axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
+        axs[i].axis('off')
+        axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
+        axs[i+1].axis('off')        
+        #add true mask
+        masked = nans.copy()
+        masked[true_mask[i] > 0] = 3 
+        axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=4)
+        if boxes is not None:
+            nb = 0
+            for b in boxes[i]:
+                if scores is not None:
+                    scr = scores[i][nb]
+                else:
+                    scr = 0   
+                if scr > scr_threshold:             
+                    masked = nans.copy()
+                    masked[:, :][masks[i][nb] > mask_threshold] = nb              
+                    axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
+                    box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
+                    axs[i+1].add_patch(box)
+                    if labels is not None:
+                        axs[i+1].annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
+                    #calculate metrics
+                    
+                    best_iou, best_dice, best_prec, best_rec,max_iou, max_dice, max_prec, max_rec = best_mask_treshold(masks[i][nb], orig_img, true_mask[i])
+                    
+                    #add iou_score as an annotation in the image
+                    axs[i+1].annotate('IoU : '+'{:.2f}'.format(best_iou) ,xy=[10,20], fontsize=30, color=color[nb])
+                    axs[i+1].annotate(''+'{:.2f}'.format(max_iou)        ,xy=[150,20], fontsize=30, color=color[nb])
+                    axs[i+1].annotate('Dice: '+'{:.2f}'.format(best_dice),xy=[10,50], fontsize=30, color=color[nb])
+                    axs[i+1].annotate(''+'{:.2f}'.format(max_dice)       ,xy=[150,50], fontsize=30, color=color[nb])
+                    axs[i+1].annotate('Prec: '+'{:.2f}'.format(best_prec),xy=[10,80], fontsize=30, color=color[nb])
+                    axs[i+1].annotate(''+'{:.2f}'.format(max_prec)       ,xy=[150,80], fontsize=30, color=color[nb])
+                    axs[i+1].annotate('Rec : '+'{:.2f}'.format(best_rec) ,xy=[10,110], fontsize=30, color=color[nb])
+                    axs[i+1].annotate(''+'{:.2f}'.format(max_rec)        ,xy=[150,110], fontsize=30, color=color[nb])
+                    #convert x,y image coordinates into r,theta coordinates
+                    polar_image = image_to_polar(orig_img[i])
+                    #plot image in r, theta
+                    axs[i+2].imshow(polar_image, vmin=0, vmax=1, cmap='gray')        
+                    axs[i+2].axis('off')
+                nb+=1
+    # axs[0].set_title(f'Cor A: {len(boxes[0])} objects detected') 
+    # axs[1].set_title(f'Cor B: {len(boxes[1])} objects detected')               
+    # axs[2].set_title(f'Lasco: {len(boxes[2])} objects detected')     
+    #if title is not None:
+    #    fig.suptitle('\n'.join([title[i]+' ; '+title[i+1] for i in range(0,len(title),2)]) , fontsize=16)   
+    plt.tight_layout()
+    plt.savefig(ofile)
+    plt.close()
+
+#------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
+testDir =  '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240912/'
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
+model_version="v5"
+trained_model = '49.torch'
+
+#model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
+#model_version="v4"
+#trained_model = '9999.torch'
+
+test_cases_file = model_path+"/validation_cases.csv"
+opath= model_path+"/test_output_diego"
+file_ext=".png"
+imageSize=[512,512]
+test_ncases = 150
+mask_thresholds = [0.7] #[0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99] # only px with scrore avobe this value are considered in the mask.
+gpu=0# GPU to use
+masks2use=[2] # index of the masks to read (should be the CME mask)
+#breakpoint()
+#main
+device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
+print(f'Using device:  {device}')
+#load image paths from test_cases_file
+imgs = []
+try:
+    with open(test_cases_file, 'r') as f:
+        for line in f:
+            imgs.append(line.strip())
+except FileNotFoundError:
+    with open('/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5/validation_cases.csv', 'r') as f:
+        for line in f:
+            imgs.append(line.strip())
+    print('File not found, using default validation cases (V5)')
+except Exception as e:
+    # This block will catch any other exceptions that might occur during file opening (optional, but good practice)
+    print(f"An error occurred while trying to open '{test_cases_file}': {e}")
+    breakpoint()
+
+nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
+rnd_idx = random.sample(range(len(imgs)), test_ncases)
+all_scr = []
+all_loss = []
+for mask_threshold in mask_thresholds:
+    this_case_scr =[]
+    this_case_loss = []    
+    for ind in range(len(rnd_idx)):
+        idx = rnd_idx[ind]
+        #reads image
+        file=os.listdir(imgs[idx])
+        file=[f for f in file if f.endswith(file_ext)]
+        print(f'Inference No. {ind}/{len(rnd_idx)} using image: {idx} and mask threshold case No. {mask_thresholds.index(mask_threshold)+1}/{len(mask_thresholds)}')
+        images = cv2.imread(os.path.join(imgs[idx], file[0]))
+        images = cv2.resize(images, imageSize, cv2.INTER_LINEAR)
+
+        # reads mask
+        maskDir=os.path.join(imgs[idx], "mask") #path to the mask iamge corresponding to the random image
+        masks=[]
+        vesMask=os.listdir(maskDir) #all masks in the mask directory
+        vesMask.sort(key=lambda x: int(x.split("_")[-1].split(".")[0])) #sort masks files by the ending number
+        vesMask = [vesMask[i] for i in masks2use][0]
+        vesMask = cv2.imread(maskDir+'/'+vesMask, 0) #reads the mask image in greyscale 
+        vesMask = (vesMask > 0).astype(np.uint8) #The mask image is stored in 0–255 format and is converted to 0–1 format
+        if np.mean(vesMask) == 0 and np.max(vesMask) == 0:
+            print('Error: Full zero mask in path', maskDir, 'skipping')
+            breakpoint()
+        # makes inference and returns only the mask with smallest loss
+        img, masks, scores, labels, boxes, loss  = nn_seg.test_mask(images, vesMask, mask_threshold=mask_threshold)
+        #breakpoint()
+
+        if masks is not None:
+            this_case_loss.append(loss) 
+            this_case_scr.append(scores)
+            # plot the predicted mask
+            if len(mask_thresholds)==1:
+                os.makedirs(opath, exist_ok=True)
+                ofile = opath+"/img_"+str(idx)+'.png'
+                plot_to_png2(ofile, [img], [[masks]], [vesMask], scores=[[scores]], labels=[[labels]], boxes=[[boxes]], 
+                            mask_threshold=mask_threshold, scr_threshold=0.1, version=model_version)
+    all_scr.append(this_case_scr)
+    all_loss.append(this_case_loss)
+
+    # plot stats for a single mask threshold
+    if len(mask_thresholds)==1:
+        this_case_scr = np.array(this_case_scr)
+        fig= plt.figure(figsize=(10, 5)) 
+        ax = fig.add_subplot() 
+        ax.hist(this_case_scr,bins=30)
+        ax.set_title(f'Mean scr: {np.mean(this_case_scr)} ; For mask threshold: {mask_threshold}  and test_ncases: {test_ncases} \n\
+                     % of scr>0.8: {len(this_case_scr[this_case_scr>0.8])/len(this_case_scr)}')
+        ax.set_yscale('log')
+        fig.savefig(opath+"/test_scores.png")
+
+        this_case_loss = np.array(this_case_loss)
+        fig= plt.figure(figsize=(10, 5))
+        ax = fig.add_subplot()
+        ax.hist(this_case_loss,bins=30)
+        ax.set_title(f'Mean loss: {np.mean(this_case_loss)} ; For mask threshold: {mask_threshold} and test_ncases: {test_ncases}')
+        ax.set_yscale('log')
+        fig.savefig(opath+"/test_loss.png")
+
+# for many mask thresholds plots mean and std loss and scr vs mask threshold
+if len(mask_thresholds)>1:
+    all_scr = np.array(all_scr)
+    fig= plt.figure(figsize=(10, 5))
+    ax = fig.add_subplot()
+    ax.errorbar(mask_thresholds, np.mean(all_scr,axis=1), yerr=np.std(all_scr,axis=1), fmt='o', color='black', ecolor='lightgray', elinewidth=3)
+    ax.set_title(f'Mean scr vs mask threshold')
+    ax.set_xlabel('mask threshold')
+    ax.set_ylabel('Score')
+    ax.grid()
+    fig.savefig(opath+"/test_scr_vs_mask_threshold.png")
+
+    all_loss = np.array(all_loss)
+    fig= plt.figure(figsize=(10, 5))
+    ax = fig.add_subplot()
+    ax.errorbar(mask_thresholds, np.mean(all_loss,axis=1), yerr=np.std(all_loss,axis=1), fmt='o', color='black', ecolor='lightgray', elinewidth=3)
+    ax.set_title(f'Mean loss vs mask threshold')
+    ax.set_xlabel('mask threshold')
+    ax.set_ylabel('Loss')
+    ax.grid()
+    fig.savefig(opath+"/test_mean_loss_vs_mask_threshold.png")
+print('Results saved in:', opath)
+print('Done :-D')
+
+

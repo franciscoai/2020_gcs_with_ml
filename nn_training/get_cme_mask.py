@@ -24,38 +24,47 @@ def get_cme_mask(sample_image, inner_cme=True,occ_size=None):
     blur = cv2.GaussianBlur(sample_image,(3,3),0)
     norm_img =(blur-np.min(blur[blur != 0]))/(np.max(blur)-np.min(blur[blur != 0]))
     norm_img[norm_img<0]=0
+    norm_img[norm_img>0]=1
     img = cv2.resize(norm_img,(img_sz,img_sz))
-    cota = np.percentile(img[img != 0],5)
-    _,thresh = cv2.threshold(img, cota, 255, cv2.THRESH_BINARY_INV)
-    edges = cv2.dilate(cv2.Canny(thresh.astype("uint8"),0,255),None,cv2.BORDER_CONSTANT, borderValue=1)
-    cnt = sorted(cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)[-2], key=cv2.contourArea)
+
+    #comment from here ##################
+    #cota = np.percentile(img[img != 0],5)
+    #_,thresh = cv2.threshold(img, cota, 255, cv2.THRESH_BINARY_INV)
+    #edges = cv2.dilate(cv2.Canny(thresh.astype("uint8"),0,255),None,cv2.BORDER_CONSTANT, borderValue=1)
+    #cnt = sorted(cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)[-2], key=cv2.contourArea)
     
-    cnt= [i for i in cnt if np.size(i)<(img_sz*8-50)]#deletes the image outer border
+    #cnt= [elem_i for elem_i in cnt if np.size(elem_i)<(img_sz*8-50)]#deletes the image outer border
+    #if len(cnt) == 0:
+    #    breakpoint()
+    #    mask = np.zeros((np.shape(sample_image)[0],np.shape(sample_image)[0]))
+    #else:
+    #    if len(cnt)>=3 and inner_cme:
+    #        breakpoint()
+    #        cme_outer = cnt[-2]
+    #        cme_inner = cnt[-3]#[i for i in cnt[0:-2] if np.size(i)<(np.size(cme_outer)-100)] 
+    #        mask_inner = np.zeros((img_sz,img_sz), np.uint8)
+    #        mask_outer = np.zeros((img_sz,img_sz), np.uint8)
+    #        mask_inner = cv2.drawContours(mask_inner, [cme_inner],-1, 1, -1)
+    #        mask_outer = cv2.drawContours(mask_outer, [cme_outer],-1, 1, -1)
+    #        mask = mask_outer - mask_inner
+    #    else: # for when the inner border of the cme i not visible
+            
+    #        length =np.argsort([len(i) for i in cnt ])
+    #        cme_outer = cnt[length[-1]]              
+    #        mask_outer = np.zeros((img_sz,img_sz), np.uint8)
+    #        mask_outer = cv2.drawContours(mask_outer, [cme_outer],-1, 1, -1)
+    #        mask = mask_outer 
+    #        breakpoint()
+        # to here ##################
 
-    if len(cnt) == 0:
-        mask = np.zeros((np.shape(sample_image)[0],np.shape(sample_image)[0]))
-    else:
-        if len(cnt)>=3 and inner_cme:
-            cme_outer = cnt[-2]
-            cme_inner = cnt[-3]#[i for i in cnt[0:-2] if np.size(i)<(np.size(cme_outer)-100)] 
-            mask_inner = np.zeros((img_sz,img_sz), np.uint8)
-            mask_outer = np.zeros((img_sz,img_sz), np.uint8)
-            mask_inner = cv2.drawContours(mask_inner, [cme_inner],-1, 1, -1)
-            mask_outer = cv2.drawContours(mask_outer, [cme_outer],-1, 1, -1)
-            mask = mask_outer - mask_inner
-        else: # for when the inner border of the cme i not visible
-            length =np.argsort([len(i) for i in cnt ])
-            cme_outer = cnt[length[-1]]              
-            mask_outer = np.zeros((img_sz,img_sz), np.uint8)
-            mask_outer = cv2.drawContours(mask_outer, [cme_outer],-1, 1, -1)
-            mask = mask_outer 
-
-        mask_aux = np.zeros((img_sz,img_sz), dtype=np.uint8)
-        occulter_size = occ_size
-        set_w = int(img_sz/2)
-        set_h = int(img_sz/2)
-        cv2.circle(mask_aux, (set_w,set_h), occulter_size, 1, -1)
-        mask[mask_aux==1] = 1
+        
+    mask_aux = np.zeros((img_sz,img_sz), dtype=np.uint8)
+    occulter_size = occ_size
+    set_w = int(img_sz/2)
+    set_h = int(img_sz/2)
+    cv2.circle(mask_aux, (set_w,set_h), occulter_size, 1, -1)
+    mask_0 = img.copy()
+    mask_0[mask_aux==1] = 1
 
         #Fill holes using contours
         #inverted_mask = cv2.bitwise_not(mask)
@@ -76,22 +85,40 @@ def get_cme_mask(sample_image, inner_cme=True,occ_size=None):
 
         #Fill holes using floodfill
         # Invert the mask
-        inverted_mask = mask.copy()
         # Flood fill from the edges (assume mask is surrounded by 0s at the edges)
-        h, w = inverted_mask.shape[:2]
-        flood_fill_mask = np.zeros((h + 2, w + 2), np.uint8)  # Create a flood fill mask with padding
+    inverted_mask = mask_0.copy()
+    hh, ww = inverted_mask.shape[:2]
+    flood_fill_mask = np.zeros((hh + 2, ww + 2), np.uint8) 
+    cv2.floodFill(inverted_mask, flood_fill_mask, (0, 0), 1)
         # Perform flood fill operation
-        cv2.floodFill(inverted_mask, flood_fill_mask, (0, 0), 255)
         # Invert the flood filled image back
-        inverted_filled_mask = cv2.bitwise_not(inverted_mask)
+
+    #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    #inverted_mask_aux = cv2.morphologyEx(inverted_mask, cv2.MORPH_OPEN, kernel)
+    #inverted_filled_mask = cv2.bitwise_not(inverted_mask_aux)
+
+    inverted_filled_mask = cv2.bitwise_not(inverted_mask)
+    inverted_filled_mask2 = np.nan_to_num(inverted_filled_mask, nan=1.0)
+    inverted_filled_mask2[inverted_filled_mask2<0]=0
         # Combine the inverted filled mask with the original mask to fill the holes
-        filled_mask = np.bitwise_or(mask, inverted_filled_mask)
+        #filled_mask = np.bitwise_or(mask, inverted_filled_mask) .astype(np.uint8)
+    filled_mask = np.bitwise_or(mask_0.astype(np.uint8), inverted_filled_mask2.astype(np.uint8))
+    filled_mask[mask_aux==1] = 0
 
-        filled_mask[mask_aux==1] = 0
-        mask = cv2.resize(filled_mask,(np.shape(sample_image)[0],np.shape(sample_image)[0]))
-        mask[mask>0.01]=1
-        mask= np.array(mask)
-
+    #drowing white borders
+    borders = img.copy()
+    cv2.floodFill(borders, flood_fill_mask, (0, 0), 1)
+    mask_borders=(borders>0) & (borders<1)
+    borders=borders*0
+    borders[mask_borders]=1
+    filled_mask2 = filled_mask + borders
+    filled_mask2[mask_aux==1] = 0
+    mask = cv2.resize(filled_mask2,(np.shape(sample_image)[0],np.shape(sample_image)[0]))
+    #mask[mask>0.01]=1
+    #mask[mask>0.01]=255
+    mask[mask>0.01]=1
+    mask= np.array(mask)
+    #breakpoint()
     return(mask)
 
 def get_mask_cloud(p_x,p_y,imsize, occ_size=None):

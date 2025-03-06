@@ -19,6 +19,7 @@ from nn_training.low_freq_map import low_freq_map
 import scipy
 from nn.utils.coord_transformation import deg2px, center_rSun_pixel, pnt2arr
 import concurrent.futures
+from scipy.stats import kstest,chisquare,ks_2samp
 
 def save_png(array, ofile=None, range=None):
     '''
@@ -38,13 +39,89 @@ def save_png(array, ofile=None, range=None):
     else:
         return None
 
+
+def get_random_lognormal(size):
+    '''
+    Generates a random number of cme desplacement in Rsun based on a lognormal distribution for cme velocity
+    '''
+    mu, sigma = np.log(433), 0.5267# mean and standard deviation of CME velocity from table 1 Yurchyshyn 2005
+    while True:
+        cme_vel = np.random.lognormal(mu, sigma, 1) # in km/s
+        #Cota minima y maxima en distribucion de velocidades segun Vourlidas et al. 2010 
+        #200 y 1800 km/s
+        if cme_vel[0] > 200 and cme_vel[0] < 1800:        
+            cme_vel = cme_vel/695700 # in Rsun/s
+            cadencia = 15 # in min
+            cadencia = cadencia*60 # in s
+            height_diff = cme_vel[0] * cadencia # displacement in Rsun, assuming 15 min cadence.
+            return height_diff
+
+def plot_histogram(back,btot,mask,filename):
+    '''
+    Plots histograms of back and btot inside the mask
+    '''
+    A=back[mask==1].copy().flatten()
+    B=btot[mask==1].copy().flatten()
+    if np.any(A==0) or np.any(B==0):
+        non_zero = (A != 0) & (B != 0)
+        A = A[non_zero]
+        B = B[non_zero]
+    min_val = np.min([np.percentile(A,2) ,np.percentile(B,2)])
+    max_val = np.max([np.percentile(A,98),np.percentile(B,98)])
+    num_bins = 80  
+    bin_edges = np.linspace(min_val, max_val, num_bins + 1)
+    plt.hist(A, bins=bin_edges, alpha=0.5, label='Back', color='blue')  
+    plt.hist(B, bins=bin_edges, alpha=0.5, label='Btot', color='green') 
+    plt.legend(loc='upper right')
+
+    ax = plt.gca()
+    y_max = ax.get_ylim()[1]
+    mean_A = np.mean(A)
+    median_A = np.median(A)
+    std_A = np.std(A)
+    mean_B = np.mean(B)
+    std_B = np.std(B)
+    median_B = np.median(B)
+
+    bins = np.histogram_bin_edges(np.hstack((B, A)), bins=num_bins)
+    hist1 = np.histogram(A, bins=bins)
+    hist2 = np.histogram(B, bins=bins)
+    bin_midpoints1 = (hist1[1][:-1] + hist1[1][1:]) / 2
+    data1 = np.repeat(bin_midpoints1, hist1[0].astype(int))
+    bin_midpoints2 = (hist2[1][:-1] + hist2[1][1:]) / 2
+    data2 = np.repeat(bin_midpoints2, hist2[0].astype(int))
+    p_value = ks_2samp(data1, data2).pvalue
+
+    plt.text(0.03, 0.95 ,f'Back:\nMean: {mean_A:.2e}\nStd: {std_A:.2e}\nMedian: {median_A:.2e}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+    plt.text(0.33, 0.95 ,f'Btot:\nMean: {mean_B:.2e}\nStd: {std_B:.2e}\nMedian: {median_B:.2e}',transform=ax.transAxes,fontsize=10,color='green',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+    plt.text(0.63, 0.65 ,f'\nP-value: {p_value:.2e}',transform=ax.transAxes,fontsize=10,color='red',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+    #mask_folder2 = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212/test/'
+    plt.savefig(filename)
+    plt.close()
+
+    #Ratio of the histograms
+    min_val = np.percentile(B/A,2) 
+    max_val = np.percentile(B/A,98)
+    bin_edges = np.linspace(min_val, max_val, num_bins + 1)
+    plt.hist(B/A, bins=bin_edges, alpha=0.5, label='Btot/Back', color='red')
+    mean_BA = np.mean(B/A)
+    median_BA = np.median(B/A)
+    std_BA   = np.std(B/A)
+    plt.text(0.03, 0.95 ,f'\nMean: {mean_BA:.2e}\nStd: {std_BA:.2e}\nMedian: {median_BA:.2e}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+    plt.axvline(x=1, color='red', linestyle='--', linewidth=2, label='x = 1')
+    plt.legend(loc='upper right')
+    plt.savefig(filename.replace('histo.png','histo_ratio.png'))
+    plt.close()
+
+
 ######Main
 
 # CONSTANTS
 #paths
 DATA_PATH = '/gehme/data'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
-opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
+#OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212'
+opath_fstructure='check'#'run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
 # morphology
@@ -53,7 +130,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 100#300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -89,12 +166,14 @@ if opath_fstructure=='check':
     cme_only_image = False
     back_only_image = False
     add_mesh_image = True
-    rnd_par=False 
+    rnd_par=True#False 
     save_only_cme_mask = True
     diff_int_cme = True #False
-    par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] #[[-0,0.1],[0,0.1],[90,90],[19,20],[0.15,0.15], [70,71],[10,10]] 
+    par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
+    #par_rng = [[-0,0.1],[0,0.1],[90,90],[19,20],[0.15,0.15], [70,71],[10,10]] 
+    inner_hole_mask= False
     show_middle_cross = True
-    add_flux_rope = False
+    add_flux_rope = True
 
 os.makedirs(OPATH, exist_ok=True)
 # saves a copy of this script to the output folder
@@ -179,7 +258,7 @@ def create_sintetic_image(row):
             mask=get_mask_cloud(p_x,p_y,imsize)
         else:
             btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row],
-                                      df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.001, nel=1e5, usr_center_off=usr_center_off)     
+                                      df['ang'][row], imsize=imsize, occrad=size_occ[sat]*0.9, in_sig=1., out_sig=0.0001, nel=1e5, usr_center_off=usr_center_off)     
             cme_npix= len(btot_mask[btot_mask>0].flatten())
             if cme_npix<=0:
                 print("\033[93m WARNING: CME number {} raytracing did not work\033".format(row))                
@@ -231,17 +310,17 @@ def create_sintetic_image(row):
         print(headers[sat]['TELESCOP'], headers[sat]['CRPIX1'], headers[sat]['CRPIX2'],headers[sat]['INSTRUME'], 
               headers[sat]['NAXIS1'], headers[sat]['NAXIS2'], headers[sat]['CRVAL1'], headers[sat]['CRVAL2'], headers[sat]['CROTA'])
         btot = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row],
-                             imsize=imsize, occrad=size_occ[sat], in_sig=0.5, out_sig=0.1, nel=1e5, usr_center_off=usr_center_off)
+                             imsize=imsize, occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)
 
         #diff intensity by adding a second, smaller GCS
         if diff_int_cme:
             # self-similar expansion -> height increase
-            height_diff = np.random.uniform(low=0, high=1) # in Sr. 1 Sr is covered in 15 min at 1500 mk/s
+            height_diff = get_random_lognormal(1)
             if height_diff > df['height'][row]:
                 height_diff = df['height'][row]*height_diff
-            scl_fac = np.random.uniform(low=0.90, high=1.3) # int scaling factor
+            scl_fac = np.random.uniform(low=1.00, high=1.3) # int scaling factor
             def_fac = np.random.uniform(low=0.95, high=1.05, size=3) # deflection and rotation factors [lat, lon, tilt]
-            exp_fac = np.random.uniform(low=0.9, high=1, size=2) # non-self-similar expansion factor [k, ang]
+            exp_fac = np.random.uniform(low=0.90, high=1,    size=2) # non-self-similar expansion factor [k, ang]
             # avoids lat and lon overturns 
             if def_fac[0]*df['CMElon'][row]>180:
                 fr_lon = 180
@@ -253,7 +332,7 @@ def create_sintetic_image(row):
                 fr_lat = def_fac[1]*df['CMElat'][row]
             btot -= scl_fac*rtraytracewcs(headers[sat], fr_lon, fr_lat ,def_fac[2]*df['CMEtilt'][row],
                                           df['height'][row]-height_diff,df['k'][row]*exp_fac[0], df['ang'][row]*exp_fac[1], imsize=imsize, 
-                                          occrad=size_occ[sat], in_sig=0.8, out_sig=0.15, nel=1e5, usr_center_off=usr_center_off)
+                                          occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)
         
         #adds a flux rope-like structure
         if add_flux_rope:
@@ -261,15 +340,17 @@ def create_sintetic_image(row):
                 frope_height_diff = np.random.uniform(low=0.55, high=0.85) # random flux rope height
             else:
                 frope_height_diff = np.random.uniform(low=0.45, high=0.75)
-            aspect_ratio_frope = np.random.uniform(low=0.4, high=0.8) # random aspect ratio
+            aspect_ratio_frope = np.random.uniform(low=0.2, high=0.4) # random % of k
             scl_fac_fr = np.random.uniform(low=0, high=2) # int scaling factor
             btot += scl_fac_fr*rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*frope_height_diff,
-                                          df['k'][row]*aspect_ratio_frope, df['ang'][row], imsize=imsize, occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)    
+                                          df['k'][row]*aspect_ratio_frope, df['ang'][row], imsize=imsize,
+                                          occrad=size_occ[sat], in_sig=2., out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)    
             # uses a differential flux rope
+            #Diego: Las in_sing: 0.8
             if diff_int_cme:
                 btot -= scl_fac*scl_fac_fr*rtraytracewcs(headers[sat], fr_lon, fr_lat,def_fac[2]*df['CMEtilt'][row], 
                                               df['height'][row]*frope_height_diff-height_diff,df['k'][row]*aspect_ratio_frope*exp_fac[0],df['ang'][row]*exp_fac[1],
-                                              imsize=imsize, occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)    
+                                              imsize=imsize, occrad=size_occ[sat], in_sig=2., out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)    
         #background corona
         back = back_corona[sat]
         if back_rnd_rot:
@@ -341,9 +422,35 @@ def create_sintetic_image(row):
         if level_occ == 'min':
             btot[r <= size_occ[sat]]     = vmin_back
             btot[r >= size_occ_ext[sat]] = vmin_back
+            back[r <= size_occ[sat]]     = vmin_back
+            back[r >= size_occ_ext[sat]] = vmin_back
         else: 
             btot[r <= size_occ[sat]]     = level_occ*mean_back 
-            btot[r >= size_occ_ext[sat]] = level_occ*mean_back 
+            btot[r >= size_occ_ext[sat]] = level_occ*mean_back
+            back[r <= size_occ[sat]]     = level_occ*mean_back
+            back[r >= size_occ_ext[sat]] = level_occ*mean_back
+
+        #check if the background on the mask area differs from btot +back
+        btot_pixels = btot[mask==1].flatten()
+        back_pixels = back[mask==1].flatten()
+        bins = np.histogram_bin_edges(np.hstack((btot_pixels, back_pixels)), bins=80)
+        # Important: Use the same bins for both histograms
+        hist1 = np.histogram(btot_pixels, bins=bins)
+        hist2 = np.histogram(back_pixels, bins=bins)
+        bin_midpoints1 = (hist1[1][:-1] + hist1[1][1:]) / 2
+        data1 = np.repeat(bin_midpoints1, hist1[0].astype(int)) # Repeat midpoints based on histogram counts.
+        bin_midpoints2 = (hist2[1][:-1] + hist2[1][1:]) / 2
+        data2 = np.repeat(bin_midpoints2, hist2[0].astype(int))
+        p_valor = ks_2samp(data1, data2).pvalue
+
+        
+        if  p_valor < 0.05:
+            #a p-value < 0.05 indicates that the two distributions are significantly different'
+            aux=''
+        else:
+            #the idea is to skip this cases, since the CME is not visible
+            aux='/rejected'
+
         #saves images
         if otype=="fits":
             if save_masks:
@@ -366,7 +473,7 @@ def create_sintetic_image(row):
         elif otype =="png": 
             if save_masks:      
                 #mask for cme
-                ofile = mask_folder +'/'+ofile_name+'_mask_2.png'
+                ofile = mask_folder +aux+'/'+ofile_name+'_mask_2.png'
                 fig=save_png(mask,ofile=ofile, range=[0, 1])
                 if save_only_cme_mask == False:   
                     if sceond_mask is not None: 
@@ -379,7 +486,7 @@ def create_sintetic_image(row):
                     ofile = mask_folder +'/'+ofile_name+'_mask_1.png'
                     fig=save_png(occ_mask_ext,ofile=ofile, range=[0, 1])
             #full image
-            ofile=folder + '/' + ofile_name+'_btot.png'
+            ofile=folder +aux+ '/' + ofile_name+'_btot.png'
             # adds middle cross to btot
             if show_middle_cross:
                 btot[imsize[0]//2-1:imsize[0]//2+1,:] = vmin_back
@@ -389,6 +496,7 @@ def create_sintetic_image(row):
                 fig=save_png(btot+arr_cloud*vmin_back,ofile=ofile, range=[vmin_back, vmax_back])
             else:
                 fig=save_png(btot,ofile=ofile, range=[vmin_back, vmax_back])
+            plot_histogram(back,btot,mask,folder +aux+ '/' + ofile_name+'_histo.png')
         else:
             print("otype value not recognized")    
         # saves ok case
