@@ -20,6 +20,9 @@ import scipy
 from nn.utils.coord_transformation import deg2px, center_rSun_pixel, pnt2arr
 import concurrent.futures
 from scipy.stats import kstest,chisquare,ks_2samp
+import matplotlib as mpl
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+mpl.use('Agg')
 
 def save_png(array, ofile=None, range=None):
     '''
@@ -56,9 +59,10 @@ def get_random_lognormal(size):
             height_diff = cme_vel[0] * cadencia # displacement in Rsun, assuming 15 min cadence.
             return height_diff
 
-def plot_histogram(back,btot,mask,filename):
+
+def flter_non_zero(back,btot,mask):
     '''
-    Plots histograms of back and btot inside the mask
+    Filters out zero values in both back and btot ndarrays. Returns the filtered arrays.
     '''
     A=back[mask==1].copy().flatten()
     B=btot[mask==1].copy().flatten()
@@ -66,52 +70,173 @@ def plot_histogram(back,btot,mask,filename):
         non_zero = (A != 0) & (B != 0)
         A = A[non_zero]
         B = B[non_zero]
-    min_val = np.min([np.percentile(A,2) ,np.percentile(B,2)])
-    max_val = np.max([np.percentile(A,98),np.percentile(B,98)])
-    num_bins = 80  
-    bin_edges = np.linspace(min_val, max_val, num_bins + 1)
-    plt.hist(A, bins=bin_edges, alpha=0.5, label='Back', color='blue')  
-    plt.hist(B, bins=bin_edges, alpha=0.5, label='Btot', color='green') 
-    plt.legend(loc='upper right')
+    area = np.sum(mask)
+    return A,B,area
 
-    ax = plt.gca()
-    y_max = ax.get_ylim()[1]
-    mean_A = np.mean(A)
+def statistic_values(A,B=None):
+    '''
+    Calculates mean, median and std of A and/or B.
+    factor size: amount of std consider to calculate the amount of values outside that range.
+
+    output: mean_A,median_A,std_A [,mean_B,median_B,std_B]
+    '''
+    mean_A   = np.mean(A)
     median_A = np.median(A)
-    std_A = np.std(A)
-    mean_B = np.mean(B)
-    std_B = np.std(B)
-    median_B = np.median(B)
+    std_A    = np.std(A)
+    if B is not None:
+        mean_B   = np.mean(B)
+        std_B    = np.std(B)
+        median_B = np.median(B)
+        return mean_A,median_A,std_A,mean_B,median_B,std_B
+    else:
+        return mean_A,median_A,std_A
 
-    bins = np.histogram_bin_edges(np.hstack((B, A)), bins=num_bins)
-    hist1 = np.histogram(A, bins=bins)
-    hist2 = np.histogram(B, bins=bins)
-    bin_midpoints1 = (hist1[1][:-1] + hist1[1][1:]) / 2
-    data1 = np.repeat(bin_midpoints1, hist1[0].astype(int))
-    bin_midpoints2 = (hist2[1][:-1] + hist2[1][1:]) / 2
-    data2 = np.repeat(bin_midpoints2, hist2[0].astype(int))
-    p_value = ks_2samp(data1, data2).pvalue
+def area_outside_std(A,factor_std=2,positive_only=False,percentile=False,cota=False):
+    '''
+    Calculates the amount of values outside a certain range in terms of std.
+    factor size: amount of std consider to calculate the amount of values outside that range.
+    '''
+    median_A = np.median(A)
+    std_A  = np.std(A)
 
-    plt.text(0.03, 0.95 ,f'Back:\nMean: {mean_A:.2e}\nStd: {std_A:.2e}\nMedian: {median_A:.2e}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
-    plt.text(0.33, 0.95 ,f'Btot:\nMean: {mean_B:.2e}\nStd: {std_B:.2e}\nMedian: {median_B:.2e}',transform=ax.transAxes,fontsize=10,color='green',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
-    plt.text(0.63, 0.65 ,f'\nP-value: {p_value:.2e}',transform=ax.transAxes,fontsize=10,color='red',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
-    #mask_folder2 = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212/test/'
-    plt.savefig(filename)
-    plt.close()
+    if cota and not percentile:
+        if positive_only:
+            return len(A[A > cota[1]])
+        else:
+            return len(A[(A < cota[0]) | (A > cota[1])])
 
-    #Ratio of the histograms
-    min_val = np.percentile(B/A,2) 
-    max_val = np.percentile(B/A,98)
-    bin_edges = np.linspace(min_val, max_val, num_bins + 1)
-    plt.hist(B/A, bins=bin_edges, alpha=0.5, label='Btot/Back', color='red')
-    mean_BA = np.mean(B/A)
-    median_BA = np.median(B/A)
-    std_BA   = np.std(B/A)
-    plt.text(0.03, 0.95 ,f'\nMean: {mean_BA:.2e}\nStd: {std_BA:.2e}\nMedian: {median_BA:.2e}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
-    plt.axvline(x=1, color='red', linestyle='--', linewidth=2, label='x = 1')
-    plt.legend(loc='upper right')
-    plt.savefig(filename.replace('histo.png','histo_ratio.png'))
-    plt.close()
+    if percentile and not cota:
+        percentiles = np.percentile(A, [percentile[0],percentile[1]])
+        if positive_only:
+            return len(A[A > percentiles[1]])
+        else:
+            return len(A[(A < percentiles[0]) | (A > percentiles[1])])
+    
+    if not percentile and not cota:
+        if positive_only:
+            return len(A[A > median_A + factor_std*std_A])
+        else:
+            return len(A[(A < median_A - factor_std*std_A) | (A > median_A + factor_std*std_A)])
+
+
+def factor(X, Y):
+    """
+    Ment to estimate the scale factor. We follow Howard et al. 2018. Density in the front of CME follows a power law with a factor of -3.
+    Therefore, Ne(r_0) = N0 * r_0**-3 and  Ne(r_0-desplazamiento)= N0 * (r_0-desplazamiento)**-3.
+    Therefore Ne(r_0-desplazamiento) / Ne(r_0) = (1-desplazamiento/r_0)**-3
+    X: desplacement in Rsun
+    Y: Height in Rsun
+    """
+    return (1-X/Y)**-3
+
+def plot_histogram(back,btot,mask,filename,plot_doble_hist=False,plot_ratio_histo=False,plot_ratio_histo2=True,factor_std=1,selected_cota=9,mask2=None,plot_histo_snr=False):
+    '''
+    Plots histograms of back and btot inside the mask
+    '''
+    A,B,area=flter_non_zero(back,btot,mask)
+    
+    num_bins = 80  
+    ax = plt.gca()
+    if plot_doble_hist:
+        min_val = np.min([np.percentile(A,2) ,np.percentile(B,2)])
+        max_val = np.max([np.percentile(A,98),np.percentile(B,98)])
+        bin_edges = np.linspace(min_val, max_val, num_bins + 1)
+        plt.hist(A, bins=bin_edges, alpha=0.5, label='Back', color='blue')  
+        plt.hist(B, bins=bin_edges, alpha=0.5, label='Btot', color='green') 
+        plt.legend(loc='upper right')
+
+        y_max = ax.get_ylim()[1]
+        mean_A,median_A,std_A,mean_B,median_B,std_B = statistic_values(A,B)
+
+        bins = np.histogram_bin_edges(np.hstack((B, A)), bins=100)
+        hist1 = np.histogram(A, bins=bins)
+        hist2 = np.histogram(B, bins=bins)
+        bin_midpoints1 = (hist1[1][:-1] + hist1[1][1:]) / 2
+        data1 = np.repeat(bin_midpoints1, hist1[0].astype(int))
+        bin_midpoints2 = (hist2[1][:-1] + hist2[1][1:]) / 2
+        data2 = np.repeat(bin_midpoints2, hist2[0].astype(int))
+        p_value = ks_2samp(data1, data2).pvalue
+
+        plt.text(0.03, 0.95 ,f'Back:\nMean: {mean_A:.2e}\nStd: {std_A:.2e}\nMedian: {median_A:.2e}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        plt.text(0.33, 0.95 ,f'Btot:\nMean: {mean_B:.2e}\nStd: {std_B:.2e}\nMedian: {median_B:.2e}',transform=ax.transAxes,fontsize=10,color='green',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        plt.text(0.63, 0.65 ,f'\nP-value: {p_value:.2e}',transform=ax.transAxes,fontsize=10,color='red',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        #mask_folder2 = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212/test/'
+        plt.savefig(filename)
+        plt.close()
+
+    if plot_ratio_histo:
+        #Ratio of the histograms
+        num_bins = 80  
+        ax = plt.gca()
+        min_val = np.percentile(B/A,2) 
+        max_val = np.percentile(B/A,98)
+        bin_edges = np.linspace(min_val, max_val, num_bins + 1)
+        plt.hist(B/A, bins=bin_edges, alpha=0.5, label='Btot/Back', color='red')
+        mean_BA,median_BA,std_BA = statistic_values(B/A)
+        area_outside_double   = area_outside_std(B/A, percentile=[15,85])
+        area_outside_positive = area_outside_std(B/A, percentile=[15,85], positive_only=True)
+        percentile_superior = np.percentile(B/A,85)
+        percentile_inferior = np.percentile(B/A,15)
+        cota = [-1,1]
+        cota = [x * selected_cota +1 for x in cota]
+        area_cota_7   = area_outside_std(B/A, cota=[0,7], positive_only=True)
+        area_cota_positive = area_outside_std(B/A, cota=cota, positive_only=True)
+        breakpoint()
+        plt.text(0.03, 0.95 ,f'\nMean: {mean_BA:.3f}\nStd: {std_BA:.3f}\nMedian: {median_BA:.3f}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        plt.text(0.03, 0.75 ,f'\nper 85: {percentile_superior:.1f}\nper 15: {percentile_inferior:.1f}',transform=ax.transAxes,fontsize=10,color='green',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        plt.text(0.70, 0.75 ,f'\nArea Tot: {area:.1f}',transform=ax.transAxes,fontsize=10,color='red',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        plt.text(0.70, 0.68 ,f'\n cota 7+/Area: {area_cota_7/area:.3f}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        plt.text(0.70, 0.64 ,f'\n cota10+ /Area: {area_cota_positive/area:.3f}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        plt.axvline(x=1, color='red', linestyle='-', linewidth=2, label='x = 1')
+        plt.axvline(x=percentile_superior, color='green', linestyle='--', linewidth=2, label='percentiles')
+        plt.axvline(x=percentile_inferior, color='green', linestyle='--', linewidth=2)
+        plt.axvline(x=cota[0], color='blue', linestyle='--', linewidth=2, label=f'cotas{cota[0],cota[1]}')
+        plt.axvline(x=cota[1], color='blue', linestyle='--', linewidth=2)
+        plt.legend(loc='upper right')
+        plt.savefig(filename.replace('histo.png','histo_ratio.png'))
+        plt.close()
+
+
+    if plot_ratio_histo2: #implementar mask2
+        fig, ax = plt.subplots(figsize=(8, 6))
+        num_bins = 80  
+        ax = plt.gca()
+        min_val = np.percentile(B/A,2) 
+        max_val = np.percentile(B/A,99)
+        bin_edges = np.linspace(min_val, max_val, num_bins + 1)
+        n, bins, _ = ax.hist(B/A, bins=bin_edges, facecolor='red', edgecolor='red', alpha=0.5)
+        ax.set_xlabel('Btot/Back')
+        ax.set_ylabel('Frequency')
+        ax.set_xlim(min_val, max_val)
+
+        ax_inset = inset_axes(ax, width="30%", height="30%", loc='upper right', borderpad=1)
+        ax_inset.hist(B/A, bins=bin_edges, facecolor='red', edgecolor='red', alpha=0.5)
+        cota_superior = np.percentile(B/A,99)
+        cota = [-1,1]
+        cota = [x * selected_cota +1 for x in cota]
+        ax_inset.set_xlim(cota[1], cota_superior)
+        _max_ylim = n[ (bins[:-1] >= cota[1]) & (bins[:-1] <= cota_superior) ]
+        if _max_ylim.size == 0:
+            _max_ylim = 10
+        max_ylim = np.max(_max_ylim)
+        ax_inset.set_ylim(0, max_ylim * 1.1 )
+        ax.axvline(x=1, color='red', linestyle='-', linewidth=2, label='x = 1')
+        percentile_superior = np.percentile(B/A,85)
+        percentile_inferior = np.percentile(B/A,15)
+        ax.axvline(x=percentile_superior, color='green', linestyle='--', linewidth=2, label='percentiles')
+        ax.axvline(x=percentile_inferior, color='green', linestyle='--', linewidth=2)
+        ax.axvline(x=cota[0], color='blue', linestyle='--', linewidth=2, label=f'cotas{cota[0],cota[1]}')
+        ax.axvline(x=cota[1], color='blue', linestyle='--', linewidth=2)
+        mean_BA,median_BA,std_BA = statistic_values(B/A)
+        area_cota_double   = area_outside_std(B/A, cota=cota)
+        area_cota_positive = area_outside_std(B/A, cota=cota, positive_only=True)
+        ax.text(0.03, 0.95 ,f'\nMean: {mean_BA:.3f}\nStd: {std_BA:.3f}\nMedian: {median_BA:.3f}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        ax.text(0.03, 0.75 ,f'\nper 85: {percentile_superior:.1f}\nper 15: {percentile_inferior:.1f}',transform=ax.transAxes,fontsize=10,color='green',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        ax.text(0.70, 0.65 ,f'\nArea Tot: {area:.1f}',transform=ax.transAxes,fontsize=10,color='red',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        ax.text(0.70, 0.60 ,f'\n cota +-/Area: {area_cota_double/area:.3f}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        ax.text(0.70, 0.55 ,f'\n cota + /Area: {area_cota_positive/area:.3f}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
+        plt.savefig(filename.replace('histo.png','histo_ratio.png'))
+        plt.close()
 
 
 ######Main
@@ -121,6 +246,7 @@ def plot_histogram(back,btot,mask,filename):
 DATA_PATH = '/gehme/data'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
 OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250304'
 opath_fstructure='check'#'run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
@@ -130,13 +256,13 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 100#300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 50#300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
 back_rnd_rot=False # set to randomly rotate the background image around its center
 same_corona=False # Set to True use a single corona back for all par_num cases
-same_position=True # Set to True to use the same set of satelite positions(not necesarly the same background image)
+same_position=False # Set to True to use the same set of satelite positions(not necesarly the same background image)
 rnd_int_occ=0.1 # set to randomly increase the internal occulter size by a max fraction of its size. Use None to keep the constant size given by get_corona
 rnd_ext_occ=0.1 # set to randomly reduce the external occulter size by a max fraction of its size. Use None to keep the constant size given by get_corona
 #noise
@@ -154,6 +280,7 @@ add_mesh_image=False # adds the GCS mesh on top of the image (only for otype='pn
 cme_only_image=False # set to True to save an addditional image with only the cme without the background corona
 back_only_image = False # set to True to save an addditional image with only the background corona without the cme
 save_masks = True # set to True to save the masks images
+save_background = False#True # set to True to save the background images
 save_only_cme_mask = False # set to True to save only the cme mask and not the occulter masks. save_masks must be True
 inner_hole_mask=False #Set to True to produce a mask that contains the inner hole of the GCS (if visible)
 mask_from_cloud=False #True #True to calculete mask from clouds, False to do it from an independent ratraycing total brigthness image
@@ -198,10 +325,18 @@ mask_prev = None
 satpos_all = []
 plotranges_all = []
 sceond_mask = None
-mask_aw = []
+mask_aw_all = []
+apex_all = []
+scl_fac_fr_all = []
+def_fac_all = []
+exp_fac_all = []
+aspect_ratio_frope_all = []
+status_all = []
 halo_count = 0
 ok_cases = 0
 usr_center_off = None
+median_btot_over_back_all = []
+filter_area_threshold_all = []
 
 def create_sintetic_image(row):
     global ok_cases, halo_count,satpos_all, plotranges_all, mask_aw,sceond_mask
@@ -225,7 +360,17 @@ def create_sintetic_image(row):
             occ_center.append(e)
     # Get the location of sats and gcs: 
     satpos, plotranges = pyGCS.processHeaders(headers)
-    mask_aw_sat = []
+    mask_aw_sat     = [np.nan for i in range(n_sat)]
+    area_sat        = [np.nan for i in range(n_sat)]
+    apex_sat        = [np.nan for i in range(n_sat)]
+    height_diff_sat = [np.nan for i in range(n_sat)]
+    scl_fac_fr_sat  = [np.nan for i in range(n_sat)]
+    def_fac_sat     = [np.nan for i in range(n_sat)]
+    exp_fac_sat     = [np.nan for i in range(n_sat)]
+    aspect_ratio_frope_sat = [np.nan for i in range(n_sat)]
+    status_sat      = ['' for i in range(n_sat)]
+    median_btot_over_back_sat = [np.nan for i in range(n_sat)]
+    filter_area_threshold_sat = [np.nan for i in range(n_sat)]
     print(f'Saving image pair {row} of {df.index.stop-1}')
 
     for sat in range(n_sat):
@@ -258,7 +403,8 @@ def create_sintetic_image(row):
             mask=get_mask_cloud(p_x,p_y,imsize)
         else:
             btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row],
-                                      df['ang'][row], imsize=imsize, occrad=size_occ[sat]*0.9, in_sig=1., out_sig=0.0001, nel=1e5, usr_center_off=usr_center_off)     
+                                      df['ang'][row], imsize=imsize, occrad=size_occ[sat]*0.9, in_sig=1., out_sig=0.0001, nel=1e5, usr_center_off=usr_center_off,
+                                      losrange=np.array([-1*df['height'][row] - 2.0 , df['height'][row] + 2.0]))     
             cme_npix= len(btot_mask[btot_mask>0].flatten())
             if cme_npix<=0:
                 print("\033[93m WARNING: CME number {} raytracing did not work\033".format(row))                
@@ -277,8 +423,11 @@ def create_sintetic_image(row):
             break
        
         # adds mask angluar width to list
-        aw = np.percentile(phi[mask==1],95)-np.percentile(phi[mask==1],5)
-        mask_aw_sat.append(aw)
+        aw   = np.percentile(phi[mask==1],98)-np.percentile(phi[mask==1],2)
+        apex = np.percentile(r[mask==1],99)
+        #mask_aw_sat.append(aw)
+        mask_aw_sat[sat]=aw
+        apex_sat[sat]   =apex
         # check for halos, i.e. maks that have pixels with polar angles that span more than 120 deg
         if aw>2*np.pi/3:
             halo_count += 1
@@ -297,7 +446,10 @@ def create_sintetic_image(row):
                 os.system("rm -r " + folder) 
             os.makedirs(folder)
             mask_folder = os.path.join(folder, "mask")
-            os.makedirs(mask_folder)         
+            os.makedirs(mask_folder) 
+            if save_background:
+                back_folder = os.path.join(folder, "back")
+                os.makedirs(back_folder)        
         elif opath_fstructure=='check':
             # save all images in the same folder
             folder = OPATH
@@ -310,17 +462,26 @@ def create_sintetic_image(row):
         print(headers[sat]['TELESCOP'], headers[sat]['CRPIX1'], headers[sat]['CRPIX2'],headers[sat]['INSTRUME'], 
               headers[sat]['NAXIS1'], headers[sat]['NAXIS2'], headers[sat]['CRVAL1'], headers[sat]['CRVAL2'], headers[sat]['CROTA'])
         btot = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row],
-                             imsize=imsize, occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)
-
+                             imsize=imsize, occrad=size_occ[sat], in_sig=1.0, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off,
+                             losrange=np.array([-1*df['height'][row] - 2.0 , df['height'][row] + 2.0]))
+        
+        btot_outer = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row],
+                             imsize=imsize, occrad=size_occ[sat], in_sig=1.0, out_sig=0.075, nel=1e5, usr_center_off=usr_center_off,
+                             losrange=np.array([-1*df['height'][row] - 2.0 , df['height'][row] + 2.0]))
+        mask_outer_for_filter = get_cme_mask(btot_outer,inner_cme=inner_hole_mask,occ_size=occ_size_1024)
         #diff intensity by adding a second, smaller GCS
         if diff_int_cme:
             # self-similar expansion -> height increase
             height_diff = get_random_lognormal(1)
             if height_diff > df['height'][row]:
                 height_diff = df['height'][row]*height_diff
-            scl_fac = np.random.uniform(low=1.00, high=1.3) # int scaling factor
+            scl_fac = factor(height_diff, df['height'][row])
+            scl_fac_fr_sat[sat] = scl_fac
+            #scl_fac = np.random.uniform(low=1.00, high=1.3) # int scaling factor
             def_fac = np.random.uniform(low=0.95, high=1.05, size=3) # deflection and rotation factors [lat, lon, tilt]
+            def_fac_sat[sat] = def_fac
             exp_fac = np.random.uniform(low=0.90, high=1,    size=2) # non-self-similar expansion factor [k, ang]
+            exp_fac_sat[sat] = exp_fac
             # avoids lat and lon overturns 
             if def_fac[0]*df['CMElon'][row]>180:
                 fr_lon = 180
@@ -332,8 +493,15 @@ def create_sintetic_image(row):
                 fr_lat = def_fac[1]*df['CMElat'][row]
             btot -= scl_fac*rtraytracewcs(headers[sat], fr_lon, fr_lat ,def_fac[2]*df['CMEtilt'][row],
                                           df['height'][row]-height_diff,df['k'][row]*exp_fac[0], df['ang'][row]*exp_fac[1], imsize=imsize, 
-                                          occrad=size_occ[sat], in_sig=0.8, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)
+                                          occrad=size_occ[sat], in_sig=1.0, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off,
+                                          losrange=np.array([-1*df['height'][row] - 2.0 , df['height'][row] + 2.0]))
         
+            btot_inner = rtraytracewcs(headers[sat], fr_lon, fr_lat ,def_fac[2]*df['CMEtilt'][row],
+                                          df['height'][row]-height_diff,df['k'][row]*exp_fac[0], df['ang'][row]*exp_fac[1], imsize=imsize, 
+                                          occrad=size_occ[sat], in_sig=1.0, out_sig=0.0001, nel=1e5, usr_center_off=usr_center_off,
+                                          losrange=np.array([-1*df['height'][row] - 2.0 , df['height'][row] + 2.0]))
+            mask_inner_for_filter = get_cme_mask(btot_inner,inner_cme=inner_hole_mask,occ_size=occ_size_1024)
+
         #adds a flux rope-like structure
         if add_flux_rope:
             if df['height'][row] < 3:
@@ -341,16 +509,19 @@ def create_sintetic_image(row):
             else:
                 frope_height_diff = np.random.uniform(low=0.45, high=0.75)
             aspect_ratio_frope = np.random.uniform(low=0.2, high=0.4) # random % of k
+            aspect_ratio_frope_sat[sat] = aspect_ratio_frope
             scl_fac_fr = np.random.uniform(low=0, high=2) # int scaling factor
+            scl_fac_fr_sat[sat]=scl_fac_fr
             btot += scl_fac_fr*rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*frope_height_diff,
                                           df['k'][row]*aspect_ratio_frope, df['ang'][row], imsize=imsize,
-                                          occrad=size_occ[sat], in_sig=2., out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)    
+                                          occrad=size_occ[sat], in_sig=2., out_sig=0.2, nel=1e5, usr_center_off=usr_center_off,
+                                          losrange=np.array([-1*df['height'][row] - 2.0 , df['height'][row] + 2.0]))    
             # uses a differential flux rope
-            #Diego: Las in_sing: 0.8
             if diff_int_cme:
                 btot -= scl_fac*scl_fac_fr*rtraytracewcs(headers[sat], fr_lon, fr_lat,def_fac[2]*df['CMEtilt'][row], 
                                               df['height'][row]*frope_height_diff-height_diff,df['k'][row]*aspect_ratio_frope*exp_fac[0],df['ang'][row]*exp_fac[1],
-                                              imsize=imsize, occrad=size_occ[sat], in_sig=2., out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)    
+                                              imsize=imsize, occrad=size_occ[sat], in_sig=2., out_sig=0.2, nel=1e5, usr_center_off=usr_center_off,
+                                              losrange=np.array([-1*df['height'][row] - 2.0 , df['height'][row] + 2.0]))    
         #background corona
         back = back_corona[sat]
         if back_rnd_rot:
@@ -375,7 +546,7 @@ def create_sintetic_image(row):
         m_abs_btot=np.abs(np.mean(btot))
         if m_abs_btot is np.nan:
             print("\033[93m WARNING: CME number {} has NaNs in btot, skipping all views...".format(row))            
-            mask_aw_sat.pop()# removes the last appended mask_aw_sat
+            #mask_aw_sat.pop()# removes the last appended mask_aw_sat
             break
 
         #adds poissonian noise to btot
@@ -430,26 +601,27 @@ def create_sintetic_image(row):
             back[r <= size_occ[sat]]     = level_occ*mean_back
             back[r >= size_occ_ext[sat]] = level_occ*mean_back
 
+        mask_outer_for_filter2=mask_outer_for_filter.copy()
+        mask_outer_for_filter2 [mask_inner_for_filter==1] = 0
+        mask_outer_for_filter2[r <= size_occ[sat]] = 0  
+        mask_outer_for_filter2[r >= size_occ_ext[sat]] = 0
         #check if the background on the mask area differs from btot +back
-        btot_pixels = btot[mask==1].flatten()
-        back_pixels = back[mask==1].flatten()
-        bins = np.histogram_bin_edges(np.hstack((btot_pixels, back_pixels)), bins=80)
-        # Important: Use the same bins for both histograms
-        hist1 = np.histogram(btot_pixels, bins=bins)
-        hist2 = np.histogram(back_pixels, bins=bins)
-        bin_midpoints1 = (hist1[1][:-1] + hist1[1][1:]) / 2
-        data1 = np.repeat(bin_midpoints1, hist1[0].astype(int)) # Repeat midpoints based on histogram counts.
-        bin_midpoints2 = (hist2[1][:-1] + hist2[1][1:]) / 2
-        data2 = np.repeat(bin_midpoints2, hist2[0].astype(int))
-        p_valor = ks_2samp(data1, data2).pvalue
+        A,B,area=flter_non_zero(back,btot,mask_outer_for_filter2)
+        mean_BA,median_BA,std_BA = statistic_values(B/A)
+        selected_cota=10#5
+        cota = [-1,1]
+        cota = [x * selected_cota for x in cota]
+        area_threshold   = area_outside_std(B/A, cota=cota,positive_only=True)
 
-        
-        if  p_valor < 0.05:
-            #a p-value < 0.05 indicates that the two distributions are significantly different'
-            aux=''
-        else:
-            #the idea is to skip this cases, since the CME is not visible
-            aux='/rejected'
+        aux=''
+        status='ok'
+        if  np.abs(median_BA-1.0) < 0.2:
+            if area_threshold/area <= 0.02:
+                aux='/rejected'
+                status='rejected'
+        median_btot_over_back_sat[sat] = median_BA
+        filter_area_threshold_sat[sat] = area_threshold/area
+        status_sat[sat] = status
 
         #saves images
         if otype=="fits":
@@ -475,6 +647,8 @@ def create_sintetic_image(row):
                 #mask for cme
                 ofile = mask_folder +aux+'/'+ofile_name+'_mask_2.png'
                 fig=save_png(mask,ofile=ofile, range=[0, 1])
+                ofile = mask_folder +aux+'/'+ofile_name+'_mask_3.png' #remover esto luego del check
+                fig=save_png(mask_outer_for_filter2,ofile=ofile, range=[0, 1])
                 if save_only_cme_mask == False:   
                     if sceond_mask is not None: 
                         ofile = mask_folder +'/'+ofile_name+'_mask_3.png'
@@ -485,8 +659,12 @@ def create_sintetic_image(row):
                     #mask for ext occulter
                     ofile = mask_folder +'/'+ofile_name+'_mask_1.png'
                     fig=save_png(occ_mask_ext,ofile=ofile, range=[0, 1])
+            if save_background:
+                ofile=folder +aux+ '/' + ofile_name+'_back.png'
+                fig=save_png(back,ofile=ofile, range=[vmin_back, vmax_back])
             #full image
             ofile=folder +aux+ '/' + ofile_name+'_btot.png'
+            btot_clean = btot.copy()
             # adds middle cross to btot
             if show_middle_cross:
                 btot[imsize[0]//2-1:imsize[0]//2+1,:] = vmin_back
@@ -496,7 +674,7 @@ def create_sintetic_image(row):
                 fig=save_png(btot+arr_cloud*vmin_back,ofile=ofile, range=[vmin_back, vmax_back])
             else:
                 fig=save_png(btot,ofile=ofile, range=[vmin_back, vmax_back])
-            plot_histogram(back,btot,mask,folder +aux+ '/' + ofile_name+'_histo.png')
+            plot_histogram(back,btot_clean,mask_outer_for_filter2,folder +aux+ '/' + ofile_name+'_histo.png',plot_histo_snr=False)
         else:
             print("otype value not recognized")    
         # saves ok case
@@ -507,10 +685,10 @@ def create_sintetic_image(row):
     #plotranges_all.append(plotranges)
     # saves aw
     #mask_aw.append(mask_aw_sat)
-    return satpos, plotranges, mask_aw_sat, halo_count, ok_cases
+    return satpos, plotranges, mask_aw_sat, halo_count, ok_cases, apex_sat, scl_fac_fr_sat, def_fac_sat, exp_fac_sat, aspect_ratio_frope_sat, status_sat, median_btot_over_back_sat, filter_area_threshold_sat
 
 def print_stuffs():
-    global satpos_all, plotranges_all, mask_aw
+    global satpos_all, plotranges_all, mask_aw_all,apex_all,scl_fac_fr_all,def_fac_all,exp_fac_all,aspect_ratio_frope_all,median_btot_over_back_all,filter_area_threshold_all,status_all,halo_count_tot,ok_cases_tot
 
     print(f'Total Number of OK cases: {ok_cases_tot}')
     print(f'Total Number of aborted cases: {df.index.stop*n_sat -1-ok_cases_tot}')
@@ -519,7 +697,15 @@ def print_stuffs():
     df['satpos'] = satpos_all
     df['plotranges'] = plotranges_all
     # add halo count to dataframe
-    df['mask AW per sat'] = mask_aw
+    df['mask AW'] = mask_aw_all
+    df['apex'] = apex_all
+    df['scl_fac_fr'] = scl_fac_fr_all
+    df['def_fac_lon_lat_tilt'] = def_fac_all
+    df['exp_fac_k_ang'] = exp_fac_all
+    df['aspect ratio'] = aspect_ratio_frope_all
+    df['status'] = status_all
+    df['median_btot_over_back'] = median_btot_over_back_all
+    df['filter_area_threshold'] = filter_area_threshold_all
     df.to_csv(configfile_name)
 
 num_cpus = os.cpu_count()
@@ -536,10 +722,18 @@ with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor
     #while len(futures) != MAX_WORKERS: # Task loader
     futures = [executor.submit(create_sintetic_image, row) for row in df.index]
     for future in concurrent.futures.as_completed(futures):
-        satpos_f, plotranges_f, mask_aw_sat_f, halo_count_f, ok_cases_f = future.result()
+        satpos_f, plotranges_f, mask_aw_sat_f, halo_count_f, ok_cases_f,apex_sat_f, scl_fac_fr_sat_f, def_fac_sat_f, exp_fac_sat_f, aspect_ratio_frope_sat_f, status_sat_f,median_btot_over_back_sat_f,filter_area_threshold_sat_f = future.result()
         satpos_all.append(satpos_f)
         plotranges_all.append(plotranges_f)
-        mask_aw.append(mask_aw_sat_f)
+        mask_aw_all.append(mask_aw_sat_f)
+        apex_all.append(apex_sat_f)
+        scl_fac_fr_all.append(scl_fac_fr_sat_f)
+        def_fac_all.append(def_fac_sat_f)
+        exp_fac_all.append(exp_fac_sat_f)
+        status_all.append(status_sat_f)
+        aspect_ratio_frope_all.append(aspect_ratio_frope_sat_f)
+        median_btot_over_back_all.append(median_btot_over_back_sat_f)
+        filter_area_threshold_all.append(filter_area_threshold_sat_f)
         halo_count_tot = halo_count_f +halo_count_tot
         ok_cases_tot = ok_cases_f + ok_cases_tot
 print_stuffs()
