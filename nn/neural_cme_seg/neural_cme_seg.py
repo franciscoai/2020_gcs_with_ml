@@ -20,6 +20,7 @@ from scipy import stats
 mpl.use('Agg')
 from astropy.io import fits
 import logging
+import itertools
 
 __author__ = "Francisco Iglesias"
 __copyright__ = "Grupo de Estudios en Heliofisica de Mendoza - https://sites.google.com/um.edu.ar/gehme"
@@ -805,6 +806,7 @@ class neural_cme_segmentation():
                 apex_angl_per = mask_prop[i][j][10]
                 data.append((date,mask_id,scr,cpa,wa,apex,label,box,mask,apex_angl,aw_min,aw_max,area_score,apex_dist_per,apex_angl_per))
         df = pd.DataFrame(data, columns=["DATE_TIME","MASK_ID","SCR","CPA","AW","APEX","LABEL","BOX","MASK","APEX_ANGL","AW_MIN","AW_MAX", "AREA_SCORE","APEX_DIST_PER","APEX_ANGL_PER"])
+        control_df = pd.DataFrame(data, columns=["DATE_TIME","MASK_ID","SCR","CPA","AW","APEX","LABEL","BOX","MASK","APEX_ANGL","AW_MIN","AW_MAX", "AREA_SCORE","APEX_DIST_PER","APEX_ANGL_PER"]) 
         df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"])
         
         #Gets the optimal number of clusters for the data
@@ -989,7 +991,7 @@ class neural_cme_segmentation():
             plt.tight_layout()
             fig2.savefig(opath+"/filtered_fitted_data.png")
             plt.close() 
-        return min_error_df
+        return min_error_df, control_df
         
 
         
@@ -1135,6 +1137,14 @@ class neural_cme_segmentation():
         return all_dates,all_masks, all_scores, all_lbl, all_boxes,all_mask_prop
         
 
+    def _calculate_iou(self, mask1, mask2):
+        """
+        Gets Intersection over Union (IoU) between two binary masks.
+        """
+        intersection = np.logical_and(mask1[0], mask2[0]).sum()
+        union = np.logical_or(mask1[0], mask2[0]).sum()
+        iou=intersection / union 
+        return iou
 
     def _intersection(self, dates, masks, scores, labels, boxes, mask_prop,plate_scl,opath,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS):
         data=[]
@@ -1157,114 +1167,45 @@ class neural_cme_segmentation():
                 apex_angl_per = mask_prop[i][j][10]
                 data.append((date,mask_id,scr,cpa,wa,apex,label,box,mask,apex_angl,aw_min,aw_max,area_score,apex_dist_per,apex_angl_per))
         df = pd.DataFrame(data, columns=["DATE_TIME","MASK_ID","SCR","CPA","AW","APEX","LABEL","BOX","MASK","APEX_ANGL","AW_MIN","AW_MAX", "AREA_SCORE","APEX_DIST_PER","APEX_ANGL_PER"])
-        unique_dates=df["DATE_TIME"].unique()
         df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"])
 
-        
-        results_df = pd.DataFrame()  
-        for date in range(len(unique_dates) - 1):  
-            event1 = df.loc[df["DATE_TIME"] == unique_dates[date]]
-            event2 = df.loc[df["DATE_TIME"] == unique_dates[date + 1]]
+
+        groups = df.groupby('DATE_TIME')['MASK_ID'].apply(list)    
+        comb = list(itertools.product(*groups))
+        df_comb = pd.DataFrame(comb, columns=groups.index)
+
+        for a in range(len(df_comb)):
+                row = df_comb.iloc[a] 
+                temp_list = []
+                for index, column in enumerate(row.index[:-1]): 
+                    id1 = row[column]
+                    id2 = row[row.index[index + 1]]
+                    mask1 = df[(df["MASK_ID"] == id1) & (df["DATE_TIME"] == column)]["MASK"]
+                    mask2 = df[(df["MASK_ID"] == id2) & (df["DATE_TIME"] == row.index[index + 1])]["MASK"]    
+
+                    if not mask1.empty and not mask2.empty:
+                        iou = self._calculate_iou(mask1=mask1.values, mask2=mask2.values)
+                        temp_list.append(iou)
+
+                iou_tot = sum(temp_list)
+                df_comb.loc[a, 'IoU'] = iou_tot
+        breakpoint()
+        return df_comb  
+
+
+
             
-            # Crear nombres dinámicos para las columnas de máscara de eventos
-            event1_col = f"EVENT_{date}"
-            event2_col = f"EVENT_{date + 1}"
-            iou_col=f"IOU_{date}_{date + 1}"
-            # Crear una lista temporal para almacenar resultados de esta fecha
-            temp_results = []
-
-            for s in range(len(event1)):
-                mask1 = event1.iloc[s]["MASK"]
-                maskid1 = event1.iloc[s]["MASK_ID"]  # Suponiendo que 'MASKID' es el ID del evento en 'event1'
-
-                for r in range(len(event2)):
-                    mask2 = event2.iloc[r]["MASK"]
-                    maskid2 = event2.iloc[r]["MASK_ID"]  # Suponiendo que 'MASKID' es el ID del evento en 'event2'
-
-                    # Calcular la intersección y la unión
-                    intersection = np.logical_and(mask1, mask2).sum()
-                    union = np.logical_or(mask1, mask2).sum()
-                    iou = intersection / union if union > 0 else 0
-
-                    # Añadir los resultados en la lista temporal
-                    temp_results.append({
-                        event1_col: maskid1,
-                        event2_col: maskid2,
-                        iou_col: iou
-                    })
-            
-            # Convertir la lista temporal en un DataFrame y añadirlo a results_df
-            temp_df = pd.DataFrame(temp_results)
-            results_df = pd.concat([results_df, temp_df], ignore_index=True)
-        print(results_df)
-
-
-
-
-        # dt_event1= df.loc[df["DATE_TIME"]==unique_dates[0]]
-        # dt_event2=df.loc[df["DATE_TIME"]==unique_dates[1]]
         
-        #intersections = []
 
-        # for i in range(len(dt_event1)):
-        #     for j in range(len(dt_event2)):
-        #         # Extraer máscaras y otros datos necesarios
-        #         mask1 = dt_event1.iloc[i]["MASK"]
-        #         mask2 = dt_event2.iloc[j]["MASK"]
-        #         mask_id1 = dt_event1.iloc[i]["MASK_ID"]
-        #         mask_id2 = dt_event2.iloc[j]["MASK_ID"]
-        #         date_time1 = dt_event1.iloc[i]["DATE_TIME"]
-        #         date_time2 = dt_event2.iloc[j]["DATE_TIME"]
 
-        #         # Calcular intersección y unión
-        #         intersection = np.logical_and(mask1, mask2).sum()
-        #         union = np.logical_or(mask1, mask2).sum()
-        #         iou = intersection / union if union > 0 else 0
 
-        #         # Agregar los datos a la lista
-        #         intersections.append({
-        #             "DATE_TIME_EVENTO1": date_time1,
-        #             "DATE_TIME_EVENTO2": date_time2,
-        #             "MASK_ID_EVENTO1": mask_id1,
-        #             "MASK_ID_EVENTO2": mask_id2,
-        #             "INTERSECCION": intersection,
-        #             "IoU": iou
-        #         })
-        # interseccion = pd.DataFrame(intersections)
-        # # looks for IoU max
-        # max_iou_row = interseccion.loc[interseccion["IoU"].idxmax()]
-        # event1_info = dt_event1.loc[dt_event1["MASK_ID"] == max_iou_row["MASK_ID_EVENTO1"]]
-        # event2_info = dt_event2.loc[dt_event2["MASK_ID"] == max_iou_row["MASK_ID_EVENTO2"]]
-        # full_event = pd.concat([event1_info, event2_info])
 
-        # for k in range(2,len(unique_dates)):
-        #     intersections = []
-        #     dt_event3=df.loc[df["DATE_TIME"]==unique_dates[k]]
-        #     for j in range(len(dt_event3)):
-        #         mask1 = full_event.iloc[-1]["MASK"]
-        #         mask3 = dt_event3.iloc[j]["MASK"]
-        #         mask_id3 = dt_event3.iloc[j]["MASK_ID"]
-        #         date_time3 = dt_event3.iloc[j]["DATE_TIME"]
 
-        #         # Calcular intersección y unión
-        #         intersection = np.logical_and(mask1, mask3).sum()
-        #         union = np.logical_or(mask1, mask3).sum()
-        #         iou = intersection / union if union > 0 else 0
 
-        #         # Agregar los datos a la lista
-        #         intersections.append({
-        #             "DATE_TIME_EVENTO3": date_time2,
-        #             "MASK_ID_EVENTO3": mask_id2,
-        #             "INTERSECCION": intersection,
-        #             "IoU": iou
-        #         })
-        #     interseccion = pd.DataFrame(intersections)
-        #     # Buscar el IoU máximo
-        #     max_iou_row = interseccion.loc[interseccion["IoU"].idxmax()]
-        #     event3_info = dt_event3.loc[dt_event3["MASK_ID"] == max_iou_row["MASK_ID_EVENTO3"]]
-        #     full_event = pd.concat([full_event, event3_info])
 
-        # return full_event
+
+
+        
 
     def infer_event2(self, imgs, dates, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None,occulter_size_ext=None,
                     centerpix=None, mask_threshold=None, scr_threshold=None, plot_params=None, filter_halos=True,modified_masks=None,
@@ -1381,14 +1322,14 @@ class neural_cme_segmentation():
         if len(all_masks)>=2:
             # keeps only one mask per img based on cpa, aw and apex radius evolution consistency
             if filter:
-                # iou_df = self._intersection(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,
-                #                         all_plate_scl,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS)
+                iou_df = self._intersection(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,
+                                         all_plate_scl,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS)
                 # if len(iou_df)>0:      
                 #     if plot_params is not None:
                 #         self._plot_mask_prop2(iou_df, self.plot_params , ending='_filtered_iou',save_pickle=True, iou=True)
 
-                    
-                df = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,
+                   
+                df, control_df = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,
                                         all_plate_scl,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS)
 
                 if len(df)>0:                        
