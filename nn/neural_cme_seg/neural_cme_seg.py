@@ -87,7 +87,21 @@ class neural_cme_segmentation():
             self.num_classes = 2 # background, CME
             self.trainable_backbone_layers = 5
             self.mask_threshold = 0.60 # value to consider a pixel belongs to the object
-            self.scr_threshold = 0.51 # only detections with score larger than this value are considered            
+            self.scr_threshold = 0.51 # only detections with score larger than this value are considered  
+        if self.version == 'A4_DS3.1':
+            # Forth version of the model. Architecture from v4. Filtered DataSet 3.0.
+            self.labels=['Background','Occ','CME'] 
+            self.num_classes = 3 # background, CME, occulter
+            self.trainable_backbone_layers = 4
+            self.mask_threshold = 0.60 
+            self.scr_threshold = 0.51 
+        if self.version == 'A6_DS31':
+            # Fifth version of the model. Architecture from v5. Filtered DataSet 3.0.
+            self.labels=['Background','CME'] # labels for the different classes
+            self.num_classes = 2 # background, CME
+            self.trainable_backbone_layers = 5
+            self.mask_threshold = 0.60 # value to consider a pixel belongs to the object
+            self.scr_threshold = 0.51 
         # innitializes the model
         self.model=torchvision.models.detection.maskrcnn_resnet50_fpn(weights='DEFAULT', trainable_backbone_layers=self.trainable_backbone_layers) 
         self.in_features = self.model.roi_heads.box_predictor.cls_score.in_features 
