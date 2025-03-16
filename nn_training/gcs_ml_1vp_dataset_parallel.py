@@ -386,7 +386,7 @@ def create_sintetic_image(row):
     sinthetic_params_Bt_RD_sat  = [np.nan for i in range(n_sat)]
     sinthetic_params_FR_out_sat = [np.nan for i in range(n_sat)]
     sinthetic_params_FR_RD_sat  = [np.nan for i in range(n_sat)]
-    folder_name_sat             = [np.nan for i in range(n_sat)]
+    folder_name_sat             = ['' for i in range(n_sat)]
     stats_btot_mask_sat         = [np.nan for i in range(n_sat)]
     stats_back_mask_sat         = [np.nan for i in range(n_sat)]
     stats_cme_mask_sat          = [np.nan for i in range(n_sat)]
@@ -651,7 +651,8 @@ def create_sintetic_image(row):
         stats_btot_mask_outer_sat[sat] = stats_caclulations(btot         , mask_outer_for_filter2)
         stats_cme_mask_outer_sat[sat]  = stats_caclulations(btot_original, mask_outer_for_filter2)
         stats_back_mask_outer_sat[sat] = stats_caclulations(back         , mask_outer_for_filter2)
-        folder_name_sat[sat] = folder
+        if opath_fstructure=='run':
+            folder_name_sat[sat] = folder.split('/')[-1]
 
         aux=''
         status='ok'

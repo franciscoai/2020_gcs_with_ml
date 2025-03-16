@@ -245,7 +245,7 @@ DATA_PATH = '/gehme/data'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240830'
 OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212'
 OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250304'
-opath_fstructure='check'#'run' # use 'check' to save all the ouput images in the same dir together for easier checkout
+opath_fstructure='run'#'check'#'run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
 # morphology
@@ -387,7 +387,7 @@ for row in df.index:
     sinthetic_params_Bt_RD_sat  = [np.nan for i in range(n_sat)]
     sinthetic_params_FR_out_sat = [np.nan for i in range(n_sat)]
     sinthetic_params_FR_RD_sat  = [np.nan for i in range(n_sat)]
-    folder_name_sat             = [np.nan for i in range(n_sat)]
+    folder_name_sat             = ['' for i in range(n_sat)]
     stats_btot_mask_sat         = [np.nan for i in range(n_sat)]
     stats_back_mask_sat         = [np.nan for i in range(n_sat)]
     stats_cme_mask_sat          = [np.nan for i in range(n_sat)]
@@ -654,7 +654,8 @@ for row in df.index:
         stats_btot_mask_outer_sat[sat] = stats_caclulations(btot         , mask_outer_for_filter2)
         stats_cme_mask_outer_sat[sat]  = stats_caclulations(btot_original, mask_outer_for_filter2)
         stats_back_mask_outer_sat[sat] = stats_caclulations(back         , mask_outer_for_filter2)
-        folder_name_sat[sat] = folder
+        if opath_fstructure=='run':
+            folder_name_sat[sat] = folder.split('/')[-1]
 
         aux=''
         status='ok'
@@ -666,6 +667,7 @@ for row in df.index:
         median_btot_over_back_sat[sat] = median_BA
         filter_area_threshold_sat[sat] = area_threshold/area
         status_sat[sat] = status
+
         #saves images
         if otype=="fits":
             if save_masks:
@@ -762,7 +764,7 @@ df['apex'] = apex_all
 df['scl_fac_fr'] = scl_fac_fr_all
 df['def_fac_lon_lat_tilt'] = def_fac_all
 df['exp_fac_k_ang'] = exp_fac_all
-df['aspect ratio'] = aspect_ratio_frope_all
+df['aspect_ratio'] = aspect_ratio_frope_all
 df['status'] = status_all
 df['median_btot_over_back'] = median_btot_over_back_all
 df['filter_area_threshold'] = filter_area_threshold_all
