@@ -734,7 +734,7 @@ for row in df.index:
     scl_fac_fr_all.append(scl_fac_fr_sat)
     def_fac_all.append(def_fac_sat)
     exp_fac_all.append(exp_fac_sat)
-    status_all.append(status_sat)
+    #status_all.append(status_sat)
     aspect_ratio_frope_all.append(aspect_ratio_frope_sat)
     median_btot_over_back_all.append(median_btot_over_back_sat)
     filter_area_threshold_all.append(filter_area_threshold_sat)
