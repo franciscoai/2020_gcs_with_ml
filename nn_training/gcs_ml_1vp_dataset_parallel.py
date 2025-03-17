@@ -22,6 +22,7 @@ import concurrent.futures
 from scipy.stats import kstest,chisquare,ks_2samp
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import time
 mpl.use('Agg')
 
 def save_png(array, ofile=None, range=None):
@@ -126,6 +127,7 @@ def area_outside_thresh(A,cota=False):
     results = []
     for j in cota:
         results.append(len(A[A > j]))
+    return results
 
 def factor(X, Y):
     """
@@ -246,7 +248,7 @@ DATA_PATH = '/gehme/data'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
 OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212'
 OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250304'
-opath_fstructure='check'#'run' # use 'check' to save all the ouput images in the same dir together for easier checkout
+opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
 # morphology
@@ -255,7 +257,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 50#300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 10#300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -302,6 +304,8 @@ if opath_fstructure=='check':
     show_middle_cross = True
     add_flux_rope = True
 
+start_time = time.time()
+
 os.makedirs(OPATH, exist_ok=True)
 # saves a copy of this script to the output folder
 os.system("cp " + os.path.realpath(__file__) + " " + OPATH)
@@ -331,7 +335,7 @@ scl_fac_fr_all = []
 def_fac_all = []
 exp_fac_all = []
 aspect_ratio_frope_all = []
-status_all = []
+#status_all = []
 halo_count = 0
 ok_cases = 0
 usr_center_off = None
@@ -379,7 +383,7 @@ def create_sintetic_image(row):
     def_fac_sat     = [np.nan for i in range(n_sat)]
     exp_fac_sat     = [np.nan for i in range(n_sat)]
     aspect_ratio_frope_sat = [np.nan for i in range(n_sat)]
-    status_sat      = ['' for i in range(n_sat)]
+    #status_sat      = ['' for i in range(n_sat)]
     median_btot_over_back_sat = [np.nan for i in range(n_sat)]
     filter_area_threshold_sat = [np.nan for i in range(n_sat)]
     sinthetic_params_Bt_out_sat = [np.nan for i in range(n_sat)]
@@ -655,15 +659,15 @@ def create_sintetic_image(row):
             folder_name_sat[sat] = folder.split('/')[-1]
 
         aux=''
-        status='ok'
-        if  np.abs(median_BA) < 0.2:
-            if area_threshold[1]/area <= 0.02:
-                if opath_fstructure=='check':
+        #status='ok'
+        if opath_fstructure=='check':
+            if  np.abs(median_BA) < 0.2:
+                if area_threshold[1]/area <= 0.02:
                     aux='/rejected'
-                status='rejected'
+                #status='rejected'
         median_btot_over_back_sat[sat] = median_BA
         filter_area_threshold_sat[sat] = area_threshold/area
-        status_sat[sat] = status
+        #status_sat[sat] = status
 
         #saves images
         if otype=="fits":
@@ -729,14 +733,17 @@ def create_sintetic_image(row):
     #plotranges_all.append(plotranges)
     # saves aw
     #mask_aw.append(mask_aw_sat)
-    return satpos, plotranges, mask_aw_sat, halo_count, ok_cases, apex_sat, scl_fac_fr_sat, def_fac_sat, exp_fac_sat, aspect_ratio_frope_sat, status_sat, median_btot_over_back_sat, filter_area_threshold_sat, sinthetic_params_Bt_out_sat, sinthetic_params_Bt_RD_sat, sinthetic_params_FR_out_sat, sinthetic_params_FR_RD_sat, stats_btot_mask_sat, stats_back_mask_sat, stats_cme_mask_sat, stats_btot_mask_outer_sat, stats_back_mask_outer_sat, stats_cme_mask_outer_sat, folder_name_sat
+    return satpos, plotranges, mask_aw_sat, halo_count, ok_cases, apex_sat, scl_fac_fr_sat, def_fac_sat, exp_fac_sat, aspect_ratio_frope_sat, median_btot_over_back_sat, filter_area_threshold_sat, sinthetic_params_Bt_out_sat, sinthetic_params_Bt_RD_sat, sinthetic_params_FR_out_sat, sinthetic_params_FR_RD_sat, stats_btot_mask_sat, stats_back_mask_sat, stats_cme_mask_sat, stats_btot_mask_outer_sat, stats_back_mask_outer_sat, stats_cme_mask_outer_sat, folder_name_sat
 
 def print_stuffs():
-    global satpos_all, plotranges_all, mask_aw_all,apex_all,scl_fac_fr_all,def_fac_all,exp_fac_all,aspect_ratio_frope_all,median_btot_over_back_all,filter_area_threshold_all,status_all,halo_count_tot,ok_cases_tot
-
+    global satpos_all, plotranges_all, mask_aw_all,apex_all,scl_fac_fr_all,def_fac_all,exp_fac_all,aspect_ratio_frope_all,median_btot_over_back_all,filter_area_threshold_all,halo_count_tot,ok_cases_tot, sinthetic_params_Bt_out_all, sinthetic_params_Bt_RD_all, sinthetic_params_FR_out_all, sinthetic_params_FR_RD_all, stats_btot_mask_all, stats_back_mask_all, stats_cme_mask_all, stats_btot_mask_outer_all, stats_back_mask_outer_all, stats_cme_mask_outer_all, folder_name_all
+    global start_time
     print(f'Total Number of OK cases: {ok_cases_tot}')
-    print(f'Total Number of aborted cases: {df.index.stop*n_sat -1-ok_cases_tot}')
+    print(f'Total Number of aborted cases: {df.index.stop*n_sat -ok_cases_tot}')
     print(f'Total Number of halos: {halo_count_tot}')
+    end_time = time.time()
+    execution_time = (end_time - start_time) / 3600  # Convert seconds to hours
+    print(f"Execution Time: {execution_time:.10f} hours")
     #add satpos and plotranges to dataframe and save csv
     df['satpos'] = satpos_all
     df['plotranges'] = plotranges_all
@@ -747,9 +754,19 @@ def print_stuffs():
     df['def_fac_lon_lat_tilt'] = def_fac_all
     df['exp_fac_k_ang'] = exp_fac_all
     df['aspect ratio'] = aspect_ratio_frope_all
-    df['status'] = status_all
     df['median_btot_over_back'] = median_btot_over_back_all
     df['filter_area_threshold'] = filter_area_threshold_all
+    df['sinthetic_params_Bt_out'] = sinthetic_params_Bt_out_all
+    df['sinthetic_params_Bt_RD'] = sinthetic_params_Bt_RD_all
+    df['sinthetic_params_FR_out'] = sinthetic_params_FR_out_all
+    df['sinthetic_params_FR_RD'] = sinthetic_params_FR_RD_all
+    df['stats_btot_mask'] = stats_btot_mask_all
+    df['stats_back_mask'] = stats_back_mask_all
+    df['stats_cme_mask'] = stats_cme_mask_all
+    df['stats_btot_mask_outer'] = stats_btot_mask_outer_all
+    df['stats_back_mask_outer'] = stats_back_mask_outer_all
+    df['stats_cme_mask_outer'] = stats_cme_mask_outer_all
+    df['folder_name'] = folder_name_all
     df.to_csv(configfile_name)
 
 num_cpus = os.cpu_count()
@@ -766,7 +783,7 @@ with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor
     #while len(futures) != MAX_WORKERS: # Task loader
     futures = [executor.submit(create_sintetic_image, row) for row in df.index]
     for future in concurrent.futures.as_completed(futures):
-        satpos_f, plotranges_f, mask_aw_sat_f, halo_count_f, ok_cases_f,apex_sat_f, scl_fac_fr_sat_f, def_fac_sat_f, exp_fac_sat_f, aspect_ratio_frope_sat_f, status_sat_f,median_btot_over_back_sat_f,filter_area_threshold_sat_f, sinthetic_params_Bt_out_sat_f, sinthetic_params_Bt_RD_sat_f, sinthetic_params_FR_out_sat_f, sinthetic_params_FR_RD_sat_f, stats_btot_mask_sat_f, stats_back_mask_sat_f, stats_cme_mask_sat_f, stats_btot_mask_outer_sat_f, stats_back_mask_outer_sat_f, stats_cme_mask_outer_sat_f, folder_name_sat_f = future.result()
+        satpos_f, plotranges_f, mask_aw_sat_f, halo_count_f, ok_cases_f,apex_sat_f, scl_fac_fr_sat_f, def_fac_sat_f, exp_fac_sat_f, aspect_ratio_frope_sat_f, median_btot_over_back_sat_f,filter_area_threshold_sat_f, sinthetic_params_Bt_out_sat_f, sinthetic_params_Bt_RD_sat_f, sinthetic_params_FR_out_sat_f, sinthetic_params_FR_RD_sat_f, stats_btot_mask_sat_f, stats_back_mask_sat_f, stats_cme_mask_sat_f, stats_btot_mask_outer_sat_f, stats_back_mask_outer_sat_f, stats_cme_mask_outer_sat_f, folder_name_sat_f = future.result()
         satpos_all.append(satpos_f)
         plotranges_all.append(plotranges_f)
         mask_aw_all.append(mask_aw_sat_f)
@@ -774,7 +791,7 @@ with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor
         scl_fac_fr_all.append(scl_fac_fr_sat_f)
         def_fac_all.append(def_fac_sat_f)
         exp_fac_all.append(exp_fac_sat_f)
-        status_all.append(status_sat_f)
+        #status_all.append(status_sat_f)
         aspect_ratio_frope_all.append(aspect_ratio_frope_sat_f)
         median_btot_over_back_all.append(median_btot_over_back_sat_f)
         filter_area_threshold_all.append(filter_area_threshold_sat_f)

@@ -173,7 +173,6 @@ def plot_histogram(back,btot,mask,filename,plot_ratio_histo=False,plot_ratio_his
         cota = [x * selected_cota +1 for x in cota]
         area_cota_7   = area_outside_std(B/A, cota=[0,7], positive_only=True)
         area_cota_positive = area_outside_std(B/A, cota=cota, positive_only=True)
-        breakpoint()
         plt.text(0.03, 0.95 ,f'\nMean: {mean_BA:.3f}\nStd: {std_BA:.3f}\nMedian: {median_BA:.3f}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
         plt.text(0.03, 0.75 ,f'\nper 85: {percentile_superior:.1f}\nper 15: {percentile_inferior:.1f}',transform=ax.transAxes,fontsize=10,color='green',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
         plt.text(0.70, 0.75 ,f'\nArea Tot: {area:.1f}',transform=ax.transAxes,fontsize=10,color='red',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
@@ -380,7 +379,7 @@ for row in df.index:
     def_fac_sat     = [np.nan for i in range(n_sat)]
     exp_fac_sat     = [np.nan for i in range(n_sat)]
     aspect_ratio_frope_sat = [np.nan for i in range(n_sat)]
-    status_sat      = ['nan' for i in range(n_sat)]
+    #status_sat      = ['nan' for i in range(n_sat)]
     median_btot_over_back_sat   = [np.nan for i in range(n_sat)]
     filter_area_threshold_sat   = [np.nan for i in range(n_sat)]
     sinthetic_params_Bt_out_sat = [np.nan for i in range(n_sat)]
@@ -658,15 +657,15 @@ for row in df.index:
             folder_name_sat[sat] = folder.split('/')[-1]
 
         aux=''
-        status='ok'
+        #status='ok'
         if  np.abs(median_BA) < 0.2:
             if area_threshold[1]/area <= 0.2:
                 if opath_fstructure=='check':
                     aux='/rejected'
-                status='rejected'
+                #status='rejected'
         median_btot_over_back_sat[sat] = median_BA
         filter_area_threshold_sat[sat] = area_threshold/area
-        status_sat[sat] = status
+        #status_sat[sat] = status
 
         #saves images
         if otype=="fits":
@@ -753,7 +752,7 @@ for row in df.index:
 ########### end of paralelize
 
 print(f'Total Number of OK cases: {ok_cases}')
-print(f'Total Number of aborted cases: {df.index.stop*n_sat -1-ok_cases}')
+print(f'Total Number of aborted cases: {df.index.stop*n_sat -ok_cases}')
 print(f'Total Number of halos: {halo_count}')
 #add satpos and plotranges to dataframe and save csv
 df['satpos'] = satpos_all
@@ -765,11 +764,18 @@ df['scl_fac_fr'] = scl_fac_fr_all
 df['def_fac_lon_lat_tilt'] = def_fac_all
 df['exp_fac_k_ang'] = exp_fac_all
 df['aspect_ratio'] = aspect_ratio_frope_all
-df['status'] = status_all
+#df['status'] = status_all
 df['median_btot_over_back'] = median_btot_over_back_all
 df['filter_area_threshold'] = filter_area_threshold_all
 df['sinthetic_params_Bt_out'] = sinthetic_params_Bt_out_all
 df['sinthetic_params_Bt_RD'] = sinthetic_params_Bt_RD_all
 df['sinthetic_params_FR_out'] = sinthetic_params_FR_out_all
 df['sinthetic_params_FR_RD'] = sinthetic_params_FR_RD_all
+df['stats_btot_mask'] = stats_btot_mask_all
+df['stats_back_mask'] = stats_back_mask_all
+df['stats_cme_mask'] = stats_cme_mask_all
+df['stats_btot_mask_outer'] = stats_btot_mask_outer_all
+df['stats_back_mask_outer'] = stats_back_mask_outer_all
+df['stats_cme_mask_outer'] = stats_cme_mask_outer_all
+df['folder_name'] = folder_name_all
 df.to_csv(configfile_name)
