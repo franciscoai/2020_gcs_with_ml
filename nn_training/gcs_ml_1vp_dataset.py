@@ -253,7 +253,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 10  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 5  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -346,6 +346,7 @@ stats_btot_mask_outer_all = []
 stats_back_mask_outer_all = []
 stats_cme_mask_outer_all = []
 folder_name_all = []
+row_all = []
 # generate views
 ########### paralelize this for loop
 for row in df.index:
@@ -749,33 +750,43 @@ for row in df.index:
     stats_back_mask_outer_all.append(stats_back_mask_outer_sat)
     stats_cme_mask_outer_all.append(stats_cme_mask_outer_sat)
     folder_name_all.append(folder_name_sat)
+    row_all.append(row)
 ########### end of paralelize
 
 print(f'Total Number of OK cases: {ok_cases}')
 print(f'Total Number of aborted cases: {df.index.stop*n_sat -ok_cases}')
 print(f'Total Number of halos: {halo_count}')
 #add satpos and plotranges to dataframe and save csv
-df['satpos'] = satpos_all
-df['plotranges'] = plotranges_all
+df_aux = pd.DataFrame()
+df_aux['satpos'] = satpos_all
+df_aux['plotranges'] = plotranges_all
 # add halo count to dataframe
-df['mask AW'] = mask_aw_all
-df['apex'] = apex_all
-df['scl_fac_fr'] = scl_fac_fr_all
-df['def_fac_lon_lat_tilt'] = def_fac_all
-df['exp_fac_k_ang'] = exp_fac_all
-df['aspect_ratio'] = aspect_ratio_frope_all
+df_aux['mask AW'] = mask_aw_all
+df_aux['apex'] = apex_all
+df_aux['scl_fac_fr'] = scl_fac_fr_all
+df_aux['def_fac_lon_lat_tilt'] = def_fac_all
+df_aux['exp_fac_k_ang'] = exp_fac_all
+df_aux['aspect_ratio'] = aspect_ratio_frope_all
 #df['status'] = status_all
-df['median_btot_over_back'] = median_btot_over_back_all
-df['filter_area_threshold'] = filter_area_threshold_all
-df['sinthetic_params_Bt_out'] = sinthetic_params_Bt_out_all
-df['sinthetic_params_Bt_RD'] = sinthetic_params_Bt_RD_all
-df['sinthetic_params_FR_out'] = sinthetic_params_FR_out_all
-df['sinthetic_params_FR_RD'] = sinthetic_params_FR_RD_all
-df['stats_btot_mask'] = stats_btot_mask_all
-df['stats_back_mask'] = stats_back_mask_all
-df['stats_cme_mask'] = stats_cme_mask_all
-df['stats_btot_mask_outer'] = stats_btot_mask_outer_all
-df['stats_back_mask_outer'] = stats_back_mask_outer_all
-df['stats_cme_mask_outer'] = stats_cme_mask_outer_all
-df['folder_name'] = folder_name_all
+df_aux['median_btot_over_back'] = median_btot_over_back_all
+df_aux['filter_area_threshold'] = filter_area_threshold_all
+df_aux['sinthetic_params_Bt_out'] = sinthetic_params_Bt_out_all
+df_aux['sinthetic_params_Bt_RD'] = sinthetic_params_Bt_RD_all
+df_aux['sinthetic_params_FR_out'] = sinthetic_params_FR_out_all
+df_aux['sinthetic_params_FR_RD'] = sinthetic_params_FR_RD_all
+df_aux['stats_btot_mask'] = stats_btot_mask_all
+df_aux['stats_back_mask'] = stats_back_mask_all
+df_aux['stats_cme_mask'] = stats_cme_mask_all
+df_aux['stats_btot_mask_outer'] = stats_btot_mask_outer_all
+df_aux['stats_back_mask_outer'] = stats_back_mask_outer_all
+df_aux['stats_cme_mask_outer'] = stats_cme_mask_outer_all
+df_aux['folder_name'] = folder_name_all
+df_aux['row'] = row_all
+df_aux = df_aux.reset_index()
+df_aux = df_aux.drop(columns=['index'])
+df_sorted = df_aux.sort_values(by=df_aux.columns[-1])
+df_fusion = pd.concat([df, df_sorted], axis=1)
+df_fusion.to_csv(OPATH + '/' + date_str+'Set_Parameters_test.csv')
+df_aux.to_csv(OPATH + '/' + date_str+'Set_Parameters_test2.csv')
 df.to_csv(configfile_name)
+breakpoint()
