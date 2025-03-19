@@ -244,10 +244,10 @@ def plot_histogram(back,btot,mask,filename,plot_ratio_histo=False,plot_ratio_his
 
 # CONSTANTS
 #paths
-DATA_PATH = '/gehme/data'
+#DATA_PATH = '/gehme/data'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250304'
+#OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212'
+OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250319'
 opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
@@ -257,7 +257,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 20#300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 50000#300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -433,8 +433,8 @@ def create_sintetic_image(row):
             mask=get_mask_cloud(p_x,p_y,imsize)
         else:
             btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row],
-                                      df['ang'][row], imsize=imsize, occrad=size_occ[sat]*0.9, in_sig=1., out_sig=0.0001, nel=1e5, usr_center_off=usr_center_off)#,
-                                      #losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] +1.0]))     
+                                      df['ang'][row], imsize=imsize, occrad=size_occ[sat]*0.9, in_sig=1., out_sig=0.0001, nel=1e5, usr_center_off=usr_center_off,
+                                      losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] +1.0]))     
             cme_npix= len(btot_mask[btot_mask>0].flatten())
             if cme_npix<=0:
                 print("\033[93m WARNING: CME number {} raytracing did not work\033".format(row))                
@@ -492,13 +492,13 @@ def create_sintetic_image(row):
         print(headers[sat]['TELESCOP'], headers[sat]['CRPIX1'], headers[sat]['CRPIX2'],headers[sat]['INSTRUME'], 
               headers[sat]['NAXIS1'], headers[sat]['NAXIS2'], headers[sat]['CRVAL1'], headers[sat]['CRVAL2'], headers[sat]['CROTA'])
         btot = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row],
-                             imsize=imsize, occrad=size_occ[sat], in_sig=1.0, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)#,
-                             #losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))
+                             imsize=imsize, occrad=size_occ[sat], in_sig=1.0, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off,
+                             losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))
         sinthetic_params_Bt_out_sat[sat] = [1, df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row]]
 
         btot_outer = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row],
-                             imsize=imsize, occrad=size_occ[sat], in_sig=1.0, out_sig=0.075, nel=1e5, usr_center_off=usr_center_off)#,
-                             #losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))
+                             imsize=imsize, occrad=size_occ[sat], in_sig=1.0, out_sig=0.075, nel=1e5, usr_center_off=usr_center_off,
+                             losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))
         mask_outer_for_filter = get_cme_mask(btot_outer,inner_cme=inner_hole_mask,occ_size=occ_size_1024)
         #diff intensity by adding a second, smaller GCS
         if diff_int_cme:
@@ -524,14 +524,14 @@ def create_sintetic_image(row):
                 fr_lat = def_fac[1]*df['CMElat'][row]
             btot -= scl_fac*rtraytracewcs(headers[sat], fr_lon, fr_lat ,def_fac[2]*df['CMEtilt'][row],
                                           df['height'][row]-height_diff,df['k'][row]*exp_fac[0], df['ang'][row]*exp_fac[1], imsize=imsize, 
-                                          occrad=size_occ[sat], in_sig=1.0, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)#,
-                                          #losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))
+                                          occrad=size_occ[sat], in_sig=1.0, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off,
+                                          losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))
             sinthetic_params_Bt_RD_sat[sat] = [scl_fac, fr_lon, fr_lat,def_fac[2]*df['CMEtilt'][row], df['height'][row]-height_diff,df['k'][row]*exp_fac[0], df['ang'][row]*exp_fac[1]]
 
             btot_inner = rtraytracewcs(headers[sat], fr_lon, fr_lat ,def_fac[2]*df['CMEtilt'][row],
                                           df['height'][row]-height_diff,df['k'][row]*exp_fac[0], df['ang'][row]*exp_fac[1], imsize=imsize, 
-                                          occrad=size_occ[sat], in_sig=1.0, out_sig=0.0001, nel=1e5, usr_center_off=usr_center_off)#,
-                                          #losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))
+                                          occrad=size_occ[sat], in_sig=1.0, out_sig=0.0001, nel=1e5, usr_center_off=usr_center_off,
+                                          losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))
             mask_inner_for_filter = get_cme_mask(btot_inner,inner_cme=inner_hole_mask,occ_size=occ_size_1024)
 
         #adds a flux rope-like structure
@@ -546,15 +546,15 @@ def create_sintetic_image(row):
             scl_fac_fr_sat[sat]=scl_fac_fr
             btot += scl_fac_fr*rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*frope_height_diff,
                                           df['k'][row]*aspect_ratio_frope, df['ang'][row], imsize=imsize,
-                                          occrad=size_occ[sat], in_sig=2., out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)#,
-                                          #losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))    
+                                          occrad=size_occ[sat], in_sig=2., out_sig=0.2, nel=1e5, usr_center_off=usr_center_off,
+                                          losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))    
             sinthetic_params_FR_out_sat[sat] = [scl_fac_fr, df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*frope_height_diff, df['k'][row]*aspect_ratio_frope, df['ang'][row]]
             # uses a differential flux rope
             if diff_int_cme:
                 btot -= scl_fac*scl_fac_fr*rtraytracewcs(headers[sat], fr_lon, fr_lat,def_fac[2]*df['CMEtilt'][row], 
                                               df['height'][row]*frope_height_diff-height_diff,df['k'][row]*aspect_ratio_frope*exp_fac[0],df['ang'][row]*exp_fac[1],
-                                              imsize=imsize, occrad=size_occ[sat], in_sig=2., out_sig=0.2, nel=1e5, usr_center_off=usr_center_off)#,
-                                              #losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))    
+                                              imsize=imsize, occrad=size_occ[sat], in_sig=2., out_sig=0.2, nel=1e5, usr_center_off=usr_center_off,
+                                              losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))    
                 sinthetic_params_FR_RD_sat[sat] = [scl_fac*scl_fac_fr, fr_lon, fr_lat,def_fac[2]*df['CMEtilt'][row], df['height'][row]*frope_height_diff-height_diff, df['k'][row]*aspect_ratio_frope*exp_fac[0], df['ang'][row]*exp_fac[1]]
         #background corona
         back = back_corona[sat]
@@ -646,10 +646,6 @@ def create_sintetic_image(row):
         #This is a similar idea than Hinrichs et al. 2021
         SNR = btot_on_mask / back_on_mask - 1
         mean_BA,median_BA,std_BA = statistic_values(SNR)
-        #selected_cota=10#5
-        #cota = [-1,1]
-        #cota = [x * selected_cota for x in cota]
-        #area_threshold   = area_outside_std(B/A, cota=cota,positive_only=True)
         area_threshold = area_outside_thresh(SNR, cota=[1,3,5,7,10])
 
         stats_btot_mask_sat[sat] = stats_caclulations(btot         , mask)
