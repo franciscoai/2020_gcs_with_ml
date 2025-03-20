@@ -247,7 +247,7 @@ def plot_histogram(back,btot,mask,filename,plot_ratio_histo=False,plot_ratio_his
 #DATA_PATH = '/gehme/data'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212'
-OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250319'
+OPATH = '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320'
 opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
@@ -256,7 +256,7 @@ diff_int_cme=True # set to use a differential intensity CME image
 add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
-par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
+par_rng = [[-180,180],[-70,70],[-90,90],[2.0,20],[0.2,0.6], [5,65],[2,7]] 
 par_num = 50000#300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
@@ -378,28 +378,28 @@ def create_sintetic_image(row):
             occ_center.append(e)
     # Get the location of sats and gcs: 
     satpos, plotranges = pyGCS.processHeaders(headers)
-    mask_aw_sat     = [np.nan for i in range(n_sat)]
-    area_sat        = [np.nan for i in range(n_sat)]
-    apex_sat        = [np.nan for i in range(n_sat)]
-    height_diff_sat = [np.nan for i in range(n_sat)]
-    scl_fac_fr_sat  = [np.nan for i in range(n_sat)]
-    def_fac_sat     = [np.nan for i in range(n_sat)]
-    exp_fac_sat     = [np.nan for i in range(n_sat)]
-    aspect_ratio_frope_sat = [np.nan for i in range(n_sat)]
-    #status_sat      = ['' for i in range(n_sat)]
-    median_btot_over_back_sat = [np.nan for i in range(n_sat)]
-    filter_area_threshold_sat = [np.nan for i in range(n_sat)]
-    sinthetic_params_Bt_out_sat = [np.nan for i in range(n_sat)]
-    sinthetic_params_Bt_RD_sat  = [np.nan for i in range(n_sat)]
-    sinthetic_params_FR_out_sat = [np.nan for i in range(n_sat)]
-    sinthetic_params_FR_RD_sat  = [np.nan for i in range(n_sat)]
-    folder_name_sat             = ['' for i in range(n_sat)]
-    stats_btot_mask_sat         = [np.nan for i in range(n_sat)]
-    stats_back_mask_sat         = [np.nan for i in range(n_sat)]
-    stats_cme_mask_sat          = [np.nan for i in range(n_sat)]
-    stats_btot_mask_outer_sat   = [np.nan for i in range(n_sat)]
-    stats_back_mask_outer_sat   = [np.nan for i in range(n_sat)]
-    stats_cme_mask_outer_sat    = [np.nan for i in range(n_sat)]
+    mask_aw_sat     = [-666 for i in range(n_sat)]
+    area_sat        = [-666 for i in range(n_sat)]
+    apex_sat        = [-666 for i in range(n_sat)]
+    height_diff_sat = [-666 for i in range(n_sat)]
+    scl_fac_fr_sat  = [-666 for i in range(n_sat)]
+    def_fac_sat     = [-666 for i in range(n_sat)]
+    exp_fac_sat     = [-666 for i in range(n_sat)]
+    aspect_ratio_frope_sat = [-666 for i in range(n_sat)]
+    #status_sat      = [666 for i in range(n_sat)]
+    median_btot_over_back_sat = [-666 for i in range(n_sat)]
+    filter_area_threshold_sat = [-666 for i in range(n_sat)]
+    sinthetic_params_Bt_out_sat = [-666 for i in range(n_sat)]
+    sinthetic_params_Bt_RD_sat  = [-666 for i in range(n_sat)]
+    sinthetic_params_FR_out_sat = [-666 for i in range(n_sat)]
+    sinthetic_params_FR_RD_sat  = [-666 for i in range(n_sat)]
+    folder_name_sat             = [-666 for i in range(n_sat)]
+    stats_btot_mask_sat         = [-666 for i in range(n_sat)]
+    stats_back_mask_sat         = [-666 for i in range(n_sat)]
+    stats_cme_mask_sat          = [-666 for i in range(n_sat)]
+    stats_btot_mask_outer_sat   = [-666 for i in range(n_sat)]
+    stats_back_mask_outer_sat   = [-666 for i in range(n_sat)]
+    stats_cme_mask_outer_sat    = [-666 for i in range(n_sat)]
 
     print(f'Saving image pair {row} of {df.index.stop-1}')
 
@@ -510,9 +510,9 @@ def create_sintetic_image(row):
             scl_fac_fr_sat[sat] = scl_fac
             #scl_fac = np.random.uniform(low=1.00, high=1.3) # int scaling factor
             def_fac = np.random.uniform(low=0.95, high=1.05, size=3) # deflection and rotation factors [lat, lon, tilt]
-            def_fac_sat[sat] = def_fac
+            def_fac_sat[sat] = def_fac.tolist()
             exp_fac = np.random.uniform(low=0.90, high=1,    size=2) # non-self-similar expansion factor [k, ang]
-            exp_fac_sat[sat] = exp_fac
+            exp_fac_sat[sat] = exp_fac.tolist()
             # avoids lat and lon overturns 
             if def_fac[0]*df['CMElon'][row]>180:
                 fr_lon = 180
@@ -665,7 +665,8 @@ def create_sintetic_image(row):
                     aux='/rejected'
                 #status='rejected'
         median_btot_over_back_sat[sat] = median_BA
-        filter_area_threshold_sat[sat] = area_threshold/area
+        aux_array = area_threshold/area
+        filter_area_threshold_sat[sat] = aux_array.tolist()
         #status_sat[sat] = status
 
         #saves images
@@ -739,40 +740,52 @@ def print_stuffs():
     execution_time = (end_time - start_time) / 3600  # Convert seconds to hours
     print(f"Execution Time: {execution_time:.10f} hours")
     #add satpos and plotranges to dataframe and save csv
-    df_aux = pd.DataFrame()
-    df_aux['satpos'] = satpos_all
-    df_aux['plotranges'] = plotranges_all
+    columns=['satpos','plotranges','mask AW','apex','scl_fac_fr','def_fac_lon_lat_tilt','exp_fac_k_ang','aspect ratio','median_btot_over_back','filter_area_threshold','sinthetic_params_Bt_out','sinthetic_params_Bt_RD','sinthetic_params_FR_out','sinthetic_params_FR_RD','stats_btot_mask','stats_back_mask','stats_cme_mask','stats_btot_mask_outer','stats_back_mask_outer','stats_cme_mask_outer','folder_name','row']
+    all_variables =[satpos_all, plotranges_all, mask_aw_all, apex_all, scl_fac_fr_all, def_fac_all, exp_fac_all, aspect_ratio_frope_all, median_btot_over_back_all, filter_area_threshold_all, sinthetic_params_Bt_out_all, sinthetic_params_Bt_RD_all, sinthetic_params_FR_out_all, sinthetic_params_FR_RD_all, stats_btot_mask_all, stats_back_mask_all, stats_cme_mask_all, stats_btot_mask_outer_all, stats_back_mask_outer_all, stats_cme_mask_outer_all, folder_name_all, row_not_ordered]
+    df_aux = pd.DataFrame(columns=columns)
+    aux_elements=[]
+    for j in range(len(all_variables)):
+        aux_elements.append(all_variables[j])
+        print(len(all_variables[j]))
+    #breakpoint()
+    aux_elements_rows = list(zip(*aux_elements))
+    df_aux2 = pd.DataFrame(aux_elements_rows, columns=columns)
+    #df_aux2 = pd.DataFrame(np.column_stack(aux_elements), columns=columns).astype(object)
+    
+    #df_aux['satpos'] = satpos_all
+    #df_aux['plotranges'] = plotranges_all
     # add halo count to dataframe
-    df_aux['mask AW'] = mask_aw_all
-    df_aux['apex'] = apex_all
-    df_aux['scl_fac_fr'] = scl_fac_fr_all
-    df_aux['def_fac_lon_lat_tilt'] = def_fac_all
-    df_aux['exp_fac_k_ang'] = exp_fac_all
-    df_aux['aspect ratio'] = aspect_ratio_frope_all
-    df_aux['median_btot_over_back'] = median_btot_over_back_all
-    df_aux['filter_area_threshold'] = filter_area_threshold_all
-    df_aux['sinthetic_params_Bt_out'] = sinthetic_params_Bt_out_all
-    df_aux['sinthetic_params_Bt_RD'] = sinthetic_params_Bt_RD_all
-    df_aux['sinthetic_params_FR_out'] = sinthetic_params_FR_out_all
-    df_aux['sinthetic_params_FR_RD'] = sinthetic_params_FR_RD_all
-    df_aux['stats_btot_mask'] = stats_btot_mask_all
-    df_aux['stats_back_mask'] = stats_back_mask_all
-    df_aux['stats_cme_mask'] = stats_cme_mask_all
-    df_aux['stats_btot_mask_outer'] = stats_btot_mask_outer_all
-    df_aux['stats_back_mask_outer'] = stats_back_mask_outer_all
-    df_aux['stats_cme_mask_outer'] = stats_cme_mask_outer_all
-    df_aux['folder_name'] = folder_name_all
-    df_aux['row'] = row_not_ordered
+    #df_aux['mask AW'] = mask_aw_all
+    #df_aux['apex'] = apex_all
+    #df_aux['scl_fac_fr'] = scl_fac_fr_all
+    #df_aux['def_fac_lon_lat_tilt'] = def_fac_all
+    #df_aux['exp_fac_k_ang'] = exp_fac_all
+    #df_aux['aspect ratio'] = aspect_ratio_frope_all
+    #df_aux['median_btot_over_back'] = median_btot_over_back_all
+    #df_aux['filter_area_threshold'] = filter_area_threshold_all
+    #df_aux['sinthetic_params_Bt_out'] = sinthetic_params_Bt_out_all
+    #df_aux['sinthetic_params_Bt_RD'] = sinthetic_params_Bt_RD_all
+    #df_aux['sinthetic_params_FR_out'] = sinthetic_params_FR_out_all
+    #df_aux['sinthetic_params_FR_RD'] = sinthetic_params_FR_RD_all
+    #df_aux['stats_btot_mask'] = stats_btot_mask_all
+    #df_aux['stats_back_mask'] = stats_back_mask_all
+    #df_aux['stats_cme_mask'] = stats_cme_mask_all
+    #df_aux['stats_btot_mask_outer'] = stats_btot_mask_outer_all
+    #df_aux['stats_back_mask_outer'] = stats_back_mask_outer_all
+    #df_aux['stats_cme_mask_outer'] = stats_cme_mask_outer_all
+    #df_aux['folder_name'] = folder_name_all
+    #df_aux['row'] = row_not_ordered
 
-    df_sorted = df_aux.sort_values(by=df_aux.columns[-1])
+    df_sorted = df_aux2.sort_values(by=df_aux2.columns[-1])
     df_sorted = df_sorted.reset_index()
     df_sorted = df_sorted.drop(columns=['index'])
     df_fusion = pd.concat([df, df_sorted], axis=1) 
     df_fusion.to_csv(configfile_name)
+    breakpoint()
 
 num_cpus = os.cpu_count()
 ########### end of paralelize
-MAX_WORKERS = num_cpus -2# number of workers for parallel processing
+MAX_WORKERS = num_cpus -1# number of workers for parallel processing
 futures = []
 index = 0
 halo_count_tot = []#0
