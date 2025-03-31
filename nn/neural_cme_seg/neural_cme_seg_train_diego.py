@@ -10,10 +10,13 @@ import matplotlib as mpl
 from neural_cme_seg import neural_cme_segmentation
 import scipy
 import logging
+import pandas as pd
+import ast
+import json
 
 mpl.use('Agg')
 
-def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normalization_func=None, masks2use=None, rnd_rot=False, logger=logging):
+def loadData(paths, batchSize, used_idx, imageSize=None, file_ext="btot.png", normalization_func=None, masks2use=None, rnd_rot=False, logger=logging):
     '''
     Loads random batchSize traning cases from paths avoiding training cases in used_idx
     paths: list of paths to use
@@ -101,10 +104,35 @@ def loadData(paths, batchSize, used_idx, imageSize=None, file_ext=".png", normal
     batch_Imgs = batch_Imgs.swapaxes(1, 3).swapaxes(2, 3)
     return batch_Imgs, batch_Data, new_used_idx
 
+def clean_DT_csv(df):
+    keys=df.keys()
+    df_read_test_2 = df.copy()
+    for i,j in enumerate(keys):
+        aux_list = []
+        for index, value in df[j].items():
+            if not isinstance(value, str):
+                aux_list.append(value)
+            if isinstance(value, str) and j!= 'instrument':
+                try:
+                    aux = ast.literal_eval(value)
+                    aux_list.append(aux)
+                except:
+                    value = value.replace('nan', 'null')
+                    print(index, j,value)
+                    lst = json.loads(value)
+                    value = [-666 if x is None else x for x in lst]
+                    aux_list.append(value)
+            if j == 'instrument':
+                aux_list.append(value)
+        df_read_test_2[j] = aux_list
+    return df_read_test_2
+
 #---------------------------------------------------------Fine_tune the pretrained R-CNN----------------------------------------------------------
 #Constants
-trainDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
-opath= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
+#trainDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
+trainDir = '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
+csvfile = '20250320_Set_Parameters_unpacked_filtered_DS31.csv'
+opath= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS31/"
 #full path of a model to use it as initial condition, use None to used the stadard pre-trained model 
 pre_trained_model= None
 batchSize=20 #number of images used in each iteration
@@ -112,8 +140,8 @@ epochs=50 #number of iterations of the full training dataset
 train_dataset_prop=0.85 #proportion of the full dataset used for training. The rest is saved for validation
 random_rot = False # if True, the images are randomly rotated
 gpu=0 # GPU to use
-masks2use=[2] # list of masks to use, use None to use all masks found in the mask directory
-model_version='v5' # version of the model to use
+masks2use=[0,2] # list of masks to use, use None to use all masks found in the mask directory
+model_version='A4' # version of the model to use
 logfile=opath + "/training_logfile.txt" # log file
 enable_check_zeros = False # Check training dataset for errors (images with all 0) before training
 
@@ -147,11 +175,19 @@ os.system(f'cp {__file__} {opath}')
 os.system(f'cp nn/neural_cme_seg/neural_cme_seg.py {opath}')
 
 #list of images on the trainig dataset
-imgs=[] #list of images on the trainig dataset
-dirs=os.listdir(trainDir)
-dirs=[pth for pth in dirs if os.path.isdir(trainDir+"/"+pth)] # keeps only dirs
-for pth in dirs:
-    imgs.append(trainDir+"/"+pth)
+#imgs=[] #list of images on the trainig dataset
+#dirs=os.listdir(trainDir)
+#dirs=[pth for pth in dirs if os.path.isdir(trainDir+"/"+pth)] # keeps only dirs
+#for pth in dirs:
+#    imgs.append(trainDir+"/"+pth)
+#logging.info(f'The total number of images found is {len(imgs)}')
+
+#Read the csv file with the list of images
+logging.info(f'Using Data Set:  {trainDir+csvfile}')
+df_DS = pd.read_csv(trainDir+csvfile)
+df_DS = clean_DT_csv(df_DS)
+imgs=[]
+imgs = [trainDir+str(name) for name in df_DS['folder_name']]
 logging.info(f'The total number of images found is {len(imgs)}')
 
 # separates the dataset into training and validation
