@@ -131,8 +131,10 @@ def clean_DT_csv(df):
 #Constants
 #trainDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
 trainDir = '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
-csvfile = '20250320_Set_Parameters_unpacked_filtered_DS31.csv'
-opath= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS31/"
+#csvfile = '20250320_Set_Parameters_unpacked_filtered_DS31.csv'
+csvfile = '20250320_Set_Parameters_unpacked_filtered_DS32.csv'
+#opath= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS31/"
+opath= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32/"
 #full path of a model to use it as initial condition, use None to used the stadard pre-trained model 
 pre_trained_model= None
 batchSize=20 #number of images used in each iteration
@@ -141,7 +143,7 @@ train_dataset_prop=0.85 #proportion of the full dataset used for training. The r
 random_rot = False # if True, the images are randomly rotated
 gpu=0 # GPU to use
 masks2use=[0,2] # list of masks to use, use None to use all masks found in the mask directory
-model_version='A4' # version of the model to use
+model_version='A6'#'A4' # version of the model to use
 logfile=opath + "/training_logfile.txt" # log file
 enable_check_zeros = False # Check training dataset for errors (images with all 0) before training
 

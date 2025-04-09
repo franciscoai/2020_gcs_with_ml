@@ -137,7 +137,7 @@ def image_to_polar(image):
     return polar_image
 
 
-def plot_to_png2(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_threshold=0.3 , title=None, 
+def plot_to_png2(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_threshold=0.3 , title=None,string=None, 
                 labels=None, boxes=None, scores=None, version='v4'):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
@@ -149,6 +149,10 @@ def plot_to_png2(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_thre
         obj_labels = ['Back', 'Occ','CME','N/A']
     elif version=='v5':
         obj_labels = ['Back', 'CME']
+    elif version=='A4':
+        obj_labels = ['Back', 'Occ','CME']
+    elif version=='A6':
+        obj_labels = ['Back', 'Occ','CME']
     else:
         print(f'ERROR. Version {version} not supported')
         sys.exit()
@@ -176,6 +180,10 @@ def plot_to_png2(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_thre
     for i in range(len(orig_img)):
         ax1.imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
         ax1.axis('off')
+        if string is not None:
+            ax1.text(0, 0, string,horizontalalignment='left',verticalalignment='bottom',
+            fontsize=15,color='white',transform=ax1.transAxes)
+
         ax2.imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
         ax2.axis('off')        
         #add true mask
@@ -244,10 +252,10 @@ def plot_to_png2(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_thre
                     ax7.axis('off')
                     ax7.set_title('Magnitude of the gradient')
                 nb+=1
-
     plt.tight_layout()
     plt.savefig(ofile)
     plt.close()
+    return best_iou, max_iou
 
 
 def plot_to_png(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_threshold=0.3 , title=None, 
@@ -324,20 +332,42 @@ def plot_to_png(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_thres
     plt.close()
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-testDir =  '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240912/'
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
-model_version="v5"
-trained_model = '49.torch'
+model = 'A4_DS31'
 
+if model == 'A4_DS31':
+    testDir =  '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS31"
+    model_version="A4"
+    trained_model = '49.torch'
+
+if model == 'A4_DS32':
+    testDir =  '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
+    model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
+    model_version="A4"
+    trained_model = '49.torch'
+
+if model == 'A6_DS32':
+    testDir =  '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"
+    model_version="A6"
+    trained_model = '49.torch'
+
+if model == 'v5':
+    testDir =  '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240912/'
+    model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
+    model_version="v5"
+    trained_model = '49.torch'
+
+#testDir of model v4 is missing
 #model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 #model_version="v4"
 #trained_model = '9999.torch'
 
 test_cases_file = model_path+"/validation_cases.csv"
 opath= model_path+"/test_output_diego"
-file_ext=".png"
+file_ext="btot.png"
 imageSize=[512,512]
-test_ncases = 150
+test_ncases = 10
 mask_thresholds = [0.7] #[0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99] # only px with scrore avobe this value are considered in the mask.
 gpu=0# GPU to use
 masks2use=[2] # index of the masks to read (should be the CME mask)
@@ -352,10 +382,11 @@ try:
         for line in f:
             imgs.append(line.strip())
 except FileNotFoundError:
-    with open('/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5/validation_cases.csv', 'r') as f:
-        for line in f:
-            imgs.append(line.strip())
-    print('File not found, using default validation cases (V5)')
+    if model_version == 'v4':
+        with open('/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5/validation_cases.csv', 'r') as f:
+            for line in f:
+                imgs.append(line.strip())
+        print('File not found, using default validation cases (V5)')
 except Exception as e:
     # This block will catch any other exceptions that might occur during file opening (optional, but good practice)
     print(f"An error occurred while trying to open '{test_cases_file}': {e}")
@@ -365,6 +396,9 @@ nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ t
 rnd_idx = random.sample(range(len(imgs)), test_ncases)
 all_scr = []
 all_loss = []
+all_best_iou = []
+all_max_iou = []
+
 for mask_threshold in mask_thresholds:
     this_case_scr =[]
     this_case_loss = []    
@@ -399,8 +433,10 @@ for mask_threshold in mask_thresholds:
             if len(mask_thresholds)==1:
                 os.makedirs(opath, exist_ok=True)
                 ofile = opath+"/img_"+str(idx)+'.png'
-                plot_to_png2(ofile, [img], [[masks]], [vesMask], scores=[[scores]], labels=[[labels]], boxes=[[boxes]], 
-                            mask_threshold=mask_threshold, scr_threshold=0.1, version=model_version)
+                best_iou_for_plot, max_iou_for_plot = plot_to_png2(ofile, [img], [[masks]], [vesMask], scores=[[scores]], labels=[[labels]], boxes=[[boxes]], 
+                            mask_threshold=mask_threshold, scr_threshold=0.1, version=model_version,string=imgs[idx])
+        all_best_iou.append(best_iou_for_plot)
+        all_max_iou.append(max_iou_for_plot)
     all_scr.append(this_case_scr)
     all_loss.append(this_case_loss)
 
@@ -423,6 +459,26 @@ for mask_threshold in mask_thresholds:
         ax.set_yscale('log')
         fig.savefig(opath+"/test_loss.png")
 
+        all_best_iou = np.array(all_best_iou)
+        fig= plt.figure(figsize=(10, 5))
+        ax = fig.add_subplot()
+        ax.hist(all_best_iou,bins=30,density=True)
+        ax.set_title(f'Mean best iou vs mask threshold')
+        ax.set_xlabel('mask threshold')
+        ax.set_ylabel('Best iou')
+        ax.grid()
+        fig.savefig(opath+"/test_mean_best_iou_vs_mask_threshold.png")
+
+        all_max_iou = np.array(all_max_iou)
+        fig= plt.figure(figsize=(10, 5))
+        ax = fig.add_subplot()
+        ax.hist(all_max_iou,bins=30,density=True)
+        ax.set_title(f'Mean max iou vs mask threshold')
+        ax.set_xlabel('mask threshold')
+        ax.set_ylabel('Max iou')
+        ax.grid()
+        fig.savefig(opath+"/test_mean_max_iou_vs_mask_threshold.png")
+
 # for many mask thresholds plots mean and std loss and scr vs mask threshold
 if len(mask_thresholds)>1:
     all_scr = np.array(all_scr)
@@ -444,6 +500,27 @@ if len(mask_thresholds)>1:
     ax.set_ylabel('Loss')
     ax.grid()
     fig.savefig(opath+"/test_mean_loss_vs_mask_threshold.png")
+
+    all_best_iou = np.array(all_best_iou)
+    fig= plt.figure(figsize=(10, 5))
+    ax = fig.add_subplot()
+    ax.errorbar(mask_thresholds, np.mean(all_best_iou,axis=1), yerr=np.std(all_best_iou,axis=1), fmt='o', color='black', ecolor='lightgray', elinewidth=3)
+    ax.set_title(f'Mean best iou vs mask threshold')
+    ax.set_xlabel('mask threshold')
+    ax.set_ylabel('Best iou')
+    ax.grid()
+    fig.savefig(opath+"/test_mean_best_iou_vs_mask_threshold.png")
+
+    all_max_iou = np.array(all_max_iou)
+    fig= plt.figure(figsize=(10, 5))
+    ax = fig.add_subplot()
+    ax.errorbar(mask_thresholds, np.mean(all_max_iou,axis=1), yerr=np.std(all_max_iou,axis=1), fmt='o', color='black', ecolor='lightgray', elinewidth=3)
+    ax.set_title(f'Mean max iou vs mask threshold')
+    ax.set_xlabel('mask threshold')
+    ax.set_ylabel('Max iou')
+    ax.grid()
+    fig.savefig(opath+"/test_mean_max_iou_vs_mask_threshold.png")
+
 print('Results saved in:', opath)
 print('Done :-D')
 
