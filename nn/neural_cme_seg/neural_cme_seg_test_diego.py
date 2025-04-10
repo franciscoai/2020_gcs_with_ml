@@ -332,7 +332,7 @@ def plot_to_png(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_thres
     plt.close()
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-model = 'A4_DS31'
+model = 'v5' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
 
 if model == 'A4_DS31':
     testDir =  '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
@@ -367,7 +367,7 @@ test_cases_file = model_path+"/validation_cases.csv"
 opath= model_path+"/test_output_diego"
 file_ext="btot.png"
 imageSize=[512,512]
-test_ncases = 10
+test_ncases = 500
 mask_thresholds = [0.7] #[0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99] # only px with scrore avobe this value are considered in the mask.
 gpu=0# GPU to use
 masks2use=[2] # index of the masks to read (should be the CME mask)
