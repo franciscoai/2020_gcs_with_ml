@@ -332,7 +332,7 @@ def plot_to_png(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_thres
     plt.close()
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
-model = 'v5' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
+model = 'A6_DS32' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
 
 if model == 'A4_DS31':
     testDir =  '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
@@ -367,11 +367,24 @@ test_cases_file = model_path+"/validation_cases.csv"
 opath= model_path+"/test_output_diego"
 file_ext="btot.png"
 imageSize=[512,512]
-test_ncases = 500
-mask_thresholds = [0.7] #[0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99] # only px with scrore avobe this value are considered in the mask.
+test_ncases = 50
+
+#Si longitud de mask_thresholds es 1, se hace un solo plot de los resultados, se correrá el plot_to_png2 y se hará un barrido,
+# en el mask_threshold para el ploteo 
+mask_thresholds = [0.7] 
+
+#Si longitud de mask_thresholds es mayor a 1, se hace unicamente una estadistica de IoU y score vs mask_thresholds.
+mask_thresholds = [0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99] 
+expand_mask_thresholds = True # if True, mask_thresholds will be expanded to 0.5-0.6 range
+if expand_mask_thresholds:
+    aux1 = np.round(np.linspace(0.5, 0.6, 11),2).tolist()
+    aux2 = np.round(np.linspace(0.4, 0.5, 11),2).tolist()
+    mask_thresholds = np.unique(mask_thresholds + aux1 + aux2)
+    mask_thresholds.sort()
+    mask_thresholds = mask_thresholds.tolist()
 gpu=0# GPU to use
 masks2use=[2] # index of the masks to read (should be the CME mask)
-#breakpoint()
+
 #main
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
 print(f'Using device:  {device}')
@@ -395,13 +408,13 @@ except Exception as e:
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 rnd_idx = random.sample(range(len(imgs)), test_ncases)
 all_scr = []
-all_loss = []
+all_iou = []
 all_best_iou = []
 all_max_iou = []
 
 for mask_threshold in mask_thresholds:
     this_case_scr =[]
-    this_case_loss = []    
+    this_case_iou = []    
     for ind in range(len(rnd_idx)):
         idx = rnd_idx[ind]
         #reads image
@@ -423,11 +436,11 @@ for mask_threshold in mask_thresholds:
             print('Error: Full zero mask in path', maskDir, 'skipping')
             breakpoint()
         # makes inference and returns only the mask with smallest loss
-        img, masks, scores, labels, boxes, loss  = nn_seg.test_mask(images, vesMask, mask_threshold=mask_threshold)
-        #breakpoint()
+        img, masks, scores, labels, boxes, iou  = nn_seg.test_mask(images, vesMask, mask_threshold=mask_threshold)
+        
 
         if masks is not None:
-            this_case_loss.append(loss) 
+            this_case_iou.append(iou) 
             this_case_scr.append(scores)
             # plot the predicted mask
             if len(mask_thresholds)==1:
@@ -435,10 +448,10 @@ for mask_threshold in mask_thresholds:
                 ofile = opath+"/img_"+str(idx)+'.png'
                 best_iou_for_plot, max_iou_for_plot = plot_to_png2(ofile, [img], [[masks]], [vesMask], scores=[[scores]], labels=[[labels]], boxes=[[boxes]], 
                             mask_threshold=mask_threshold, scr_threshold=0.1, version=model_version,string=imgs[idx])
-        all_best_iou.append(best_iou_for_plot)
-        all_max_iou.append(max_iou_for_plot)
+                all_best_iou.append(best_iou_for_plot)
+                all_max_iou.append(max_iou_for_plot)
     all_scr.append(this_case_scr)
-    all_loss.append(this_case_loss)
+    all_iou.append(this_case_iou)
 
     # plot stats for a single mask threshold
     if len(mask_thresholds)==1:
@@ -478,7 +491,7 @@ for mask_threshold in mask_thresholds:
         ax.set_ylabel('Max iou')
         ax.grid()
         fig.savefig(opath+"/test_mean_max_iou_vs_mask_threshold.png")
-
+breakpoint()
 # for many mask thresholds plots mean and std loss and scr vs mask threshold
 if len(mask_thresholds)>1:
     all_scr = np.array(all_scr)
@@ -491,35 +504,16 @@ if len(mask_thresholds)>1:
     ax.grid()
     fig.savefig(opath+"/test_scr_vs_mask_threshold.png")
 
-    all_loss = np.array(all_loss)
+    new_list= [np.array(todo_iou) for todo_iou in all_iou]
     fig= plt.figure(figsize=(10, 5))
     ax = fig.add_subplot()
-    ax.errorbar(mask_thresholds, np.mean(all_loss,axis=1), yerr=np.std(all_loss,axis=1), fmt='o', color='black', ecolor='lightgray', elinewidth=3)
-    ax.set_title(f'Mean loss vs mask threshold')
+    ax.boxplot(new_list)
+    ax.set_title(f'IoU vs mask threshold')
     ax.set_xlabel('mask threshold')
-    ax.set_ylabel('Loss')
+    ax.set_ylabel('IoU')
     ax.grid()
+    ax.set_xticks([y + 1 for y in range(len(new_list))],labels=[str(thresh_num) for thresh_num in mask_thresholds])
     fig.savefig(opath+"/test_mean_loss_vs_mask_threshold.png")
-
-    all_best_iou = np.array(all_best_iou)
-    fig= plt.figure(figsize=(10, 5))
-    ax = fig.add_subplot()
-    ax.errorbar(mask_thresholds, np.mean(all_best_iou,axis=1), yerr=np.std(all_best_iou,axis=1), fmt='o', color='black', ecolor='lightgray', elinewidth=3)
-    ax.set_title(f'Mean best iou vs mask threshold')
-    ax.set_xlabel('mask threshold')
-    ax.set_ylabel('Best iou')
-    ax.grid()
-    fig.savefig(opath+"/test_mean_best_iou_vs_mask_threshold.png")
-
-    all_max_iou = np.array(all_max_iou)
-    fig= plt.figure(figsize=(10, 5))
-    ax = fig.add_subplot()
-    ax.errorbar(mask_thresholds, np.mean(all_max_iou,axis=1), yerr=np.std(all_max_iou,axis=1), fmt='o', color='black', ecolor='lightgray', elinewidth=3)
-    ax.set_title(f'Mean max iou vs mask threshold')
-    ax.set_xlabel('mask threshold')
-    ax.set_ylabel('Max iou')
-    ax.grid()
-    fig.savefig(opath+"/test_mean_max_iou_vs_mask_threshold.png")
 
 print('Results saved in:', opath)
 print('Done :-D')

@@ -437,8 +437,8 @@ class neural_cme_segmentation():
             iou = TP / (TP + FP + FN) if TP + FP + FN > 0 else 0
             all_iou.append(iou)
         # return the mask with the highest iou
-        imin = np.argmax(all_iou)
-        return orig_img, all_masks[imin], all_scores[imin], all_lbl[imin], all_boxes[imin], all_iou[imin]
+        imax = np.argmax(all_iou)
+        return orig_img, all_masks[imax], all_scores[imax], all_lbl[imax], all_boxes[imax], all_iou[imax]
         
 
     def _rec2pol(self, mask, center=None):
