@@ -425,16 +425,20 @@ class neural_cme_segmentation():
         if len(all_masks) == 0:
             self.logger.warning('Warning, no masks found in the image')
             return None
-        # compute loss for all masks
-        all_loss = []
+        # compute IoU for all masks
+        all_iou= []
         for i in range(len(all_masks)):
             msk = all_masks[i].copy() #This is mandatory to avoid changing the original mask!!!!!!!
             msk[msk > self.mask_threshold] = 1
             msk[msk <= self.mask_threshold] = 0
-            all_loss.append(np.sum(np.abs(msk - target))/np.sum(target))
-        # return the mask with the smallest loss
-        imin = np.argmin(all_loss)
-        return orig_img, all_masks[imin], all_scores[imin], all_lbl[imin], all_boxes[imin], all_loss[imin]
+            TP = np.sum(np.logical_and(msk, target))
+            FP = np.sum(np.logical_and(msk, np.logical_not(target)))
+            FN = np.sum(np.logical_and(np.logical_not(msk), target))
+            iou = TP / (TP + FP + FN) if TP + FP + FN > 0 else 0
+            all_iou.append(iou)
+        # return the mask with the highest iou
+        imin = np.argmax(all_iou)
+        return orig_img, all_masks[imin], all_scores[imin], all_lbl[imin], all_boxes[imin], all_iou[imin]
         
 
     def _rec2pol(self, mask, center=None):
