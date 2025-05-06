@@ -586,7 +586,7 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, fil
                                                             occulter_size=all_occ_size[i],occulter_size_ext=all_occ_size_ext[i],
                                                             centerpix=all_occ_center[i])
         # plot the predicted mask
-        #ofile = opath+"/"+os.path.basename(cimga)+'infer1.png'
+        #ofile = opath+"/"+os.path.basename(cimga)+'infer1.png'inference_base
         #plot_to_png(ofile, [orig_img], [masks], scores=[scores], labels=[labels], boxes=[boxes],version=version)
         #breakpoint()
         all_orig_img.append(orig_img)

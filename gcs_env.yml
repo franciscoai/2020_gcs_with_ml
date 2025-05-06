@@ -161,4 +161,3 @@ dependencies:
       - tzdata==2024.1
       - webencodings==0.5.1
       - yarl==1.9.4
-prefix: /home/sanchez/anaconda3/envs/ml

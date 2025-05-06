@@ -28,20 +28,36 @@ __email__ = "franciscoaiglesias@gmail.com"
 
 
 
-def read_fits(file_path,smooth_kernel=[0,0]):
-    imageSize=[512,512]
-    try: 
-        img = fits.open(file_path)
-        img=(img[0].data).astype("float32")
+def read_fits(file_path, header=False, imageSize=[512,512],smooth_kernel=[0,0]):
+    try:       
+        img = fits.open(file_path)[0].data
+        img=img.astype("float32")
         img = gaussian_filter(img, sigma=smooth_kernel)
-        header = fits.getheader(file_path)
-        
-        if smooth_kernel[0]!=0 and smooth_kernel[1]!=0: 
-            img = rebin(img, imageSize,operation='mean')
-        return img, header  
+        if imageSize:
+            img = rebin(img, imageSize, operation='mean')  
+            #img = rebin_interp(img, new_size=[512,512])#si la imagen no es cuadrada usar esto
+            if header:
+                hdr = fits.open(file_path)[0].header
+                naxis_original1 = hdr["naxis1"]
+                naxis_original2 = hdr["naxis2"]
+                hdr["naxis1"]=imageSize[0]
+                hdr["naxis2"]=imageSize[1]
+                hdr["crpix1"]=hdr["crpix1"]/(naxis_original1/imageSize[0])
+                hdr["crpix2"]=hdr["crpix2"]/(naxis_original2/imageSize[1])
+                hdr["CDELT1"]=hdr["CDELT1"]*(naxis_original1/imageSize[0])
+                hdr["CDELT2"]=hdr["CDELT2"]*(naxis_original2/imageSize[1])
+               
+        # flips y axis to match the orientation of the images
+        #img = np.flip(img, axis=0) 
+        if header:
+            return img, hdr
+        else:
+            return img 
     except:
-        print(f'WARNING. could not find file {file_path}')
-        return None, None
+        print(f'WARNING. I could not find file {file_path}')
+        return None
+                            
+
 
 def get_cdaw(repo,path,opath):
     '''
@@ -100,9 +116,15 @@ def get_cdaw(repo,path,opath):
         found_events = pd.DataFrame(columns=['PATH',"DATE_TIME"])
         date= pd.to_datetime(catalogue['DATE'])
         date= date.dt.strftime('%Y%m%d')
+        date=date.unique()
+        
         for k in tqdm(range(len(catalogue['DATE'].unique()))):
+            
+            #if date[k] == "20220224":#"20120422"
+               
             folder_path=path+catalogue['TEL'][k].lower()+'/'+date[k]+'/'
             if os.path.exists(folder_path):
+                    
                 try:
                     files = os.listdir(folder_path)
                 except Exception as error:
@@ -110,29 +132,42 @@ def get_cdaw(repo,path,opath):
                     files=[]
                 # Iterate over the paths and extract the date from the headers
                 for l in tqdm(files, desc="Preparing lasco data"):
+                    
                     if l.endswith(".fts"):
+                        
                         file_path=folder_path+l
-                        try:
-                            basename = os.path.basename(file_path)
-                            header = fits.getheader(file_path)
-                            date_obs = header["DATE-OBS"]
-                            time_obs = header["TIME-OBS"]
-                            datetime_obs = datetime.strptime(date_obs + ' ' + time_obs, '%Y/%m/%d %H:%M:%S.%f')
-                            found_events.loc[len(found_events.index)] = [file_path, datetime_obs]
-                        except:
+                        
+                        basename = os.path.basename(file_path)
+                        header = fits.getheader(file_path)
+                        date_obs = header["DATE-OBS"]
+                        time_obs = header["TIME-OBS"]
+                        if len(time_obs)==0:
+                            time_obs = date_obs.split("T")[1]
+                            date_obs = date_obs.split("T")[0]
                             
-                            print("Empty or Corrupted .fts file " +file_path)
+                        try:    
+                            datetime_obs = datetime.strptime(date_obs + ' ' + time_obs, '%Y/%m/%d %H:%M:%S.%f')
+                            
+                        except:
+                            try:
+                                datetime_obs = datetime.strptime(date_obs + ' ' + time_obs, '%Y-%m-%d %H:%M:%S.%f')
+                                datetime_obs.strftime('%Y/%m/%d %H:%M:%S.%f')
+                            except:
+                                breakpoint()
+                                print("Empty or Corrupted .fts file " +file_path)
+
+                        found_events.loc[len(found_events.index)] = [file_path, datetime_obs]
+    
         found_events= found_events.drop_duplicates()    
         found_events.to_csv(opath+'found_events_cdaw.csv', index=False)
     
     return found_events , catalogue
 
-def plot_to_png(ofile, orig_img, event, all_center, mask_threshold, scr_threshold, title=None):
+def plot_to_png(ofile, orig_img, event, control_df, all_center, mask_threshold, scr_threshold,  title=None):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
     """    
-    
     color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
     obj_labels = ['Back', 'Occ','CME','N/A']
     masks=event['MASK']
@@ -141,23 +176,57 @@ def plot_to_png(ofile, orig_img, event, all_center, mask_threshold, scr_threshol
     fig, axs = plt.subplots(1, len(orig_img)*2, figsize=(20, 10))
     axs = axs.ravel()
     
+    # for i in range(len(orig_img)):
+    #     axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
+    #     axs[i].axis('off')
+    #     axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
+    #     axs[i+1].axis('off') 
+    #     for b in range(len(event['LABEL'])):
+    #         scr = event['SCR'][b]
+    #         if scr > scr_threshold:             
+    #             masked = nans.copy()            
+    #             masked[:, :][masks[b] > mask_threshold] = event['CME_ID'][b]           
+    #             axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
+                
+    #             box =  mpl.patches.Rectangle(event['BOX'][b][0:2], event['BOX'][b][2]- event['BOX'][b][0], event['BOX'][b][3]- event['BOX'][b][1], linewidth=2, edgecolor=color[int(event['CME_ID'][b])] , facecolor='none') # add box
+    #             axs[i+1].add_patch(box)
+    #             axs[i+1].scatter(round(all_center[0][0]), round(all_center[0][1]), color='red', marker='x', s=100)
+    #             axs[i+1].annotate(obj_labels[event['LABEL'][b]]+':'+'{:.2f}'.format(scr),xy=event['BOX'][b][0:2], fontsize=15, color=color[int(event['CME_ID'][b])])
+    
     for i in range(len(orig_img)):
         axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
         axs[i].axis('off')
         axs[i+1].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')        
         axs[i+1].axis('off') 
-        for b in range(len(event['LABEL'])):
-            scr = event['SCR'][b]
-            if scr > scr_threshold:             
-                masked = nans.copy()            
-                masked[:, :][masks[b] > mask_threshold] = event['CME_ID'][b]           
-                axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1) # add mask
-                
-                box =  mpl.patches.Rectangle(event['BOX'][b][0:2], event['BOX'][b][2]- event['BOX'][b][0], event['BOX'][b][3]- event['BOX'][b][1], linewidth=2, edgecolor=color[int(event['CME_ID'][b])] , facecolor='none') # add box
-                axs[i+1].add_patch(box)
-                axs[i+1].scatter(round(all_center[0][0]), round(all_center[0][1]), color='red', marker='x', s=100)
-                axs[i+1].annotate(obj_labels[event['LABEL'][b]]+':'+'{:.2f}'.format(scr),xy=event['BOX'][b][0:2], fontsize=15, color=color[int(event['CME_ID'][b])])
-     
+        event_datetime = event['DATE_TIME'].iloc[0] 
+        masks_for_date = control_df[control_df['DATE_TIME'] == event_datetime]
+
+    for _, row in masks_for_date.iterrows():
+        if row['SCR'] > scr_threshold:
+            masked = nans.copy()
+            masked[:, :][row['MASK'] > mask_threshold] = row['CME_ID']
+            color_idx = int(row['CME_ID'])
+
+            axs[i].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1)  # Agregar máscaras en axs[i]
+
+    # Todo lo demás sigue en axs[i+1] sin modificaciones
+    for b in range(len(event['LABEL'])):
+        scr = event['SCR'][b]
+        if scr > scr_threshold:             
+            masked = nans.copy()            
+            masked[:, :][masks[b] > mask_threshold] = event['CME_ID'][b]           
+            axs[i+1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1)  # add mask
+            
+            box = mpl.patches.Rectangle(event['BOX'][b][0:2], event['BOX'][b][2]- event['BOX'][b][0], 
+                                        event['BOX'][b][3]- event['BOX'][b][1], linewidth=2, 
+                                        edgecolor=color[int(event['CME_ID'][b])], facecolor='none')  # add box
+            axs[i+1].add_patch(box)
+            axs[i+1].scatter(round(all_center[0][0]), round(all_center[0][1]), color='red', marker='x', s=100)
+            axs[i+1].annotate(obj_labels[event['LABEL'][b]]+':'+'{:.2f}'.format(scr),
+                            xy=event['BOX'][b][0:2], fontsize=15, color=color[int(event['CME_ID'][b])])
+
+
+        
     plt.tight_layout()
     plt.savefig(ofile)
     plt.close()
@@ -165,7 +234,7 @@ def plot_to_png(ofile, orig_img, event, all_center, mask_threshold, scr_threshol
 #---------------------------------------------------------- MAIN ----------------------------------------------------------
 repo_dir =  os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 cdaw_repo='/gehme/data/catalogues/soho/lasco/'
-lasco_path='/gehme/data/soho/lasco/level_05/'
+lasco_path='/gehme/data/soho/lasco/level_1/'
 cdaw_catalogue='/gehme-gpu/projects/2020_gcs_with_ml/repo_flor/2020_gcs_with_ml/nn/neural_cme_seg/applications/cdaw_catalogue/'
 
 level = 'L1' # fits reduction level
@@ -179,20 +248,22 @@ units= ["-","-","yyyymmdd","hhmm","yyyymmdd","hhmm","deg","lon","old","deg","deg
 imsize=[0,0]# if 0,0 no rebin its applied
 imsize_nn=[512,512] #for rebin befor the nn
 smooth_kernel=[2,2] #changes the gaussian filter size
-occ_size = [88] # occulter radius in pixels. An artifitial occulter with constant value equal to the mean of the image is added before inference. Use 0 to avoid
+occ_size = [90] # occulter radius in pixels. An artifitial occulter with constant value equal to the mean of the image is added before inference. Use 0 to avoid
 occ_center=[[256,256]]
+occulter_size_ext = []
+
 smooth_kernel=[2,2] #changes the gaussian filter size
 MAX_TIME_DIFF= timedelta(minutes=15)
 MAX_TIME_DIFF_IMAGE_L1=timedelta(minutes=60)
-
-
+plot_png=True #Saves the png files with the selected mask vs all masks
+w_metric=[0.4,0.4,0.1,0.1] #weights for the metric used to select the best mask [IOU,CPA,AW,APEX]
 
 #nn model parameters
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
-model_version="v4"
-opath= model_path + "/infer_neural_cme_seg_kincat_"+level+"/"+sat
+model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"#"/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/"
+model_version="A6"#"v4"
+opath= model_path + "/infer_neural_cme_seg_kincat_"+level+"/"+sat +"_flor_test"
 file_ext=".fits"
-trained_model = '9999.torch'
+trained_model = "4.torch"#'9999.torch'
 mask_threshold = 0.6 # value to consider a pixel belongs to the object
 scr_threshold = 0.25 # only detections with score larger than this value are considered
 
@@ -215,7 +286,7 @@ found_events, cdaw_full  = get_cdaw(cdaw_repo,lasco_path, cdaw_catalogue)
 if exclude_poor_events:
     cdaw_full['QUALITY_INDEX'] = cdaw_full['QUALITY_INDEX'].str.extract(r'(\d+)').astype(int)
     cdaw_full=cdaw_full.loc[cdaw_full['QUALITY_INDEX']>quality_idx]
-
+    
 if exclude_mult:
     unique_dates=cdaw_full["DATE"].unique()
     for j in range(len(unique_dates)):
@@ -249,7 +320,7 @@ yht_files=cdaw_full["FOLDER_NAME"].unique()
 #cdaw_unique_values = cdaw_full[cdaw_full["FOLDER_NAME"].isin(yht_files)].drop_duplicates(subset="FOLDER_NAME", keep="first")
 
 # Process the lasco data
-for i in tqdm(range(3200,len(yht_files)), desc="Processing lasco data"):
+for i in tqdm(range(len(yht_files)), desc="Processing lasco data"):
     #if yht_files[i]=="20021110.083005.w068n.v0290.p097s.yht":
     all_images=[]
     all_dates=[]
@@ -261,71 +332,87 @@ for i in tqdm(range(3200,len(yht_files)), desc="Processing lasco data"):
     all_ofiles=[]
     #separates cdaw catalogue in cdaw_events (to be part of the cdaw_event the files must have same date and be from the same yht file)
     cdaw_event=cdaw_full.loc[cdaw_full["FOLDER_NAME"]==yht_files[i]]
-    date=cdaw_event["DATE_TIME"].iloc[0]
-    prev_date = date - MAX_TIME_DIFF
+    cdaw_event=cdaw_event.loc[cdaw_event["TEL"]=="C2"]
+    cdaw_event=cdaw_event.reset_index(drop=True)
 
-    #finds all files present in the folder for the corresponding cdaw_event
-    event=found_events.loc[(found_events["DATE_TIME"]>=str(prev_date))&(found_events["DATE_TIME"]<=str(cdaw_event["DATE_TIME"].iloc[-1]))]
-    event["DATE_TIME"]=pd.to_datetime(event["DATE_TIME"])
-    event = event.reset_index(drop=True)
-
-    #finds the cdaw_event files present in the event
-    if len(event)>2:
-        coincidences = event[event["DATE_TIME"].isin(cdaw_event["DATE_TIME"])]
-        coincidences = coincidences.reset_index(drop=True)
-        for j in range(len(coincidences)-1):
-            file1 = [coincidences["PATH"].iloc[j]]
-            prev_time=coincidences["DATE_TIME"].iloc[j]-MAX_TIME_DIFF_IMAGE_L1
-            prev_images=event.loc[(event["DATE_TIME"]<coincidences["DATE_TIME"].iloc[j])&(event["DATE_TIME"]>prev_time)]
-            prev_images = prev_images.reset_index(drop=True)
-            if len(prev_images)>0:
-                file2 = [prev_images["PATH"].iloc[-1]]
-
-                if len(file1)!=0 or len(file2)!=0:
-                    image1, header1 = read_fits(file1[0])# final image
-                    image2,header2 = read_fits(file2[0])# initial image
-                    if (image1 is not None) and (image2 is not None):
-                        # Check shape
-                        if header1['NAXIS1'] != imsize_nn[0]:
-                            scale=(header1['NAXIS1']/imsize_nn[0])
-                            plt_scl = header1['CDELT1'] * scale
-                        else:
-                            plt_scl = header1['CDELT1']
-                        # Resize images if necessary
-                        if (imsize[0]!=0 and imsize[1]!=0) or (image1.shape !=image2.shape):
-                            image1 = rebin(image1,imsize_nn,operation='mean') 
-                            image2 = rebin(image2,imsize_nn,operation='mean')
-                            header1['NAXIS1'] = imsize_nn[0]   
-                            header1['NAXIS2'] = imsize_nn[1]
-                        
-                        im_date=coincidences["DATE_TIME"].iloc[j]
-                        # Gets diff image
-                        img=image1-image2
-
-                        filename=os.path.basename(file1[0])[:-4]
-                        folder_name = date.strftime('%Y%m%d')
-                        event_folder= (cdaw_full.loc[cdaw_full["DATE_TIME"]==date, "FOLDER_NAME"].values)[0][:-4]
-                        ofile = opath+"/"+folder_name+"/"+event_folder+"/"
-                        final_path=ofile+"filtered/"
-                        props_path=final_path+'mask_props'
-                        # if not os.path.exists(final_path):
-                        #     os.makedirs(final_path)
-                        if not os.path.exists(props_path):
-                            os.makedirs(props_path)
-                        
-                        all_center.append(occ_center[0])
-                        all_plate_scl.append(plt_scl)                    
-                        all_images.append(img)
-                        all_dates.append(im_date)
-                        all_occ_size.append(occ_size[0])
-                        file_names.append(filename)
-                        all_headers.append(header1)
-                        all_ofiles.append(ofile)
+    if len(cdaw_event)>0:
+        date=cdaw_event["DATE_TIME"].iloc[0]
             
+        prev_date = date - MAX_TIME_DIFF
+
+        #finds all files present in the folder for the corresponding cdaw_event
+        event=found_events.loc[(found_events["DATE_TIME"]>=str(prev_date))&(found_events["DATE_TIME"]<=str(cdaw_event["DATE_TIME"].iloc[-1]))]
+        event["DATE_TIME"]=pd.to_datetime(event["DATE_TIME"])
+        event = event.reset_index(drop=True)
+        
+        #finds the cdaw_event files present in the event
+        #specific_event=pd.to_datetime("2003-12-08")
+        #if date.date()==specific_event.date():     
+            
+        if len(event)>2:
+
+            
+            #coincidences = event[event["DATE_TIME"].isin(cdaw_event["DATE_TIME"])]
+            #coincidences = coincidences.reset_index(drop=True)
+            for j in range(len(event)-1):#for j in range(len(coincidences)-1):
+                file1 = [event["PATH"].iloc[j]]#file1 = [coincidences["PATH"].iloc[j]]
+                prev_time=event["DATE_TIME"].iloc[j]-MAX_TIME_DIFF_IMAGE_L1#prev_time=coincidences["DATE_TIME"].iloc[j]-MAX_TIME_DIFF_IMAGE_L1
+                prev_images=event.loc[(event["DATE_TIME"]<event["DATE_TIME"].iloc[j])&(event["DATE_TIME"]>prev_time)]
+                #prev_images=event.loc[(event["DATE_TIME"]<coincidences["DATE_TIME"].iloc[j])&(event["DATE_TIME"]>prev_time)]
+                prev_images = prev_images.reset_index(drop=True)
+                
+                if len(prev_images)>0:
+                    file2 = [prev_images["PATH"].iloc[-1]]
+                    
+                    if len(file1)!=0 or len(file2)!=0:
+                        image1, header1 = read_fits(file1[0],header=True)# final image
+                        image2,header2 = read_fits(file2[0],header=True)# initial image
+                        if (image1 is not None) and (image2 is not None):
+                            # # Check shape
+                            # if header1['NAXIS1'] != imsize_nn[0]:
+                            #     scale=(header1['NAXIS1']/imsize_nn[0])
+                            #     plt_scl = header1['CDELT1'] * scale
+                            # else:
+                            #     plt_scl = header1['CDELT1']
+                            # # Resize images if necessary
+                            # if (imsize[0]!=0 and imsize[1]!=0) or (image1.shape !=image2.shape):
+                            #     image1 = rebin(image1,imsize_nn,operation='mean') 
+                            #     image2 = rebin(image2,imsize_nn,operation='mean')
+                            #     header1['NAXIS1'] = imsize_nn[0]   
+                            #     header1['NAXIS2'] = imsize_nn[1]
+                            
+                            plt_scl = header1['CDELT1']
+                            im_date=event["DATE_TIME"].iloc[j]#im_date=coincidences["DATE_TIME"].iloc[j]
+                            # Gets diff image
+                            img=image1-image2
+
+                            filename=os.path.basename(file1[0])[:-4]
+                            folder_name = date.strftime('%Y%m%d')
+                            event_folder= (cdaw_full.loc[cdaw_full["DATE_TIME"]==date, "FOLDER_NAME"].values)[0][:-4]
+                            ofile = opath+"/"+folder_name+"/"+event_folder+"/"
+                            final_path=ofile+"filtered/"
+                            props_path=final_path+'mask_props'
+                            # if not os.path.exists(final_path):
+                            #     os.makedirs(final_path)
+                            if not os.path.exists(props_path):
+                                os.makedirs(props_path)
+                            
+                            all_center.append(occ_center[0])
+                            all_plate_scl.append(plt_scl)                    
+                            all_images.append(img)
+                            all_dates.append(im_date)
+                            all_occ_size.append(occ_size[0])
+                            file_names.append(filename)
+                            all_headers.append(header1)
+                            all_ofiles.append(ofile)
+                            occulter_size_ext.append(300)
+        
         if len(all_images)>=2:
-            data_list =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=props_path)
-            if len(data_list)==3:
-                ok_orig_img,ok_dates,df =data_list
+            data_list =  nn_seg.infer_event2(all_images, all_dates, w_metric,filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=props_path, occulter_size_ext=occulter_size_ext)
+            
+            if len(data_list)==4:
+                ok_orig_img,ok_dates,df, control_df =data_list
+            
                 if len(ok_dates)>0:
                     zeros = np.zeros(np.shape(ok_orig_img[0]))
                     all_idx=[]
@@ -346,7 +433,7 @@ for i in tqdm(range(3200,len(yht_files)), desc="Processing lasco data"):
                         os.makedirs(d,exist_ok=True)    
                     for m in range(len(ok_dates)):
                         event = df[df['DATE_TIME'] == ok_dates[m]].reset_index(drop=True)
-
+                        control_event=control_df[control_df['DATE_TIME'] == ok_dates[m]].reset_index(drop=True)
                         for n in range(len(event['MASK'])):
                             if event['SCR'][n] > scr_threshold:             
                                 masked = zeros.copy()
@@ -364,7 +451,8 @@ for i in tqdm(range(3200,len(yht_files)), desc="Processing lasco data"):
                                 h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1]) 
                                 fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
                         
-                        plot_to_png(opath+"/"+folder_name+"/"+event_folder+"/"+file_names[m]+".png", [ok_orig_img[m]], event,[all_center[m]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[m]])  
+                        if plot_png:
+                            plot_to_png(opath+"/"+folder_name+"/"+event_folder+"/"+file_names[m]+".png", [ok_orig_img[m]], event, control_df,[all_center[m]],mask_threshold=mask_threshold,scr_threshold=scr_threshold, title=[file_names[m]])  
                         
                     #Saves df for future comparison
                     col_drop= ['MASK'] # its necessary to drop mask column (its a matrix) to succsessfully save the csv file
@@ -376,7 +464,7 @@ for i in tqdm(range(3200,len(yht_files)), desc="Processing lasco data"):
                 else:
                     print("WARNING: COULD NOT PROCESS EVENT "+ str(date)+", LESS THAN TWO IMAGES IN THE EVENT")
             
-directory= model_path+"/"+"infer_neural_cme_seg_kincat_L1/lasco"
+directory= model_path+"/"+"infer_neural_cme_seg_kincat_L1/lasco"+"_flor_test"
 elements = os.listdir(directory)
 for element in elements:
     element_path = os.path.join(directory, element)
