@@ -14,7 +14,7 @@ def pnt2arr(points,imsize):
         arr[points[i][0], points[i][1]] = 1
     return arr
 
-def get_cme_mask(sample_image, inner_cme=True,occ_size=None):
+def get_cme_mask(sample_image, inner_cme=True,occ_size=None,only_btot=False):
     '''
     Returns a binary mask for the CME in the input (CME-only brigthness image)
     sample_image: array from rtraytracewcs
@@ -22,10 +22,16 @@ def get_cme_mask(sample_image, inner_cme=True,occ_size=None):
     '''    
     img_sz=np.shape(sample_image)[0]*2
     blur = cv2.GaussianBlur(sample_image,(3,3),0)
+    if blur[blur != 0].size == 0:
+        return(np.zeros((512,512), dtype=np.uint8))
     norm_img =(blur-np.min(blur[blur != 0]))/(np.max(blur)-np.min(blur[blur != 0]))
     norm_img[norm_img<0]=0
     norm_img[norm_img>0]=1
     img = cv2.resize(norm_img,(img_sz,img_sz))
+    #if only_btot:
+    #    #usar norm_img >0 podria estar cagandome esto. CHEQUEAR.
+    #    breakpoint()
+    #    return(np.array(img))
 
     #comment from here ##################
     #cota = np.percentile(img[img != 0],5)
@@ -65,7 +71,6 @@ def get_cme_mask(sample_image, inner_cme=True,occ_size=None):
     cv2.circle(mask_aux, (set_w,set_h), occulter_size, 1, -1)
     mask_0 = img.copy()
     mask_0[mask_aux==1] = 1
-
         #Fill holes using contours
         #inverted_mask = cv2.bitwise_not(mask)
         #contours, _ = cv2.findContours(inverted_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -89,6 +94,9 @@ def get_cme_mask(sample_image, inner_cme=True,occ_size=None):
     inverted_mask = mask_0.copy()
     hh, ww = inverted_mask.shape[:2]
     flood_fill_mask = np.zeros((hh + 2, ww + 2), np.uint8) 
+    if flood_fill_mask[0,0] == 1:
+        breakpoint()
+        #si sucede esto, probablemente haya que hacer un floodfill en 512,512 en lugar de en 0,0
     cv2.floodFill(inverted_mask, flood_fill_mask, (0, 0), 1)
         # Perform flood fill operation
         # Invert the flood filled image back

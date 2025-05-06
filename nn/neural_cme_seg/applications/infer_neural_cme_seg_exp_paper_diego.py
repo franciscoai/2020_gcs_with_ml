@@ -333,6 +333,10 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
         obj_labels = ['Back', 'Occ','CME','N/A']
     elif version=='v5':
         obj_labels = ['Back', 'CME']
+    elif version=='A4':
+        obj_labels = ['Back', 'Occ','CME']
+    elif version=='A6':
+        obj_labels = ['Back', 'Occ','CME']
     else:
         print(f'ERROR. Version {version} not supported')
         sys.exit()
@@ -351,12 +355,13 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
         axs[i+3].axis('off')        
         if boxes is not None:
             nb = 0
-            nb_aux = 0
+            nb_aux = 1
             iou_mask_list = [0 for _ in range(len(boxes[i]))]
             for b in boxes[i]:
                 scr = 0
-                if version=='v4' and labels[i][nb] == 1: #avoid plotting occulter
+                if version in ('v4', 'A4', 'A6') and labels[i][nb] == 1: #avoid plotting occulter
                     nb+=1
+                    nb_aux+=1
                     continue
                 if version=='v5':
                     nb_aux+=1
@@ -405,7 +410,7 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
                 max_scr_index = np.argmax(iou_mask_list)
                 best_iou, best_dice, best_prec, best_rec,max_iou, max_dice, max_prec, max_rec = best_mask_treshold(masks[i][max_scr_index], orig_img, masks_gcs[i][0])
                 axs[i+6].annotate('max_IoU: '+'{:.2f}'.format(max_iou)              ,xy=[10,450]  , fontsize=15, color=color[max_scr_index])
-                axs[i+6].annotate('scr    : '+'{:.2f}'.format(best_iou)             ,xy=[10,480]  , fontsize=15, color=color[max_scr_index])
+                axs[i+6].annotate('maxthresh: '+'{:.2f}'.format(best_iou)             ,xy=[10,480]  , fontsize=15, color=color[max_scr_index])
 
         if masks_gcs is not None:
             #breakpoint()
@@ -600,9 +605,26 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, fil
 
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
-model_version="v5"
-trained_model = '49.torch'
+model = 'A4_DS32' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
+if model == "v5":
+    model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
+    model_version="v5"
+    trained_model = '49.torch'
+
+if model == 'A4_DS31':
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS31"
+    model_version="A4"
+    trained_model = '49.torch'
+
+if model == 'A4_DS32':
+    model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
+    model_version="A4"
+    trained_model = '49.torch'
+
+if model == 'A6_DS32':
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"
+    model_version="A6"
+    trained_model = '49.torch'
 
 #model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 #model_version="v4"
@@ -755,6 +777,7 @@ for ev in event:
         mask_list.append([mask_list_cor2a,mask_list_cor2b,mask_list_c2])
         #breakpoint()
         ofile = os.path.join(ev_opath,os.path.basename(ev['pro_files'][t])+'.png')
+        #breakpoint()
         if filter:
             plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [[maska[t]],[maskb[t]],[maskl[t]]], 
                         title=[datesa[t], datesb[t], datesl[t]],labels=[[labelsa[t]],[labelsb[t]], [labelsl[t]]], 

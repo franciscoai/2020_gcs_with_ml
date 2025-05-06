@@ -37,12 +37,16 @@ def get_corona(sat, imsize=None, diff=True, rnd_rot=False, custom_headers=False)
     
     cor2_a_path= "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2/cor2_a"
     cor2_b_path= "/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/cor2/cor2_b"
-    lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/lasco/c2/3VP"
+    #lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/lasco/c2/3VP"
+    lasco_path="/gehme/projects/2020_gcs_with_ml/data/corona_background_affects/lasco/c2"
     H_COR2B = "/gehme/data/stereo/secchi/L1/b/img/cor2/20130209/20130209_062400_14c2B.fts"
     H_COR2A = "/gehme/data/stereo/secchi/L1/a/img/cor2/20130209/20130209_062400_14c2A.fts" 
     H_LASCO = "/gehme/data/soho/lasco/level_1/c2/20130209/25447666.fts"     
-    size_occ  = [2.9, 3.9, 1.9]
+    #size_occ  = [2.9, 3.9, 1.9]
+    #size_occ  = [2.9, 3.9, 2.0]
+    size_occ  = [2.9, 3.9, 2.2]
     size_occ_ext=[16+1, 16+1, 6+1] # Occulters size for [sat1, sat2 ,sat3] in [Rsun]
+    size_occ_ext=[15, 16, 6+1] #following the backgrounds
     occ_center = [[0.,0.], [0.3,-0.3] , [0.,0.]] # [0.3,-0.6] Occulters center offsets [x,y] for [sat1, sat2 ,sat3] in arcsec?
 
     # main
