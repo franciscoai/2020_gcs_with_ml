@@ -356,19 +356,23 @@ def plot_to_png(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_thres
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
 #select the model
-model = 'A6_DS32' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
+model = 'A4_DS31' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
 
 if model == 'A4_DS31':
     testDir =  '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
     model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS31"
     model_version="A4"
-    trained_model = ['49.torch']
+    trained_model = [f"{i}.torch" for i in range(50)]
+    #trained_model = ['48.torch']
+    original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS32.csv"
 
 if model == 'A4_DS32':
-    testDir =  '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
-    model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
+    testDir =  '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
     model_version="A4"
-    trained_model = ['49.torch']
+    trained_model = [f"{i}.torch" for i in range(50)]
+    trained_model = ['48.torch']
+    original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS32.csv"
 
 if model == 'A6_DS32':
     testDir =  '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
@@ -386,9 +390,9 @@ if model == 'v5':
 
 
 #Select the desired mode, one at a time
-calculate_best_mask_treshold  = False #estimate the best mask treshold based on the IoU score
+calculate_best_mask_treshold  = True #estimate the best mask treshold based on the IoU score
 normal_test_one_mask_treshold = False #run the test with a single mask treshold and plot the result images
-statistics_using_best_mask_treshold = True #run massive test statistics using the best mask treshold and saving DF.
+statistics_using_best_mask_treshold = False #run massive test statistics using the best mask treshold and saving DF.
 
 if calculate_best_mask_treshold:
     #Si longitud de mask_thresholds es mayor a 1, se hace una estadistica de IoU y score vs mask_thresholds, SIN ploteo de imagenes.
@@ -603,7 +607,7 @@ for torch_models in trained_model:
             df_new = df_new.drop_duplicates().reset_index(drop=True)
             df_new['IoU'] = all_iou[0]
             #save df_new to csv
-            breakpoint()
+            #breakpoint()
             df_new_output = model_path+"/"+model+"_"+torch_models.replace('.', '')+"_maskthresh"+str(mask_threshold)+"_training_cases_"+str(test_ncases)+"_IOU.csv"
             df_new.to_csv(df_new_output, index=False)
                                                     

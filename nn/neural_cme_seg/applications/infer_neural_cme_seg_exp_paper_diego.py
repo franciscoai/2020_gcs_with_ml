@@ -612,12 +612,12 @@ if model == "v5":
     trained_model = '49.torch'
 
 if model == 'A4_DS31':
-    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS31"
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
     model_version="A4"
     trained_model = '49.torch'
 
 if model == 'A4_DS32':
-    model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
     model_version="A4"
     trained_model = '49.torch'
 
@@ -625,6 +625,8 @@ if model == 'A6_DS32':
     model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"
     model_version="A6"
     trained_model = '49.torch'
+
+mask_threshold = 0.54 
 
 #model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 #model_version="v4"
@@ -656,6 +658,8 @@ file.close()
 
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
+nn_seg.mask_threshold = mask_threshold
+breakpoint()
 for ev in event:
     print(f'Processing event {ev["date"]}')
     ev_opath = os.path.join(opath, ev['date'].split('/')[-1]) + '_filter_'+str(filter)   
