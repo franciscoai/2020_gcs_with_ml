@@ -131,15 +131,15 @@ def get_paths_cme_exp_sources():
         tinst = os.listdir(ev)
         sav_files = sorted([os.path.join(ev,f) for f in tinst if (f.endswith('.sav') and 'm1.' not in f and 'm2.' not in f)])
         pro_files = sorted([os.path.join(ev,f) for f in tinst if (f.endswith('.pro') and 'fit_' not in f and 'tevo_' not in f and 'm1.' not in f and 'm2.' not in f and 'download' not in f and 'data' not in f)])
-       
+        #breakpoint()
         if len(sav_files) != len(pro_files):
             os.error('ERROR. Found different number of .sav and .pro files')
-         
+            breakpoint()
             sys.exit
         # reads the lasco and stereo files from within each pro
         ok_pro_files = []
         ok_sav_files = []
-  
+        #breakpoint()
         for index ,f in enumerate(pro_files):
             with open(f) as of:
                 for line in of:
@@ -159,7 +159,7 @@ def get_paths_cme_exp_sources():
                         cpre = [s for s in pre_event if (cdate in s and cor in s and '/a/' in s )]
                         if len(cpre) == 0:
                             print(f'Cloud not find pre event image for {cdate}')
-                            
+                            breakpoint()
                         cdict['pre_ima'].append(cpre[0])
                         cdict['pre_imb'].append([s for s in pre_event if (cdate in s and  cor in s and '/a/' in s )][0])
                     if 'imaprev=sccreadfits(' in line:
@@ -188,7 +188,7 @@ def get_paths_cme_exp_sources():
                         cpre= [s for s in pre_event if (cdate in s and '/c2/' in s)]
                         if len(cpre) == 0:
                             print(f'Cloud not find pre event image for {cdate}')
-                                              
+                            breakpoint()                        
                         cdict['pre_lasco'].append(cpre[0])                                           
                     if 'lasco0=readfits' in line:
                         cline = lasco_path +line.split('\'')[1]
@@ -199,7 +199,7 @@ def get_paths_cme_exp_sources():
         cdict['pro_files']=ok_pro_files
         cdict['sav_files']=ok_sav_files                                                      
         event.append(cdict)
- 
+        #breakpoint()
     return event
 
 def read_fits_old(file_path, header=False, imageSize=[512,512]):
@@ -333,6 +333,10 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
         obj_labels = ['Back', 'Occ','CME','N/A']
     elif version=='v5':
         obj_labels = ['Back', 'CME']
+    elif version=='A4':
+        obj_labels = ['Back', 'Occ','CME']
+    elif version=='A6':
+        obj_labels = ['Back', 'Occ','CME']
     else:
         print(f'ERROR. Version {version} not supported')
         sys.exit()
@@ -343,7 +347,7 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
     if masks_gcs is not None:
         fig, axs = plt.subplots(3, 3, figsize=[20,10])
     axs = axs.ravel()
-    
+    #breakpoint()
     for i in range(len(orig_img)):
         axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray', origin='lower')
         axs[i].axis('off')
@@ -351,12 +355,13 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
         axs[i+3].axis('off')        
         if boxes is not None:
             nb = 0
-            nb_aux = 0
+            nb_aux = 1
             iou_mask_list = [0 for _ in range(len(boxes[i]))]
             for b in boxes[i]:
                 scr = 0
-                if version=='v4' and labels[i][nb] == 1: #avoid plotting occulter
+                if version in ('v4', 'A4', 'A6') and labels[i][nb] == 1: #avoid plotting occulter
                     nb+=1
+                    nb_aux+=1
                     continue
                 if version=='v5':
                     nb_aux+=1
@@ -364,15 +369,12 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
                     if scores[i][nb] is not None:
                         scr = scores[i][nb]
                 if scr > scr_threshold:    
-                    #breakpoint()
-                    if len(masks_gcs[i]) > 0 and np.max(masks_gcs[i]) != 0:
-                        masks_gcs[i] = [np.zeros((512,512))]
-                    # try:
-                    #     if np.max(masks_gcs[i]) == 0:    
-                    #         breakpoint()
-                    # except:
-                    #     masks_gcs[i] = [np.zeros((512,512))] #if no mask is given by gcs proyection.
-                      
+                    try:
+                        if np.max(masks_gcs[i]) == 0:    
+                            breakpoint()
+                    except:
+                        masks_gcs[i] = [np.zeros((512,512))] #if no mask is given by gcs proyection.
+                        breakpoint()
                     #precision, recall, dice, iou = calculate_metrics(masks_gcs[i][0], masks[i][nb])
                     #best_iou, best_dice, best_prec, best_rec,max_iou, max_dice, max_prec, max_rec = best_mask_treshold(masks[i][nb], orig_img, masks_gcs[i])
                     masked = nans.copy()
@@ -404,14 +406,14 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
                 nb_aux+=1
             if len(iou_mask_list) > 0:
                 if len(iou_mask_list) == 0:
-                   breakpoint()
+                    breakpoint()
                 max_scr_index = np.argmax(iou_mask_list)
                 best_iou, best_dice, best_prec, best_rec,max_iou, max_dice, max_prec, max_rec = best_mask_treshold(masks[i][max_scr_index], orig_img, masks_gcs[i][0])
                 axs[i+6].annotate('max_IoU: '+'{:.2f}'.format(max_iou)              ,xy=[10,450]  , fontsize=15, color=color[max_scr_index])
-                axs[i+6].annotate('scr    : '+'{:.2f}'.format(best_iou)             ,xy=[10,480]  , fontsize=15, color=color[max_scr_index])
+                axs[i+6].annotate('maxthresh: '+'{:.2f}'.format(best_iou)             ,xy=[10,480]  , fontsize=15, color=color[max_scr_index])
 
         if masks_gcs is not None:
-        
+            #breakpoint()
             mask_aux = masks_gcs[i][0].copy()
             mask_aux[masks_gcs[i][0] == 0] = 1
             mask_aux[masks_gcs[i][0] == 1] = 0
@@ -486,7 +488,7 @@ def inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=T
             cprea = ev[imgs_labels[1]][t]
         else:
             cprea = ev[imgs_labels[2]][t]
-    
+        breakpoint()
         imga, ha = read_fits(cimga, header=True,imageSize=imageSize)
         img = imga-read_fits(cprea, imageSize=imageSize)
         all_diff_img.append(img)
@@ -499,8 +501,8 @@ def inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=T
         all_headers.append(ha)
     # inference of all images in the event
     #print(f'Running inference for {imgs_labels[0]} dates {all_dates}')
-
-    orig_img, dates, mask, scr, labels, boxes, mask_porp =  nn_seg.infer_event2(all_diff_img, all_dates,w_metric, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=ev_opath+'/'+imgs_labels[0])
+    breakpoint()
+    orig_img, dates, mask, scr, labels, boxes, mask_porp =  nn_seg.infer_event2(all_diff_img, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=ev_opath+'/'+imgs_labels[0])
     
     # adds mask_prop to headers as keywords, [mask_id,score,cpa_ang, wide_ang, apex_dist]
     for cdate in all_dates:
@@ -537,7 +539,7 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, fil
     all_score = []
     all_lbl = []
     all_box = []
-
+    #breakpoint()
     #for t in range(len(ev['pro_files'])):
     for t in range(len(ev[imgs_labels[0]])):    
         cimga= ev[imgs_labels[0]][t]
@@ -557,7 +559,7 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, fil
         else:
             cur_occ_size = 0
             occulter_size_ext = 0
-
+        #breakpoint()
         all_occ_size.append(cur_occ_size)
         all_occ_size_ext.append(occulter_size_ext)
         
@@ -565,7 +567,7 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, fil
             cprea = ev[imgs_labels[1]][t]
         else:
             cprea = ev[imgs_labels[2]][t]
-
+        #breakpoint()
         imga, ha = read_fits(cimga, header=True,imageSize=imageSize)
         occ_center=[ha["crpix1"],ha["crpix2"]]
         img = imga-read_fits(cprea, imageSize=imageSize)
@@ -580,8 +582,8 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, fil
         all_headers.append(ha)
     # inference of all images in the event
     #print(f'Running inference for {imgs_labels[0]} dates {all_dates}')
-   
-    orig_img, dates, mask, scr, labels, boxes, mask_porp =  nn_seg.infer_event2(all_diff_img, all_dates,w_metric, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=ev_opath+'/'+imgs_labels[0])
+    #breakpoint()
+    #orig_img, dates, mask, scr, labels, boxes, mask_porp =  nn_seg.infer_event2(all_diff_img, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,  plot_params=ev_opath+'/'+imgs_labels[0])
 
     for i in range(len(all_diff_img)):
         #infer masks
@@ -589,9 +591,9 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, fil
                                                             occulter_size=all_occ_size[i],occulter_size_ext=all_occ_size_ext[i],
                                                             centerpix=all_occ_center[i])
         # plot the predicted mask
-        #ofile = opath+"/"+os.path.basename(cimga)+'infer1.png'
+        #ofile = opath+"/"+os.path.basename(cimga)+'infer1.png'inference_base
         #plot_to_png(ofile, [orig_img], [masks], scores=[scores], labels=[labels], boxes=[boxes],version=version)
-
+        #breakpoint()
         all_orig_img.append(orig_img)
         all_mask.append(masks)
         all_score.append(scores)
@@ -603,15 +605,34 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, fil
 
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
-# model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
-# model_version="v5"
-# trained_model = '49.torch'
+model = 'A4_DS32' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
+if model == "v5":
+    model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
+    model_version="v5"
+    trained_model = '49.torch'
 
-model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
-model_version="v4"
-trained_model = '9999.torch'
+if model == 'A4_DS31':
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
+    model_version="A4"
+    trained_model = '49.torch'
+
+if model == 'A4_DS32':
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
+    model_version="A4"
+    trained_model = '49.torch'
+
+if model == 'A6_DS32':
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"
+    model_version="A6"
+    trained_model = '49.torch'
+
+mask_threshold = 0.54 
+
+#model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
+#model_version="v4"
+#trained_model = '9999.torch'
 #trained_model = '6000.torch'
-w_metric=[0.4,0.4,0.1,0.1] #weights for the metric used to select the best mask [IOU,CPA,AW,APEX]
+
 opath= model_path + "/infer_neural_cme_seg_exp_paper_filtered_flor"
 file_ext=".png"
 do_run_diff = True # set to use running diff instead of base diff (False)
@@ -627,27 +648,28 @@ print(f'Using device:  {device}')
 
 os.makedirs(opath, exist_ok=True)
 event = get_paths_cme_exp_sources() # get all files event
-
-#Saves all events in a csv file
-# file = open(opath + '/all_events.csv', 'w')
-# writer = csv.writer(file)
-# writer.writerow(event[0].keys())
-# for e in event:
-#     writer.writerow(e.values())
-# file.close()
+#breakpoint()
+file = open(opath + '/all_events.csv', 'w')
+writer = csv.writer(file)
+writer.writerow(event[0].keys())
+for e in event:
+    writer.writerow(e.values())
+file.close()
 
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
+nn_seg.mask_threshold = mask_threshold
+breakpoint()
 for ev in event:
     print(f'Processing event {ev["date"]}')
     ev_opath = os.path.join(opath, ev['date'].split('/')[-1]) + '_filter_'+str(filter)   
     #cora
-      
+    #breakpoint()    
     imgs_labels = ['ima1', 'ima0','pre_ima']
     #orig_imga, datesa, maska, scra, labelsa, boxesa, mask_porpa, ha = inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=filter)
     orig_imga, datesa, maska, scra, labelsa, boxesa, headersa, plate_scl_a = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=filter, version=model_version)
     datesa = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesa]      
-
+    #breakpoint()
     #corb
     imgs_labels = ['imb1', 'imb0','pre_imb']
     orig_imgb, datesb, maskb, scrb, labelsb, boxesb, headersb, plate_scl_b = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=filter, version=model_version) 
@@ -656,7 +678,7 @@ for ev in event:
     imgs_labels = ['lasco1', 'lasco0','pre_lasco']
     orig_imgl, datesl, maskl, scrl, labelsl, boxesl, headersl, plate_scl_l = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=filter, version=model_version)
     datesl = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesl]    
-
+    #breakpoint()
 
     if len(orig_imga) != len(orig_imgb) or len(orig_imga) != len(orig_imgl):
         print('Different number of images in the three instruments. We are repeting some images in the triplet plots.')
@@ -719,62 +741,58 @@ for ev in event:
                     occ_size_1024 = 120
                 elif sat==2:
                     occ_size_1024 = 150
-                try:
-                    x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
-                    y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
-                    xx, yy = np.meshgrid(x, y)
-                    x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat) 
-                    # ad hoc correction for the occulter center
-                    x_cS, y_cS = x_cS+occ_center[sat][0], y_cS+occ_center[sat][1]       
-                    r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
-                    phi = np.arctan2(yy - y_cS, xx - x_cS)
-                          
-                    btot_mask = rtraytracewcs(headers[sat], float(lon), float(lat), float(rot), float(hgt), float(rat),
-                                            float(han), imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.001, nel=1e5, usr_center_off=usr_center_off)     
-                    cme_npix= len(btot_mask[btot_mask>0].flatten())
-                    if cme_npix<=0:
-                        print("Empty mask created corresponding to")
-                        print(ev['sav_files'][t])
-     
-                        break          
-                    mask = get_cme_mask(btot_mask,inner_cme=inner_hole_mask,occ_size=occ_size_1024)          
-                    mask_npix= len(mask[mask>0].flatten())
-                    if mask_npix/cme_npix<0.5:                        
-                        print("Empty projection mask created?")
-   
-                        break
-                    #adds occulter to the masks and checks for null masks
-                    mask[r <= size_occ[sat]] = 0  
-                    mask[r >= size_occ_ext[sat]] = 0
-                    #save mask
-                    if sat == 0:
-                        mask_list_cor2a.append(mask)
-                    if sat == 1:
-                        mask_list_cor2b.append(mask)
-                        if len(mask) == 0:
-                            breakpoint()
-               
-                    if sat == 2:
-                        mask_list_c2.append(mask)
-                        if len(mask) == 0:
-                            breakpoint()
-                  
-                except:
-                    print(f'Error creating mask for {ev["sav_files"][t]}')
+                x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
+                y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
+                xx, yy = np.meshgrid(x, y)
+                x_cS, y_cS = center_rSun_pixel(headers, plotranges, sat) 
+                # ad hoc correction for the occulter center
+                x_cS, y_cS = x_cS+occ_center[sat][0], y_cS+occ_center[sat][1]       
+                r = np.sqrt((xx - x_cS)**2 + (yy - y_cS)**2)
+                phi = np.arctan2(yy - y_cS, xx - x_cS)
+                #breakpoint()                
+                btot_mask = rtraytracewcs(headers[sat], float(lon), float(lat), float(rot), float(hgt), float(rat),
+                                        float(han), imsize=imsize, occrad=size_occ[sat], in_sig=1., out_sig=0.001, nel=1e5, usr_center_off=usr_center_off)     
+                cme_npix= len(btot_mask[btot_mask>0].flatten())
+                if cme_npix<=0:
+                    print("Empty mask created corresponding to")
+                    print(ev['sav_files'][t])
+                    breakpoint()
+                    break          
+                mask = get_cme_mask(btot_mask,inner_cme=inner_hole_mask,occ_size=occ_size_1024)          
+                mask_npix= len(mask[mask>0].flatten())
+                if mask_npix/cme_npix<0.5:                        
+                    print("Empty projection mask created?")
+                    breakpoint()
+                    break
+                #adds occulter to the masks and checks for null masks
+                mask[r <= size_occ[sat]] = 0  
+                mask[r >= size_occ_ext[sat]] = 0
+                #save mask
+                if sat == 0:
+                    mask_list_cor2a.append(mask)
+                if sat == 1:
+                    mask_list_cor2b.append(mask)
+                    if len(mask) == 0:
+                        breakpoint()
+                if sat == 2:
+                    mask_list_c2.append(mask)
+                    if len(mask) == 0:
+                        breakpoint()
         mask_list.append([mask_list_cor2a,mask_list_cor2b,mask_list_c2])
-
+        #breakpoint()
         ofile = os.path.join(ev_opath,os.path.basename(ev['pro_files'][t])+'.png')
+        #breakpoint()
         if filter:
             plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [[maska[t]],[maskb[t]],[maskl[t]]], 
                         title=[datesa[t], datesb[t], datesl[t]],labels=[[labelsa[t]],[labelsb[t]], [labelsl[t]]], 
                         boxes=[[boxesa[t]], [boxesb[t]], [boxesl[t]]], scores=[[scra[t]], [scrb[t]], [scrl[t]]],
                         masks_gcs = mask_list[t],
                         version=model_version,scr_threshold=scr_threshold)#, save_masks=[ha[t],hb[t],hl[t]])
-            
+            #breakpoint()
         else:
             plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [maska[t],maskb[t],maskl[t]], 
                         title=[datesa[t], datesb[t], datesl[t]],labels=[labelsa[t],labelsb[t], labelsl[t]], 
                         boxes=[boxesa[t], boxesb[t], boxesl[t]], scores=[scra[t], scrb[t], scrl[t]],
                         masks_gcs = mask_list[t],
                         version=model_version,scr_threshold=scr_threshold) 
-                 
+            #breakpoint()        
