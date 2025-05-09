@@ -91,6 +91,8 @@ imsize_nn=[512,512] #for rebin befor the nn
 smooth_kernel=[2,2] #changes the gaussian filter size
 occ_size = [55,60] # occulter radius in pixels. An artifitial occulter with constant value equal to the mean of the image is added before inference. Use 0 to avoid
 occ_center=[[256,256],[260,247]]
+occ_size_ext_val=#PEDIR VALOR DIEGO
+w_metric=[0.4,0.4,0.1,0.1] #weights for the metric used to select the best mask [IOU,CPA,AW,APEX]
 sat="cor2_a"#"cor2_b"
 
 if sat=="cor2_a":
@@ -165,6 +167,7 @@ for i in tqdm(range(len(catalogue.index)), desc="Reading Catalogue"):
         all_headers=[]
         all_center=[]
         folder=files[0][40:-26]
+        cculter_size_ext=[]
         
         #if folder=="20090218":
         for j in tqdm(range(len(files)-1),desc="Processing files of folder "+ folder):
@@ -209,10 +212,11 @@ for i in tqdm(range(len(catalogue.index)), desc="Reading Catalogue"):
                 all_occ_size.append(occ_size)
                 file_names.append(filename)
                 all_headers.append(header)
-
+                occulter_size_ext.append(occ_size_ext_val)
         print("cant de img antes de la red: ",len(all_images))
         if len(all_images)>=2:
-            data_list =  nn_seg.infer_event2(all_images, all_dates, filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=props_path)
+            data_list =  nn_seg.infer_event2(all_images, all_dates, w_metric,filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_center,  plot_params=props_path, occulter_size_ext=occulter_size_ext)
+            
             
             if len(data_list)==3:
                 ok_orig_img,ok_dates, df =data_list
@@ -256,7 +260,7 @@ for i in tqdm(range(len(catalogue.index)), desc="Reading Catalogue"):
                 col_drop= ['MASK'] # its necessary to drop mask column (its a matrix) to succsessfully save the csv file
                 df = df.drop(col_drop, axis=1)
                 df.to_csv(final_path+folder_name+'_filtered_stats', index=False)
-                breakpoint()
+                
             else:
                 print("MASK NOT FOUNDED FOR EVENT "+ files[0][49:-13] )
         else:
