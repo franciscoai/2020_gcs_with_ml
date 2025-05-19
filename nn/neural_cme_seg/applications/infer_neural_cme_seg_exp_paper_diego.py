@@ -392,21 +392,19 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
                     if masks_gcs is not None:
                         axs[i+6].annotate('IoU: '                            ,xy=[10 ,20]    , fontsize=15, color=color[nb])#pasar a negro
                         axs[i+6].annotate(''+'{:.2f}'.format(iou)            ,xy=[30*nb_aux*3,20]  , fontsize=15, color=color[nb])
-                        #axs[i+6].annotate(''+'{:.2f}'.format(max_iou)        ,xy=[50*nb,20]  , fontsize=15, color=color[nb])
-                        axs[i+6].annotate('Dic: '                            ,xy=[10 ,50]    , fontsize=15, color=color[nb])
-                        axs[i+6].annotate(''+'{:.2f}'.format(dice)           ,xy=[30*nb_aux*3,50]  , fontsize=15, color=color[nb])
-                        #axs[i+6].annotate(''+'{:.2f}'.format(max_dice)       ,xy=[50*nb,50]  , fontsize=15, color=color[nb])
-                        axs[i+6].annotate('Pre: '                            ,xy=[10 ,80]    , fontsize=15, color=color[nb])
-                        axs[i+6].annotate(''+'{:.2f}'.format(precision)      ,xy=[30*nb_aux*3,80]  , fontsize=15, color=color[nb])
-                        #axs[i+6].annotate(''+'{:.2f}'.format(max_prec)       ,xy=[50*nb,80]  , fontsize=15, color=color[nb])
-                        axs[i+6].annotate('Rec: '                            ,xy=[10 ,110]   , fontsize=15, color=color[nb])
-                        axs[i+6].annotate(''+'{:.2f}'.format(recall)         ,xy=[30*nb_aux*3,110] , fontsize=15, color=color[nb])
-                        #axs[i+6].annotate(''+'{:.2f}'.format(max_rec)        ,xy=[50*nb,110] , fontsize=15, color=color[nb])
+                        ##axs[i+6].annotate(''+'{:.2f}'.format(max_iou)        ,xy=[50*nb,20]  , fontsize=15, color=color[nb])
+                        #axs[i+6].annotate('Dic: '                            ,xy=[10 ,50]    , fontsize=15, color=color[nb])
+                        #axs[i+6].annotate(''+'{:.2f}'.format(dice)           ,xy=[30*nb_aux*3,50]  , fontsize=15, color=color[nb])
+                        ##axs[i+6].annotate(''+'{:.2f}'.format(max_dice)       ,xy=[50*nb,50]  , fontsize=15, color=color[nb])
+                        #axs[i+6].annotate('Pre: '                            ,xy=[10 ,80]    , fontsize=15, color=color[nb])
+                        #axs[i+6].annotate(''+'{:.2f}'.format(precision)      ,xy=[30*nb_aux*3,80]  , fontsize=15, color=color[nb])
+                        ##axs[i+6].annotate(''+'{:.2f}'.format(max_prec)       ,xy=[50*nb,80]  , fontsize=15, color=color[nb])
+                        #axs[i+6].annotate('Rec: '                            ,xy=[10 ,110]   , fontsize=15, color=color[nb])
+                        #axs[i+6].annotate(''+'{:.2f}'.format(recall)         ,xy=[30*nb_aux*3,110] , fontsize=15, color=color[nb])
+                        ##axs[i+6].annotate(''+'{:.2f}'.format(max_rec)        ,xy=[50*nb,110] , fontsize=15, color=color[nb])
                 nb+=1
                 nb_aux+=1
             if len(iou_mask_list) > 0:
-                if len(iou_mask_list) == 0:
-                    breakpoint()
                 max_scr_index = np.argmax(iou_mask_list)
                 best_iou, best_dice, best_prec, best_rec,max_iou, max_dice, max_prec, max_rec = best_mask_treshold(masks[i][max_scr_index], orig_img, masks_gcs[i][0])
                 axs[i+6].annotate('max_IoU: '+'{:.2f}'.format(max_iou)              ,xy=[10,450]  , fontsize=15, color=color[max_scr_index])
@@ -605,7 +603,7 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, fil
 
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
-model = 'A4_DS32' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
+model = 'A6_DS32' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
 if model == "v5":
     model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
     model_version="v5"

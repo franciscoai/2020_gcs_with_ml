@@ -17,7 +17,8 @@ import pandas as pd
 import csv 
 
 def create_csv_file(input_csv_file=None, path=None):
-    path = '/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32/'
+    #path = '/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32/'
+    path = '/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS31/'
     output_csv_1k = "training_cases_1000.csv"
     output_csv_10k = "training_cases_10000.csv"
     input_csv_file = "training_cases.csv"
@@ -356,7 +357,7 @@ def plot_to_png(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_thres
 
 #------------------------------------------------------------------Testing the CNN-----------------------------------------------------------------
 #select the model
-model = 'A4_DS31' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
+model = 'A6_DS32' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
 
 if model == 'A4_DS31':
     testDir =  '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
@@ -364,7 +365,8 @@ if model == 'A4_DS31':
     model_version="A4"
     trained_model = [f"{i}.torch" for i in range(50)]
     #trained_model = ['48.torch']
-    original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS32.csv"
+    #original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS32.csv"
+    original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS31.csv"
 
 if model == 'A4_DS32':
     testDir =  '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
@@ -372,16 +374,29 @@ if model == 'A4_DS32':
     model_version="A4"
     trained_model = [f"{i}.torch" for i in range(50)]
     trained_model = ['48.torch']
-    original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS32.csv"
+    #original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS32.csv"
+    original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS31.csv"
 
 if model == 'A6_DS32':
     testDir =  '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
-    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"
+    #model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"
+    model_path = "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32/batchs_epoch1"
     model_version="A6"
     #trained_model = [f"{i}.torch" for i in range(50)]
-    trained_model = ['46.torch']
-    original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS32.csv"
-
+    
+    all_entries = os.listdir(model_path)
+    csv_files = []
+    file_pattern = "batch_"
+    for entry_name in all_entries:
+        if entry_name.endswith(".torch") and entry_name.startswith(file_pattern):
+            csv_files.append(entry_name)
+    csv_files.sort()
+    trained_model = csv_files
+    #trained_model = ['46.torch']
+    #original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS32.csv"
+    original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS31.csv"
+    breakpoint()
+    
 if model == 'v5':
     testDir =  '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240912/'
     model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
@@ -390,9 +405,9 @@ if model == 'v5':
 
 
 #Select the desired mode, one at a time
-calculate_best_mask_treshold  = True #estimate the best mask treshold based on the IoU score
+calculate_best_mask_treshold  = False #estimate the best mask treshold based on the IoU score
 normal_test_one_mask_treshold = False #run the test with a single mask treshold and plot the result images
-statistics_using_best_mask_treshold = False #run massive test statistics using the best mask treshold and saving DF.
+statistics_using_best_mask_treshold = True #run massive test statistics using the best mask treshold and saving DF.
 
 if calculate_best_mask_treshold:
     #Si longitud de mask_thresholds es mayor a 1, se hace una estadistica de IoU y score vs mask_thresholds, SIN ploteo de imagenes.
@@ -426,7 +441,7 @@ if statistics_using_best_mask_treshold:
     use_random_cases        = False # if True, it will use random cases from the testDir. Select False to use a specific csv file with fixed cases.
     use_fixed_cases         = True # if True, it will use a specific csv file with fixed cases. Select False to use random cases.
     DF_to_use = original_DF  #DF created when DataSet was created. It contains statistics of the synthetic images.
-    test_ncases = 10000 #llevar a 10k
+    test_ncases = 1000#16000 #10k  16k
     #df_new_output = model_path+"/"+model+trained_model.replace('.', '')+"_training_cases_1000_IOU.csv"
 
 opath= model_path+"/test_output_diego"
@@ -441,9 +456,11 @@ if not create_validation_cases and not use_random_cases:
 if use_fixed_cases:
     #select csv file that should be the outful of running this code with create_validation_cases=True.
     if test_ncases == 1000:
-        test_cases_file = model_path+"/training_cases_1000.csv"
+        test_cases_file = model_path+"/validation_cases_1000_DS31.csv"
     if test_ncases == 10000:
-        test_cases_file = model_path+"/training_cases_10000.csv"
+        test_cases_file = model_path+"/validation_cases_10000_DS31.csv"
+    if test_ncases == 16000:
+        test_cases_file = model_path+"/validation_cases_16000_DS31.csv"
 gpu=0# GPU to use
 masks2use=[2] # index of the masks to read (should be the CME mask)
 
@@ -498,7 +515,7 @@ for torch_models in trained_model:
     list_of_rows_selected_dfs = []
     for mask_threshold in mask_thresholds:
         this_case_scr =[]
-        this_case_iou = []    
+        this_case_iou = [0 for _ in range(test_ncases)] #[]    
         for ind in range(len(rnd_idx)):
             idx = rnd_idx[ind]
 
@@ -510,12 +527,14 @@ for torch_models in trained_model:
                 mask = df_original['folder_name'] == folder_check
                 row_indices = df_original.index[mask].tolist()
                 list_of_rows_selected_dfs.append(row_indices)
+                if len(row_indices) == 0 or len(row_indices) > 1:
+                    print("this should not happen, please check.")
+                    breakpoint()
                 list_of_selected_dfs.append(df_original.iloc[row_indices])
                 if len(row_indices) != 1:
                     print("this should not happen, please check.")
                     breakpoint()
                 
-
             #reads image
             file=os.listdir(idx)#(imgs[idx])
             file=[f for f in file if f.endswith(file_ext)]
@@ -548,7 +567,8 @@ for torch_models in trained_model:
                 this_case_iou.append(None)
 
             if masks is not None:
-                this_case_iou.append(iou) 
+                #this_case_iou.append(iou)
+                this_case_iou[ind] = iou 
                 this_case_scr.append(scores)
                 # plot the predicted mask
                 if len(mask_thresholds)==1 and plot_images:
@@ -558,6 +578,7 @@ for torch_models in trained_model:
                                 mask_threshold=mask_threshold, scr_threshold=0.1, version=model_version,string=imgs[idx])
                     all_best_iou.append(best_iou_for_plot)
                     all_max_iou.append(max_iou_for_plot)
+        #all_iou[ind]= this_case_iou
         all_scr.append(this_case_scr)
         all_iou.append(this_case_iou)
 
@@ -605,10 +626,11 @@ for torch_models in trained_model:
         if statistics_using_best_mask_treshold:
             df_new = pd.concat(list_of_selected_dfs, ignore_index=True)
             df_new = df_new.drop_duplicates().reset_index(drop=True)
+            breakpoint()
             df_new['IoU'] = all_iou[0]
+            #df_new['IoU'] = all_iou
             #save df_new to csv
-            #breakpoint()
-            df_new_output = model_path+"/"+model+"_"+torch_models.replace('.', '')+"_maskthresh"+str(mask_threshold)+"_training_cases_"+str(test_ncases)+"_IOU.csv"
+            df_new_output = model_path+"/"+model+"_"+torch_models.replace('.', '')+"_maskthresh"+str(mask_threshold)+"_validation_cases_"+str(test_ncases)+"_IOU.csv"
             df_new.to_csv(df_new_output, index=False)
                                                     
     # for many mask thresholds plots mean and std loss and scr vs mask threshold
