@@ -512,7 +512,6 @@ class neural_cme_segmentation():
 
         prop_list=[]
         for i in range(len(masks)):
-            
             if filter_halos:
                 box_center = np.array([boxes[i][0]+(boxes[i][2]-boxes[i][0])/2, boxes[i][1]+(boxes[i][3]-boxes[i][1])/2])
                 if centerpix is not None:
@@ -525,10 +524,9 @@ class neural_cme_segmentation():
                     halo_flag = True
             else:
                 halo_flag = True
-            
+
             if self.labels[labels[i]]=='CME' and scores[i]>self.scr_threshold and halo_flag: 
                 pol_mask=self._rec2pol(masks[i],center=centerpix)
-                
                 if (pol_mask is not None):            
                     #takes the min and max angles and calculates cpa and wide angles
                     angles = [s[1] for s in pol_mask]
@@ -561,7 +559,7 @@ class neural_cme_segmentation():
                         apex_dist_percentile = np.percentile(distance, 98) 
                         apex_dist_per = [d * plate_scl for d,a in zip(distance,angulos) if d >= apex_dist_percentile and d<=apex_dist_percentile+0.5]
                         apex_angl_per = [a for d,a in zip(distance,angulos) if d >= apex_dist_percentile and d<=apex_dist_percentile+0.5]
-                
+
                         if filter_halos:
                             if wide_ang < self.max_wide_ang:
                                 prop_list.append([i,float(scores[i]),cpa_ang, wide_ang, apex_dist, apex_angl, aw_min, aw_max, area_score,apex_dist_per,apex_angl_per])  
@@ -686,7 +684,10 @@ class neural_cme_segmentation():
                             ax.plot(x_points, y_points, style,color=colors[k])
                     
                     hours = [str(timestamp.time()) for timestamp in dt_list]
-                    hours1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in hours]
+                    try:
+                        hours1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in hours]
+                    except:
+                        hours1 = [datetime.strptime(timestamp.split('.')[0], "%H:%M:%S") for timestamp in hours]
                     hours2 = [timestamp.strftime("%H:%M") for timestamp in hours1]
 
                     ax.set_title(y_title)    
@@ -890,10 +891,10 @@ class neural_cme_segmentation():
             comb_df["APEX_NORM"]=(comb_df["APEX_TOT"]-comb_df["APEX_TOT"].min())/(comb_df["APEX_TOT"].max()-comb_df["APEX_TOT"].min())             
             
             comb_df['METRIC'] = (w_metric[0] * comb_df['IOU_NORM']) + (w_metric[1] * comb_df['CPA_NORM']) + (w_metric[2] * comb_df['AW_NORM']) + (w_metric[3] * comb_df['APEX_NORM'])
-            try:
+            if comb_df['METRIC'].isna().any():
+                best_comb = comb_df.loc[comb_df['IOU_TOT'].idxmax()]
+            else:
                 best_comb = comb_df.loc[comb_df['METRIC'].idxmin()]
-            except:
-                breakpoint()
         else:
             best_comb = comb_df.loc[0]
         
@@ -1064,10 +1065,13 @@ class neural_cme_segmentation():
 
 
         if len(min_error_df)>0:
+            try:
+                hours1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in hours]
+            except:
+                hours1 = [datetime.strptime(timestamp.split('.')[0], "%H:%M:%S") for timestamp in hours]
             
-            hours1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in hours]
             hours2 = [timestamp.strftime("%H:%M") for timestamp in hours1]
-            #breakpoint()
+            
             axs[0].set_xticks(dt_list,hours2,rotation=45)
             axs[1].set_xticks(dt_list,hours2,rotation=45)
             axs[2].set_xticks(dt_list,hours2,rotation=45)
@@ -1094,7 +1098,10 @@ class neural_cme_segmentation():
                 ax[0].scatter(x, filtered_event["CPA"], color=colors[l])
                 ax[1].scatter(x, filtered_event["AW"], color=colors[l])
                 ax[2].scatter(x, filtered_event["APEX"], color=colors[l])
-            time1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in time]
+            try:
+                time1 = [datetime.strptime(timestamp, "%H:%M:%S") for timestamp in time]
+            except:
+                time1 = [datetime.strptime(timestamp.split('.')[0], "%H:%M:%S") for timestamp in time]
             time2 = [timestamp.strftime("%H:%M") for timestamp in time1]
             ax[0].set_xticks(x_ax,time2,rotation=45)
             ax[1].set_xticks(x_ax,time2,rotation=45)
@@ -1331,7 +1338,7 @@ class neural_cme_segmentation():
   
 
     def infer_event2(self, imgs, dates, w_metric, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None,occulter_size_ext=None,
-                    centerpix=None, mask_threshold=None, scr_threshold=None, plot_params=None, filter_halos=True,modified_masks=None,
+                    centerpix=None, mask_threshold=None, scr_threshold=None, plot_params=None, filter_halos=False,modified_masks=None,
                     percentiles=[5,95],increase_contrast=None):
         '''
         Updated version of infer_event, it recognices more than one CME per event.

@@ -680,7 +680,36 @@ for ev in event:
     datesl = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesl]    
     #breakpoint()
 
-    if len(orig_imga) != len(orig_imgb) or len(orig_imga) != len(orig_imgl):
+   
+                mask[r >= size_occ_ext[sat]] = 0
+                #save mask
+                if sat == 0:
+                    mask_list_cor2a.append(mask)
+                if sat == 1:
+                    mask_list_cor2b.append(mask)
+                    if len(mask) == 0:
+                        breakpoint()
+                if sat == 2:
+                    mask_list_c2.append(mask)
+                    if len(mask) == 0:
+                        breakpoint()
+        mask_list.append([mask_list_cor2a,mask_list_cor2b,mask_list_c2])
+        #breakpoint()
+        ofile = os.path.join(ev_opath,os.path.basename(ev['pro_files'][t])+'.png')
+        #breakpoint()
+        if filter:
+            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [[maska[t]],[maskb[t]],[maskl[t]]], 
+                        title=[datesa[t], datesb[t], datesl[t]],labels=[[labelsa[t]],[labelsb[t]], [labelsl[t]]], 
+                        boxes=[[boxesa[t]], [boxesb[t]], [boxesl[t]]], scores=[[scra[t]], [scrb[t]], [scrl[t]]],
+                        masks_gcs = mask_list[t],
+                        version=model_version,scr_threshold=scr_threshold)#, save_masks=[ha[t],hb[t],hl[t]])
+            #breakpoint()
+        else:
+            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [maska[t],maskb[t],maskl[t]], 
+                        title=[datesa[t], datesb[t], datesl[t]],labels=[labelsa[t],labelsb[t], labelsl[t]], 
+                        boxes=[boxesa[t], boxesb[t], boxesl[t]], scores=[scra[t], scrb[t], scrl[t]],
+                        masks_gcs = mask_list[t],
+                        version=model_version,scr_threshold=scr_threshold) if len(orig_imga) != len(orig_imgb) or len(orig_imga) != len(orig_imgl):
         print('Different number of images in the three instruments. We are repeting some images in the triplet plots.')
         max_size = max(len(orig_imga), len(orig_imgb), len(orig_imgl))
         for i in range(3):
@@ -765,34 +794,5 @@ for ev in event:
                     breakpoint()
                     break
                 #adds occulter to the masks and checks for null masks
-                mask[r <= size_occ[sat]] = 0  
-                mask[r >= size_occ_ext[sat]] = 0
-                #save mask
-                if sat == 0:
-                    mask_list_cor2a.append(mask)
-                if sat == 1:
-                    mask_list_cor2b.append(mask)
-                    if len(mask) == 0:
-                        breakpoint()
-                if sat == 2:
-                    mask_list_c2.append(mask)
-                    if len(mask) == 0:
-                        breakpoint()
-        mask_list.append([mask_list_cor2a,mask_list_cor2b,mask_list_c2])
-        #breakpoint()
-        ofile = os.path.join(ev_opath,os.path.basename(ev['pro_files'][t])+'.png')
-        #breakpoint()
-        if filter:
-            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [[maska[t]],[maskb[t]],[maskl[t]]], 
-                        title=[datesa[t], datesb[t], datesl[t]],labels=[[labelsa[t]],[labelsb[t]], [labelsl[t]]], 
-                        boxes=[[boxesa[t]], [boxesb[t]], [boxesl[t]]], scores=[[scra[t]], [scrb[t]], [scrl[t]]],
-                        masks_gcs = mask_list[t],
-                        version=model_version,scr_threshold=scr_threshold)#, save_masks=[ha[t],hb[t],hl[t]])
-            #breakpoint()
-        else:
-            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [maska[t],maskb[t],maskl[t]], 
-                        title=[datesa[t], datesb[t], datesl[t]],labels=[labelsa[t],labelsb[t], labelsl[t]], 
-                        boxes=[boxesa[t], boxesb[t], boxesl[t]], scores=[scra[t], scrb[t], scrl[t]],
-                        masks_gcs = mask_list[t],
-                        version=model_version,scr_threshold=scr_threshold) 
+                mask[r <= size_occ[sat]] = 0   
             #breakpoint()        
