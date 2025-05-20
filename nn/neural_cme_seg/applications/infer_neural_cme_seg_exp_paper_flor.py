@@ -761,20 +761,22 @@ for ev in event:
                   
                 except:
                     print(f'Error creating mask for {ev["sav_files"][t]}')
-        mask_list.append([mask_list_cor2a,mask_list_cor2b,mask_list_c2])
+            mask_list.append([mask_list_cor2a,mask_list_cor2b,mask_list_c2])
 
-        ofile = os.path.join(ev_opath,os.path.basename(ev['pro_files'][t])+'.png')
-        if filter:
-            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [[maska[t]],[maskb[t]],[maskl[t]]], 
-                        title=[datesa[t], datesb[t], datesl[t]],labels=[[labelsa[t]],[labelsb[t]], [labelsl[t]]], 
-                        boxes=[[boxesa[t]], [boxesb[t]], [boxesl[t]]], scores=[[scra[t]], [scrb[t]], [scrl[t]]],
-                        masks_gcs = mask_list[t],
-                        version=model_version,scr_threshold=scr_threshold)#, save_masks=[ha[t],hb[t],hl[t]])
-            
+            ofile = os.path.join(ev_opath,os.path.basename(ev['pro_files'][t])+'.png')
+            if filter:
+                plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [[maska[t]],[maskb[t]],[maskl[t]]], 
+                            title=[datesa[t], datesb[t], datesl[t]],labels=[[labelsa[t]],[labelsb[t]], [labelsl[t]]], 
+                            boxes=[[boxesa[t]], [boxesb[t]], [boxesl[t]]], scores=[[scra[t]], [scrb[t]], [scrl[t]]],
+                            masks_gcs = mask_list[t],
+                            version=model_version,scr_threshold=scr_threshold)#, save_masks=[ha[t],hb[t],hl[t]])
+                
+            else:
+                plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [maska[t],maskb[t],maskl[t]], 
+                            title=[datesa[t], datesb[t], datesl[t]],labels=[labelsa[t],labelsb[t], labelsl[t]], 
+                            boxes=[boxesa[t], boxesb[t], boxesl[t]], scores=[scra[t], scrb[t], scrl[t]],
+                            masks_gcs = mask_list[t],
+                            version=model_version,scr_threshold=scr_threshold) 
+
         else:
-            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [maska[t],maskb[t],maskl[t]], 
-                        title=[datesa[t], datesb[t], datesl[t]],labels=[labelsa[t],labelsb[t], labelsl[t]], 
-                        boxes=[boxesa[t], boxesb[t], boxesl[t]], scores=[scra[t], scrb[t], scrl[t]],
-                        masks_gcs = mask_list[t],
-                        version=model_version,scr_threshold=scr_threshold) 
-                 
+                        
