@@ -392,21 +392,19 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
                     if masks_gcs is not None:
                         axs[i+6].annotate('IoU: '                            ,xy=[10 ,20]    , fontsize=15, color=color[nb])#pasar a negro
                         axs[i+6].annotate(''+'{:.2f}'.format(iou)            ,xy=[30*nb_aux*3,20]  , fontsize=15, color=color[nb])
-                        #axs[i+6].annotate(''+'{:.2f}'.format(max_iou)        ,xy=[50*nb,20]  , fontsize=15, color=color[nb])
-                        axs[i+6].annotate('Dic: '                            ,xy=[10 ,50]    , fontsize=15, color=color[nb])
-                        axs[i+6].annotate(''+'{:.2f}'.format(dice)           ,xy=[30*nb_aux*3,50]  , fontsize=15, color=color[nb])
-                        #axs[i+6].annotate(''+'{:.2f}'.format(max_dice)       ,xy=[50*nb,50]  , fontsize=15, color=color[nb])
-                        axs[i+6].annotate('Pre: '                            ,xy=[10 ,80]    , fontsize=15, color=color[nb])
-                        axs[i+6].annotate(''+'{:.2f}'.format(precision)      ,xy=[30*nb_aux*3,80]  , fontsize=15, color=color[nb])
-                        #axs[i+6].annotate(''+'{:.2f}'.format(max_prec)       ,xy=[50*nb,80]  , fontsize=15, color=color[nb])
-                        axs[i+6].annotate('Rec: '                            ,xy=[10 ,110]   , fontsize=15, color=color[nb])
-                        axs[i+6].annotate(''+'{:.2f}'.format(recall)         ,xy=[30*nb_aux*3,110] , fontsize=15, color=color[nb])
-                        #axs[i+6].annotate(''+'{:.2f}'.format(max_rec)        ,xy=[50*nb,110] , fontsize=15, color=color[nb])
+                        ##axs[i+6].annotate(''+'{:.2f}'.format(max_iou)        ,xy=[50*nb,20]  , fontsize=15, color=color[nb])
+                        #axs[i+6].annotate('Dic: '                            ,xy=[10 ,50]    , fontsize=15, color=color[nb])
+                        #axs[i+6].annotate(''+'{:.2f}'.format(dice)           ,xy=[30*nb_aux*3,50]  , fontsize=15, color=color[nb])
+                        ##axs[i+6].annotate(''+'{:.2f}'.format(max_dice)       ,xy=[50*nb,50]  , fontsize=15, color=color[nb])
+                        #axs[i+6].annotate('Pre: '                            ,xy=[10 ,80]    , fontsize=15, color=color[nb])
+                        #axs[i+6].annotate(''+'{:.2f}'.format(precision)      ,xy=[30*nb_aux*3,80]  , fontsize=15, color=color[nb])
+                        ##axs[i+6].annotate(''+'{:.2f}'.format(max_prec)       ,xy=[50*nb,80]  , fontsize=15, color=color[nb])
+                        #axs[i+6].annotate('Rec: '                            ,xy=[10 ,110]   , fontsize=15, color=color[nb])
+                        #axs[i+6].annotate(''+'{:.2f}'.format(recall)         ,xy=[30*nb_aux*3,110] , fontsize=15, color=color[nb])
+                        ##axs[i+6].annotate(''+'{:.2f}'.format(max_rec)        ,xy=[50*nb,110] , fontsize=15, color=color[nb])
                 nb+=1
                 nb_aux+=1
             if len(iou_mask_list) > 0:
-                if len(iou_mask_list) == 0:
-                    breakpoint()
                 max_scr_index = np.argmax(iou_mask_list)
                 best_iou, best_dice, best_prec, best_rec,max_iou, max_dice, max_prec, max_rec = best_mask_treshold(masks[i][max_scr_index], orig_img, masks_gcs[i][0])
                 axs[i+6].annotate('max_IoU: '+'{:.2f}'.format(max_iou)              ,xy=[10,450]  , fontsize=15, color=color[max_scr_index])
@@ -605,19 +603,19 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, fil
 
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
-model = 'A4_DS32' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
+model = 'A6_DS32' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
 if model == "v5":
     model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
     model_version="v5"
     trained_model = '49.torch'
 
 if model == 'A4_DS31':
-    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS31"
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
     model_version="A4"
     trained_model = '49.torch'
 
 if model == 'A4_DS32':
-    model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
     model_version="A4"
     trained_model = '49.torch'
 
@@ -625,6 +623,8 @@ if model == 'A6_DS32':
     model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"
     model_version="A6"
     trained_model = '49.torch'
+
+mask_threshold = 0.54 
 
 #model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
 #model_version="v4"
@@ -656,6 +656,8 @@ file.close()
 
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
+nn_seg.mask_threshold = mask_threshold
+breakpoint()
 for ev in event:
     print(f'Processing event {ev["date"]}')
     ev_opath = os.path.join(opath, ev['date'].split('/')[-1]) + '_filter_'+str(filter)   
@@ -676,7 +678,36 @@ for ev in event:
     datesl = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesl]    
     #breakpoint()
 
-    if len(orig_imga) != len(orig_imgb) or len(orig_imga) != len(orig_imgl):
+   
+                mask[r >= size_occ_ext[sat]] = 0
+                #save mask
+                if sat == 0:
+                    mask_list_cor2a.append(mask)
+                if sat == 1:
+                    mask_list_cor2b.append(mask)
+                    if len(mask) == 0:
+                        breakpoint()
+                if sat == 2:
+                    mask_list_c2.append(mask)
+                    if len(mask) == 0:
+                        breakpoint()
+        mask_list.append([mask_list_cor2a,mask_list_cor2b,mask_list_c2])
+        #breakpoint()
+        ofile = os.path.join(ev_opath,os.path.basename(ev['pro_files'][t])+'.png')
+        #breakpoint()
+        if filter:
+            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [[maska[t]],[maskb[t]],[maskl[t]]], 
+                        title=[datesa[t], datesb[t], datesl[t]],labels=[[labelsa[t]],[labelsb[t]], [labelsl[t]]], 
+                        boxes=[[boxesa[t]], [boxesb[t]], [boxesl[t]]], scores=[[scra[t]], [scrb[t]], [scrl[t]]],
+                        masks_gcs = mask_list[t],
+                        version=model_version,scr_threshold=scr_threshold)#, save_masks=[ha[t],hb[t],hl[t]])
+            #breakpoint()
+        else:
+            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [maska[t],maskb[t],maskl[t]], 
+                        title=[datesa[t], datesb[t], datesl[t]],labels=[labelsa[t],labelsb[t], labelsl[t]], 
+                        boxes=[boxesa[t], boxesb[t], boxesl[t]], scores=[scra[t], scrb[t], scrl[t]],
+                        masks_gcs = mask_list[t],
+                        version=model_version,scr_threshold=scr_threshold) if len(orig_imga) != len(orig_imgb) or len(orig_imga) != len(orig_imgl):
         print('Different number of images in the three instruments. We are repeting some images in the triplet plots.')
         max_size = max(len(orig_imga), len(orig_imgb), len(orig_imgl))
         for i in range(3):
@@ -761,34 +792,5 @@ for ev in event:
                     breakpoint()
                     break
                 #adds occulter to the masks and checks for null masks
-                mask[r <= size_occ[sat]] = 0  
-                mask[r >= size_occ_ext[sat]] = 0
-                #save mask
-                if sat == 0:
-                    mask_list_cor2a.append(mask)
-                if sat == 1:
-                    mask_list_cor2b.append(mask)
-                    if len(mask) == 0:
-                        breakpoint()
-                if sat == 2:
-                    mask_list_c2.append(mask)
-                    if len(mask) == 0:
-                        breakpoint()
-        mask_list.append([mask_list_cor2a,mask_list_cor2b,mask_list_c2])
-        #breakpoint()
-        ofile = os.path.join(ev_opath,os.path.basename(ev['pro_files'][t])+'.png')
-        #breakpoint()
-        if filter:
-            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [[maska[t]],[maskb[t]],[maskl[t]]], 
-                        title=[datesa[t], datesb[t], datesl[t]],labels=[[labelsa[t]],[labelsb[t]], [labelsl[t]]], 
-                        boxes=[[boxesa[t]], [boxesb[t]], [boxesl[t]]], scores=[[scra[t]], [scrb[t]], [scrl[t]]],
-                        masks_gcs = mask_list[t],
-                        version=model_version,scr_threshold=scr_threshold)#, save_masks=[ha[t],hb[t],hl[t]])
-            #breakpoint()
-        else:
-            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [maska[t],maskb[t],maskl[t]], 
-                        title=[datesa[t], datesb[t], datesl[t]],labels=[labelsa[t],labelsb[t], labelsl[t]], 
-                        boxes=[boxesa[t], boxesb[t], boxesl[t]], scores=[scra[t], scrb[t], scrl[t]],
-                        masks_gcs = mask_list[t],
-                        version=model_version,scr_threshold=scr_threshold) 
+                mask[r <= size_occ[sat]] = 0   
             #breakpoint()        

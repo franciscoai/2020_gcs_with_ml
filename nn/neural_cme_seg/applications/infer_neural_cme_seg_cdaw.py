@@ -260,7 +260,7 @@ w_metric=[0.4,0.4,0.1,0.1] #weights for the metric used to select the best mask 
 
 #nn model parameters
 model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"#"/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4/"
-model_version="A6"#"v4"
+model_version="A4"#"v4"
 opath= model_path + "/infer_neural_cme_seg_kincat_"+level+"/"+sat +"_flor_test"
 file_ext=".fits"
 trained_model = "4.torch"#'9999.torch'
@@ -460,7 +460,7 @@ for i in tqdm(range(len(yht_files)), desc="Processing lasco data"):
                     if not os.path.exists(final_path):
                         os.makedirs(final_path)
                     df.to_csv(final_path+folder_name+'_filtered_stats', index=False)
-
+                    breakpoint()
                 else:
                     print("WARNING: COULD NOT PROCESS EVENT "+ str(date)+", LESS THAN TWO IMAGES IN THE EVENT")
             
