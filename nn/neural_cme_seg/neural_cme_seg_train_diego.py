@@ -131,10 +131,10 @@ def clean_DT_csv(df):
 #Constants
 #trainDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
 trainDir = '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
-#csvfile = '20250320_Set_Parameters_unpacked_filtered_DS31.csv'
-csvfile = '20250320_Set_Parameters_unpacked_filtered_DS32.csv'
+csvfile = '20250320_Set_Parameters_unpacked_filtered_DS31.csv'
+#csvfile = '20250320_Set_Parameters_unpacked_filtered_DS32.csv'
 #opath= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS31/"
-opath= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32/"
+opath= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS31/"
 #full path of a model to use it as initial condition, use None to used the stadard pre-trained model 
 pre_trained_model= None
 batchSize=20 #number of images used in each iteration
@@ -174,7 +174,7 @@ torch.cuda.empty_cache()
 # saves a copy of this file to opath
 os.system(f'cp {__file__} {opath}')
 # saves a copy of the model to opath
-os.system(f'cp nn/neural_cme_seg/neural_cme_seg.py {opath}')
+os.system(f'cp neural_cme_seg.py {opath}')
 
 #list of images on the trainig dataset
 #imgs=[] #list of images on the trainig dataset
@@ -254,6 +254,11 @@ for i in range(epochs):
             all_loss.append(losses.item())
             cn_img=j+i*len(imgs_train)
             logging.info(f'Epoch {i} of {epochs}, batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), loss: {losses.item():.3f}')
+            if i == 0:
+                if j % (batchSize*100) == 0:
+                    logging.info(f'Batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), loss: {losses.item():.3f}')
+                    #save model
+                    torch.save(nn_seg.model.state_dict(),opath + "/batch_" + str(int(j/100))+".torch")
         except Exception as e:
             logging.info(f'ERROR in epoch {i}, batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), error: {e}', exc_info=True)
             continue 
