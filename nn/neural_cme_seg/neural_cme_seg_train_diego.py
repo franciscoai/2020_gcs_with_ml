@@ -131,14 +131,14 @@ def clean_DT_csv(df):
 #Constants
 #trainDir = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
 trainDir = '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
-csvfile = '20250320_Set_Parameters_unpacked_filtered_DS31.csv'
-#csvfile = '20250320_Set_Parameters_unpacked_filtered_DS32.csv'
+#csvfile = '20250320_Set_Parameters_unpacked_filtered_DS31.csv'
+csvfile = '20250320_Set_Parameters_unpacked_filtered_DS32.csv'
 #opath= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS31/"
-opath= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS31/"
+opath= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32_aux/"
 #full path of a model to use it as initial condition, use None to used the stadard pre-trained model 
 pre_trained_model= None
-batchSize=20 #number of images used in each iteration
-epochs=50 #number of iterations of the full training dataset
+batchSize=10#20 #number of images used in each iteration
+epochs=1#50 #number of iterations of the full training dataset
 train_dataset_prop=0.85 #proportion of the full dataset used for training. The rest is saved for validation
 random_rot = False # if True, the images are randomly rotated
 gpu=0 # GPU to use
@@ -223,6 +223,7 @@ if enable_check_zeros:
 
 
 logging.info(f'The total number of images used for training is {len(imgs_train)}')
+print(len(imgs_train))
 # saves the list of images used for training and validation as csv files
 with open(opath + "/training_cases.csv", 'w') as file:
     for i in imgs_train:
@@ -234,6 +235,26 @@ with open(opath + "/validation_cases.csv", 'w') as file:
 # loads nn model and sets it to train mode
 nn_seg = neural_cme_segmentation(device, pre_trained_model = pre_trained_model, version=model_version, logger=logging)
 nn_seg.train()  
+
+#temporal
+cant_images_to_save_torch = [np.int64(10),
+    np.int64(20),
+    np.int64(30),
+    np.int64(40),
+    np.int64(50),
+    np.int64(70),
+    np.int64(100),
+    np.int64(140),
+    np.int64(200),
+    np.int64(280),
+    np.int64(390),
+    np.int64(540),
+    np.int64(760),
+    np.int64(1060),
+    np.int64(1470),
+    np.int64(2060),
+    np.int64(2870),
+    np.int64(4000)]
 
 #training
 all_loss=[]
@@ -255,10 +276,12 @@ for i in range(epochs):
             cn_img=j+i*len(imgs_train)
             logging.info(f'Epoch {i} of {epochs}, batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), loss: {losses.item():.3f}')
             if i == 0:
-                if j % (batchSize*100) == 0:
-                    logging.info(f'Batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), loss: {losses.item():.3f}')
-                    #save model
-                    torch.save(nn_seg.model.state_dict(),opath + "/batch_" + str(int(j/100))+".torch")
+                #if j % (batchSize*100) == 0:
+                #    logging.info(f'Batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), loss: {losses.item():.3f}')
+                #    torch.save(nn_seg.model.state_dict(),opath + "/batch_" + str(int(j/100))+".torch")
+                if  j in cant_images_to_save_torch:
+                    logging.info(f'Saving model at {j} images')
+                    torch.save(nn_seg.model.state_dict(),opath + "/batch_" + str(int(j*batchSize)).zfill(5)+".torch")
         except Exception as e:
             logging.info(f'ERROR in epoch {i}, batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), error: {e}', exc_info=True)
             continue 

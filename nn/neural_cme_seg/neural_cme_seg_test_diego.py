@@ -15,6 +15,7 @@ from neural_cme_seg import neural_cme_segmentation
 import matplotlib.gridspec as gridspec
 import pandas as pd
 import csv 
+import pickle
 
 def create_csv_file(input_csv_file=None, path=None):
     #path = '/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32/'
@@ -281,6 +282,74 @@ def plot_to_png2(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_thre
     plt.close()
     return best_iou, max_iou
 
+def plot_to_png_contornos(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_threshold=0.54 , title=None,string=None, 
+                labels=None, boxes=None, scores=None, version='v4'):
+    """
+    Plot the input images (orig_img) along with the infered masks, labels and scores
+    in a single image saved to ofile
+    """    
+    # only detections with score larger than this value are considered
+    color=['r','b','g','k','y','m','c','w','r','b','g','k','y','m','c','w']
+    if version=='v4':
+        obj_labels = ['Back', 'Occ','CME','N/A']
+    elif version=='v5':
+        obj_labels = ['Back', 'CME']
+    elif version=='A4':
+        obj_labels = ['Back', 'Occ','CME']
+    elif version=='A6':
+        obj_labels = ['Back', 'Occ','CME']
+    else:
+        print(f'ERROR. Version {version} not supported')
+        sys.exit()
+    cmap = mpl.colors.ListedColormap(color)  
+    nans = np.full(np.shape(orig_img[0]), np.nan)
+    
+    fig = plt.figure(figsize=(10, 10))
+    ax1 = fig.add_subplot()
+    #fig, axs = plt.subplots(1, len(orig_img)*3, figsize=(30, 10))
+    #axs = axs.ravel()
+    try:
+        for i in range(len(orig_img)):
+            ax1.imshow(orig_img[i], vmin=0, vmax=1, cmap='gray')
+            ax1.axis('off')
+            if string is not None:
+                ax1.text(0, 0, string,horizontalalignment='left',verticalalignment='bottom',
+                fontsize=15,color='white',transform=ax1.transAxes)
+            masked = nans.copy()
+            masked[true_mask[i] > 0] = 3 
+            mask_converted = np.nan_to_num(masked, nan=2.0)
+            #breakpoint()
+            ax1.contour(mask_converted, levels=[2.5], colors='yellow', alpha=0.9,thick=2)
+            #ax1.imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=4)
+            if boxes is not None:
+                nb = 0
+                for b in boxes[i]:
+                    if scores is not None:
+                        scr = scores[i][nb]
+                    else:
+                        scr = 0   
+                    if scr > scr_threshold:             
+                        if np.nanmax(masks[i][nb]) < 0.1:
+                            breakpoint()
+                        best_iou, best_dice, best_prec, best_rec,max_iou, max_dice, max_prec, max_rec = best_mask_treshold(masks[i][nb], orig_img, true_mask[i],mask_thresholds_list=[mask_threshold])                    
+                        masked = nans.copy()
+                        ax1.contour(masks[i][nb], levels=[best_iou], colors='r', alpha=0.9,thick=2) 
+                        box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
+                        ax1.add_patch(box)
+                        if labels is not None:
+                            ax1.annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
+                        #calculate metrics
+                        #add iou_score as an annotation in the image
+                        ax1.annotate('IoU : '+'{:.2f}'.format(max_iou) ,xy=[10,20], fontsize=30, color=color[nb])
+                        #ax1.annotate(''+'{:.2f}'.format(max_iou)        ,xy=[150,20], fontsize=30, color=color[nb])
+                    nb+=1
+        plt.tight_layout()
+        plt.savefig(ofile)
+        plt.close()
+    except:
+        print(f"Error plotting the image {ofile}. Check the input data.")
+        return 0,0
+    return 0,0#best_iou, max_iou
 
 def plot_to_png(ofile, orig_img, masks, true_mask, scr_threshold=0.3, mask_threshold=0.3 , title=None, 
                 labels=None, boxes=None, scores=None, version='v4'):
@@ -379,23 +448,25 @@ if model == 'A4_DS32':
 
 if model == 'A6_DS32':
     testDir =  '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/'
-    #model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"
-    model_path = "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32/batchs_epoch1"
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"
     model_version="A6"
     #trained_model = [f"{i}.torch" for i in range(50)]
     
-    all_entries = os.listdir(model_path)
-    csv_files = []
-    file_pattern = "batch_"
-    for entry_name in all_entries:
-        if entry_name.endswith(".torch") and entry_name.startswith(file_pattern):
-            csv_files.append(entry_name)
-    csv_files.sort()
-    trained_model = csv_files
-    #trained_model = ['46.torch']
+    using_batch_torch_files = False # if True, it will use the batch torch files, not the epochs files
+    if using_batch_torch_files:
+        model_path = "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32/batchs_epoch1"
+        all_entries = os.listdir(model_path)
+        csv_files = []
+        file_pattern = "batch_"
+        for entry_name in all_entries:
+            if entry_name.endswith(".torch") and entry_name.startswith(file_pattern):
+                csv_files.append(entry_name)
+        csv_files.sort()
+        trained_model = csv_files
+    
+    trained_model = ['48.torch']
     #original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS32.csv"
     original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS31.csv"
-    breakpoint()
     
 if model == 'v5':
     testDir =  '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240912/'
@@ -436,12 +507,12 @@ if normal_test_one_mask_treshold:
 if statistics_using_best_mask_treshold:
 
     mask_thresholds = [0.54] 
-    plot_images = False # if True, it will plot the images with the selected mask treshold
+    plot_images = True # if True, it will plot the images with the selected mask treshold
     create_validation_cases = False  # if True, it will create a file with the test cases. Select False to use a specific csv file with fixed cases.
     use_random_cases        = False # if True, it will use random cases from the testDir. Select False to use a specific csv file with fixed cases.
     use_fixed_cases         = True # if True, it will use a specific csv file with fixed cases. Select False to use random cases.
     DF_to_use = original_DF  #DF created when DataSet was created. It contains statistics of the synthetic images.
-    test_ncases = 1000#16000 #10k  16k
+    test_ncases = 16000 #10k  16k
     #df_new_output = model_path+"/"+model+trained_model.replace('.', '')+"_training_cases_1000_IOU.csv"
 
 opath= model_path+"/test_output_diego"
@@ -573,15 +644,17 @@ for torch_models in trained_model:
                 # plot the predicted mask
                 if len(mask_thresholds)==1 and plot_images:
                     os.makedirs(opath, exist_ok=True)
-                    ofile = opath+"/img_"+str(idx)+'.png'
-                    best_iou_for_plot, max_iou_for_plot = plot_to_png2(ofile, [img], [[masks]], [vesMask], scores=[[scores]], labels=[[labels]], boxes=[[boxes]], 
-                                mask_threshold=mask_threshold, scr_threshold=0.1, version=model_version,string=imgs[idx])
+                    ofile = opath+"/img_"+idx.split('/')[-1]+'.png'
+                    #best_iou_for_plot, max_iou_for_plot = plot_to_png2(ofile, [img], [[masks]], [vesMask], scores=[[scores]], labels=[[labels]], boxes=[[boxes]], 
+                    #            mask_threshold=mask_threshold, scr_threshold=0.1, version=model_version,string=imgs[idx])
+                    best_iou_for_plot, max_iou_for_plot = plot_to_png_contornos(ofile, [img], [[masks]], [vesMask], scores=[[scores]], labels=[[labels]], boxes=[[boxes]], 
+                                mask_threshold=mask_threshold, scr_threshold=0.1, version=model_version,string=None)
                     all_best_iou.append(best_iou_for_plot)
                     all_max_iou.append(max_iou_for_plot)
         #all_iou[ind]= this_case_iou
         all_scr.append(this_case_scr)
         all_iou.append(this_case_iou)
-
+        breakpoint()
         # plot stats for a single mask threshold
         if len(mask_thresholds)==1:
             this_case_scr = np.array(this_case_scr)
@@ -644,7 +717,6 @@ for torch_models in trained_model:
         ax.set_ylabel('Score')
         ax.grid()
         fig.savefig(opath+"/test_scr_vs_mask_threshold.png")
-
         new_list= [np.array(todo_iou) for todo_iou in all_iou]
         fig= plt.figure(figsize=(15, 5))
         ax = fig.add_subplot()
@@ -661,6 +733,8 @@ for torch_models in trained_model:
         ax.grid()
         ax.set_xticks([y + 1 for y in range(len(new_list))],labels=[str(thresh_num) for thresh_num in mask_thresholds])
         fig.savefig(opath+"/"+model+"_"+torch_models.replace('.', '')+"max_iou_vs_mask_threshold.png")
+        with open(opath+"/"+model+"_"+torch_models.replace('.', '')+"max_iou_vs_mask_threshold.pickle", 'wb') as file:
+            pickle.dump((new_list,mask_thresholds), file)
 breakpoint()
 
 print('Results saved in:', opath)
