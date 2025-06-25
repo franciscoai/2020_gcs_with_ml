@@ -377,4 +377,4 @@ dependencies:
     - webcolors==1.12
     - websocket-client==1.5.1
     - widgetsnbextension==4.0.5
-prefix: /home/lloveras/.conda/envs/gcs_ml_diego_v2
+prefix: /home/cisterna/.conda/envs/gcs_ml_v2
