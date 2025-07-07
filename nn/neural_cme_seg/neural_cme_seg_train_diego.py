@@ -237,7 +237,8 @@ nn_seg = neural_cme_segmentation(device, pre_trained_model = pre_trained_model, 
 nn_seg.train()  
 
 #temporal
-cant_images_to_save_torch = [np.int64(10),
+cant_images_to_save_torch = [
+    np.int64(10),
     np.int64(20),
     np.int64(30),
     np.int64(40),
@@ -255,7 +256,7 @@ cant_images_to_save_torch = [np.int64(10),
     np.int64(2060),
     np.int64(2870),
     np.int64(4000)]
-
+breakpoint()
 #training
 all_loss=[]
 for i in range(epochs):
@@ -281,10 +282,11 @@ for i in range(epochs):
                 #    torch.save(nn_seg.model.state_dict(),opath + "/batch_" + str(int(j/100))+".torch")
                 if  j in cant_images_to_save_torch:
                     logging.info(f'Saving model at {j} images')
-                    torch.save(nn_seg.model.state_dict(),opath + "/batch_" + str(int(j*batchSize)).zfill(5)+".torch")
+                    torch.save(nn_seg.model.state_dict(),opath + "/batch_" + str(int(j)).zfill(6)+".torch")
         except Exception as e:
             logging.info(f'ERROR in epoch {i}, batch {j//batchSize}, images {cn_img} ({(cn_img)/(epochs*len(imgs_train))*100:.1f}%), error: {e}', exc_info=True)
             continue 
+    breakpoint()
     #save training results after each epoch
     #model
     torch.save(nn_seg.model.state_dict(),opath + "/" + str(i)+".torch")

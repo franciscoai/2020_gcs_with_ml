@@ -319,7 +319,7 @@ def plot_to_png_contornos(ofile, orig_img, masks, true_mask, scr_threshold=0.3, 
             masked[true_mask[i] > 0] = 3 
             mask_converted = np.nan_to_num(masked, nan=2.0)
             #breakpoint()
-            ax1.contour(mask_converted, levels=[2.5], colors='yellow', alpha=0.9,thick=2)
+            ax1.contour(mask_converted, levels=[2.5], colors='darkblue', alpha=0.99,linewidths=4)
             #ax1.imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=4)
             if boxes is not None:
                 nb = 0
@@ -333,14 +333,14 @@ def plot_to_png_contornos(ofile, orig_img, masks, true_mask, scr_threshold=0.3, 
                             breakpoint()
                         best_iou, best_dice, best_prec, best_rec,max_iou, max_dice, max_prec, max_rec = best_mask_treshold(masks[i][nb], orig_img, true_mask[i],mask_thresholds_list=[mask_threshold])                    
                         masked = nans.copy()
-                        ax1.contour(masks[i][nb], levels=[best_iou], colors='r', alpha=0.9,thick=2) 
-                        box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
+                        ax1.contour(masks[i][nb], levels=[best_iou], colors='red', alpha=0.9,linewidths=4) 
+                        box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=4, edgecolor='red', facecolor='none') # add box
                         ax1.add_patch(box)
                         if labels is not None:
-                            ax1.annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
+                            ax1.annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=35, color=color[nb])
                         #calculate metrics
                         #add iou_score as an annotation in the image
-                        ax1.annotate('IoU : '+'{:.2f}'.format(max_iou) ,xy=[10,20], fontsize=30, color=color[nb])
+                        ax1.annotate('IoU : '+'{:.2f}'.format(max_iou) ,xy=[10,30], fontsize=45, color='white')
                         #ax1.annotate(''+'{:.2f}'.format(max_iou)        ,xy=[150,20], fontsize=30, color=color[nb])
                     nb+=1
         plt.tight_layout()
@@ -451,6 +451,9 @@ if model == 'A6_DS32':
     model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"
     model_version="A6"
     #trained_model = [f"{i}.torch" for i in range(50)]
+    trained_model = ['48.torch']
+    #original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS32.csv"
+    original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS31.csv"
     
     using_batch_torch_files = False # if True, it will use the batch torch files, not the epochs files
     if using_batch_torch_files:
@@ -464,10 +467,21 @@ if model == 'A6_DS32':
         csv_files.sort()
         trained_model = csv_files
     
-    trained_model = ['48.torch']
-    #original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS32.csv"
-    original_DF = "/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320/20250320_Set_Parameters_unpacked_filtered_DS31.csv"
     
+    using_batch_torch_files2 = False # if True, it will use the batch torch files, not the epochs files
+    if using_batch_torch_files2:
+        #model_path = "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32/batchs_epoch1"
+        model_path = "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32/batchs_sub_epoch1"
+        all_entries = os.listdir(model_path)
+        csv_files = []
+        file_pattern = "batch_"
+        for entry_name in all_entries:
+            if entry_name.endswith(".torch") and entry_name.startswith(file_pattern):
+                csv_files.append(entry_name)
+        csv_files.sort()
+        trained_model = csv_files
+        breakpoint()
+
 if model == 'v5':
     testDir =  '/gehme/projects/2020_gcs_with_ml/data/cme_seg_20240912/'
     model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v5"
@@ -580,13 +594,19 @@ for torch_models in trained_model:
     nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ torch_models, version=model_version)
     all_scr = []
     all_iou = []
+    all_precision = []
+    all_error_cuadratico = []
+    all_error_test = []
     all_best_iou = []
     all_max_iou = []
     list_of_selected_dfs = []
     list_of_rows_selected_dfs = []
     for mask_threshold in mask_thresholds:
         this_case_scr =[]
-        this_case_iou = [0 for _ in range(test_ncases)] #[]    
+        this_case_iou = [0 for _ in range(test_ncases)] #[] 
+        this_case_precision = [0 for _ in range(test_ncases)] 
+        this_case_error_cuadratico = [0 for _ in range(test_ncases)]
+        this_case_error_test = [0 for _ in range(test_ncases)]
         for ind in range(len(rnd_idx)):
             idx = rnd_idx[ind]
 
@@ -630,16 +650,22 @@ for torch_models in trained_model:
                 breakpoint()
             # makes inference and returns only the mask with smallest loss
             try:
-                img, masks, scores, labels, boxes, iou  = nn_seg.test_mask(images, vesMask, mask_threshold=mask_threshold)
+                img, masks, scores, labels, boxes, iou, presicion, error_cuadratico,error_test  = nn_seg.test_mask(images, vesMask, mask_threshold=mask_threshold)
             except Exception as e:
                 continue
             
             if masks is None:
                 this_case_iou.append(None)
+                this_case_precision.append(None)
+                this_case_error_cuadratico.append(None)
+                this_case_error_test.append(None)
 
             if masks is not None:
                 #this_case_iou.append(iou)
                 this_case_iou[ind] = iou 
+                this_case_precision[ind] = presicion
+                this_case_error_cuadratico[ind] = error_cuadratico
+                this_case_error_test[ind] = error_test
                 this_case_scr.append(scores)
                 # plot the predicted mask
                 if len(mask_thresholds)==1 and plot_images:
@@ -654,7 +680,10 @@ for torch_models in trained_model:
         #all_iou[ind]= this_case_iou
         all_scr.append(this_case_scr)
         all_iou.append(this_case_iou)
-        breakpoint()
+        all_precision.append(this_case_precision)
+        all_error_cuadratico.append(this_case_error_cuadratico)
+        all_error_test.append(this_case_error_test)
+
         # plot stats for a single mask threshold
         if len(mask_thresholds)==1:
             this_case_scr = np.array(this_case_scr)
@@ -699,11 +728,14 @@ for torch_models in trained_model:
         if statistics_using_best_mask_treshold:
             df_new = pd.concat(list_of_selected_dfs, ignore_index=True)
             df_new = df_new.drop_duplicates().reset_index(drop=True)
-            breakpoint()
+            #breakpoint()
             df_new['IoU'] = all_iou[0]
+            df_new['precision'] = all_precision[0]
+            df_new['error_cuadratico'] = all_error_cuadratico[0]
+            df_new['error_test'] = all_error_test[0]
             #df_new['IoU'] = all_iou
             #save df_new to csv
-            df_new_output = model_path+"/"+model+"_"+torch_models.replace('.', '')+"_maskthresh"+str(mask_threshold)+"_validation_cases_"+str(test_ncases)+"_IOU.csv"
+            df_new_output = model_path+"/"+model+"_"+torch_models.replace('.', '')+"_maskthresh"+str(mask_threshold)+"_validation_cases_"+str(test_ncases)+"_IOU_prec_error.csv"
             df_new.to_csv(df_new_output, index=False)
                                                     
     # for many mask thresholds plots mean and std loss and scr vs mask threshold
