@@ -247,8 +247,8 @@ def plot_histogram(back,btot,mask,filename,plot_ratio_histo=False,plot_ratio_his
 #DATA_PATH = '/gehme/data'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212'
-OPATH = '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_20250320'
-opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
+OPATH = '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_poster_colombia'
+opath_fstructure='check'#'run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
 # morphology
@@ -257,7 +257,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[2.0,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 50000#300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 10#50000#300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -285,10 +285,13 @@ save_background = True#True # set to True to save the background images
 save_leading_edge = True # set to True to save the leading edge images
 save_only_cme_mask = False # set to True to save only the cme mask and not the occulter masks. save_masks must be True
 inner_hole_mask=False #Set to True to produce a mask that contains the inner hole of the GCS (if visible)
-mask_from_cloud=False #True #True to calculete mask from clouds, False to do it from an independent ratraycing total brigthness image
+mask_from_cloud=True #True to calculete mask from clouds, False to do it from an independent ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
 show_middle_cross = False #False # set to show the middle cross of the image
-
+#None # set to a list of fixed satellite positions, sorted by cor2A, 2B and C2
+fixed_satpos = [[300.081940747, 1.95463511752, 0.0], [32.8937181611, 7.05123478188, 0.0], [170.0892,  -6.5866,   0.0000]]
+recorte_lasco_height = False#True # set to True to recorte the lasco height by a factor of 2.667, so that it matches the other satellites.
+                            # la idea es que la CME no exceda el FoV de lasco, pero usando el mismo parametro del GCS.
 #### main
 if opath_fstructure=='check':
     save_masks = True #False
@@ -296,12 +299,14 @@ if opath_fstructure=='check':
     back_only_image = False
     add_mesh_image = True
     rnd_par=True#False 
-    save_only_cme_mask = True
+    save_only_cme_mask = False#True
     diff_int_cme = True #False
-    par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
+    #par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
+    #par_rng = [[19.2, 19.2],[64.7, 64.7], [13.6, 13.6], [8.5, 8.5], [0.535, 0.535], [36.535, 26.535], [5,5]]
+    par_rng = [[-115.604,-115.604],[-53.178,-53.178], [-89.378,-89.378], [4.0,7.0], [0.491,0.491], [54.966,54.966], [6,6]]
     #par_rng = [[-0,0.1],[0,0.1],[90,90],[19,20],[0.15,0.15], [70,71],[10,10]] 
     inner_hole_mask= False
-    show_middle_cross = True
+    show_middle_cross = False#True
     add_flux_rope = True
 
 start_time = time.time()
@@ -317,7 +322,7 @@ for (rng, num) in zip(par_rng, par_num):
     if rnd_par:
         np.random.shuffle(cpar)
     all_par.append(cpar)
-
+    
 # Save param to .CSV
 date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
 configfile_name = OPATH + '/' + date_str+'Set_Parameters.csv'
@@ -378,6 +383,10 @@ def create_sintetic_image(row):
             occ_center.append(e)
     # Get the location of sats and gcs: 
     satpos, plotranges = pyGCS.processHeaders(headers)
+    print(f'Satellite positions: {satpos}')
+    if fixed_satpos:
+        satpos = fixed_satpos
+    print(f'Satellite positions: {satpos}')
     mask_aw_sat     = [-666 for i in range(n_sat)]
     area_sat        = [-666 for i in range(n_sat)]
     apex_sat        = [-666 for i in range(n_sat)]
@@ -411,8 +420,8 @@ def create_sintetic_image(row):
             occ_size_1024 = 120
         elif sat==2:
             occ_size_1024 = 150
-        if sat==2:
-            df.loc[row, 'height'] = df.loc[row, 'height']/2.667
+        if sat==2 and recorte_lasco_height:
+            df.loc[row, 'height'] = df.loc[row, 'height']/2.667 #<---- Cuidado con esto. fue puesto para que en la estatistica no se llegue al FoV de lasco
         #defining ranges and radius of the occulter
         x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
         y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
@@ -425,7 +434,7 @@ def create_sintetic_image(row):
         if mask_from_cloud: 
             #mask for cme outer envelope
             clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row],
-                                    satpos, do_rotate_lat=[False, False, True])                         
+                                    satpos, do_rotate_lat=[False, False, False])                         
             x = clouds[sat, :, 1]
             y = clouds[sat, :, 2] # sat has always been 0 in this line, but why ???
 
@@ -599,9 +608,9 @@ def create_sintetic_image(row):
                 btot += btot_prev
                 btot_prev = cbtot
                 cbtot = 0
-                sceond_mask = np.array(mask_prev)
+                second_mask = np.array(mask_prev)
                 mask_prev = mask
-
+        print(f'Height of CME {row} is {df["height"][row]} Rsun')
         # output files base name
         ofile_name = '{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}'.format(
                     df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)
@@ -785,7 +794,7 @@ def print_stuffs():
 
 num_cpus = os.cpu_count()
 ########### end of paralelize
-MAX_WORKERS = num_cpus -1# number of workers for parallel processing
+MAX_WORKERS = 1#num_cpus -1# number of workers for parallel processing
 futures = []
 index = 0
 halo_count_tot = []#0
