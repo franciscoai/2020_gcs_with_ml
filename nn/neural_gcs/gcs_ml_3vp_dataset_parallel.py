@@ -246,7 +246,7 @@ def plot_histogram(back,btot,mask,filename,plot_ratio_histo=False,plot_ratio_his
 #DATA_PATH = '/gehme/data'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212'
-OPATH = '/gehme-gpu2/projects/2020_gcs_with_ml/data/sirats_debug'
+OPATH = '/gehme-gpu2/projects/2020_gcs_with_ml/data/sirats_3VP'
 opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
@@ -256,7 +256,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[2.0,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 10 #300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 100000 #300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -426,8 +426,6 @@ def create_sintetic_image(row, df_row_data):
             occ_size_1024 = 120
         elif sat==2:
             occ_size_1024 = 150
-        if sat==2:
-            df_row_data['height'] = df_row_data['height']/2.667
         #defining ranges and radius of the occulter
         x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
         y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
@@ -780,7 +778,7 @@ def print_stuffs():
 
 num_cpus = os.cpu_count()
 ########### end of paralelize
-MAX_WORKERS = num_cpus -1# number of workers for parallel processing
+MAX_WORKERS = num_cpus - 4 # number of workers for parallel processing
 futures = []
 index = 0
 halo_count_tot = []#0
