@@ -90,12 +90,46 @@ def option1(console: Console, lang: dict):
 
     console.print(lang["insert_triplet_path"], style="bold yellow")
     triplet_path = console.input()
-    idx = os.path.basename(triplet_path)
-    idx = int(idx)
-    root_dir = os.path.dirname(triplet_path)
-    dataset = Cme_MVP_Dataset(root_dir)
-
-    img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = dataset.getByIndex(idx)
+    
+    # Check if this is a dataset directory (has CSV files) or individual triplet directory
+    if os.path.isdir(triplet_path):
+        # Check if the directory contains satellite images directly
+        files = os.listdir(triplet_path)
+        has_sat_images = any("sat1" in f for f in files) and any("sat2" in f for f in files) and any("sat3" in f for f in files)
+        
+        if has_sat_images:
+            # Direct triplet directory - use processImages
+            console.print("Processing individual triplet directory...", style="bold cyan")
+            img = processImages(triplet_path)
+            # Use fixed values for satpos and plotranges since they are constant in the dataset
+            # Convert to tensors as expected by the plotter
+            fixed_satpos = [[32.8937181611, 7.05123478188, 0.0], [300.081940747, 1.95463511752, 0.0], [170.0892, -6.5866, 0.0000]]
+            fixed_plotranges = [[-16.6431925965469, 16.737728407985518, -16.84856349725838, 16.53235750727404], [-15.00659312775248, 15.050622251843686, -14.988981478115997, 15.068233901480168], [-6.338799715536909, 6.304081179329522, -6.388457593426707, 6.254423301439724]]
+            satpos = torch.tensor(fixed_satpos, dtype=torch.float32)
+            plotranges = torch.tensor(fixed_plotranges, dtype=torch.float32)
+        else:
+            # Assume it's a numbered directory in a dataset
+            idx = os.path.basename(triplet_path)
+            idx = int(idx)
+            root_dir = os.path.dirname(triplet_path)
+            
+            # Check if root_dir has CSV files
+            csv_files = [f for f in os.listdir(root_dir) if f.endswith('Set_Parameters.csv')]
+            if not csv_files:
+                console.print("Error: No CSV parameter file found in dataset directory.", style="bold red")
+                console.print(lang["press_any_key_to_continue"], style="bold yellow")
+                console.input()
+                mainMenu(lang)
+                return
+                
+            dataset = Cme_MVP_Dataset(root_dir)
+            img, targets, sat_masks, occulter_masks, satpos, plotranges, idx = dataset.getByIndex(idx)
+    else:
+        console.print("Error: Invalid path. Please provide a valid directory path.", style="bold red")
+        console.print(lang["press_any_key_to_continue"], style="bold yellow")
+        console.input()
+        mainMenu(lang)
+        return
     
     # send images to device
     img = img.unsqueeze(0)
@@ -103,14 +137,21 @@ def option1(console: Console, lang: dict):
     infered_params = siratsInception.infer(img)
     console.print(lang["insert_output_path"], style="bold yellow")
     output_path = console.input()
-    infered_params = infered_params[0]
+    infered_params = infered_params[0].clone()
+    # Testing real output of /gehme-gpu2/projects/2020_gcs_with_ml/data/sirats_v3_redone_seed_72430/75
+    # infered_params[0] = 170.828
+    # infered_params[1] = 51.657
+    # infered_params[2] = -84.703
+    # infered_params[3] = 6.736
+    # infered_params[4] = 0.583
+    # infered_params[5] = 10.980
     console.print(lang["show_params"], style="bold yellow")
-    console.print(f"Length: {infered_params[0]:.3f}")
-    console.print(f"Latitude: {infered_params[1]:.3f}")
-    console.print(f"Tail Thickness: {infered_params[2]:.3f}")
-    console.print(f"Tail Height: {infered_params[3]:.3f}")
-    console.print(f"Aspect Ratio: {infered_params[4]:.3f}")
-    console.print(f"Angle of Inclination: {infered_params[5]:.3f}\n")
+    console.print(f"CMELon: {infered_params[0]:.3f}")
+    console.print(f"CMELat: {infered_params[1]:.3f}")
+    console.print(f"CMEtilt: {infered_params[2]:.3f}")
+    console.print(f"height: {infered_params[3]:.3f}")
+    console.print(f"k: {infered_params[4]:.3f}")
+    console.print(f"ang: {infered_params[5]:.3f}\n")
     saveOutput(output_path, infered_params)
     console.print(lang["ask_plot"], style="bold yellow")
     plot = console.input()
