@@ -83,8 +83,8 @@ class SiratsPlotter:
             x, y = clouds[0, :, 1], clouds[0, :, 2]
             arr_cloud = pnt2arr(x, y, [plotranges[i, :]], images.shape[1:3], 0)
 
-            # flip arr_cloud in y axis
-            arr_cloud = np.flip(arr_cloud, axis=0)
+            # flip arr_cloud in x axis
+            arr_cloud = np.flip(arr_cloud, axis=0) # This flip is checked and is correct
 
             ax[i].imshow(images[i, :, :], cmap="gray", vmin=0, vmax=1)
             ax[i].imshow(arr_cloud, cmap='Greens', alpha=0.6,
