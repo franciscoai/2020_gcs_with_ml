@@ -109,15 +109,18 @@ def plot_to_png_3sources(ofile,ev, orig_imga, orig_imgb, orig_imgl, dfa,dfb,dfl,
     plt.savefig(ofile)
     plt.close()
 
-def plot_to_png(ofile,found_maska,found_maskb,found_maskl, orig_img, masks, title=None, labels=None, boxes=None, scores=None, save_masks=None, version='v4', scr_threshold = 0.25, masks_gcs=None):
+def plot_to_png(ofile,found_maska,found_maskb,found_maskl,found_boxa,found_boxb,found_boxl, orig_img, masks, title=None, labels=None, boxes=None, scores=None, save_masks=None, version='v4', scr_threshold = 0.25, masks_gcs=None):
     """
     Plot the input images (orig_img) along with the infered masks, labels and scores
     in a single image saved to ofile
     save_masks: set to a list of fits headers to save the masks as fits files
     """    
+   
     mask_threshold = 0.75 # value to consider a pixel belongs to the object
     #scr_threshold = 0.25 # only detections with score larger than this value are considered
-    color=['b','r','g','k','y','m','c','w','b','r','g','k','y','m','c','w']
+    color = ['blue', 'red', 'green', 'black', 'yellow', 'magenta', 'cyan', 'white',
+                   'orange', 'purple', 'brown', 'pink', 'grey', 'lime', 'navy']
+    #color=['b','r','g','k','y','m','c','w','b','r','g','k','y','m','c','w']
     if version=='v4':
         obj_labels = ['Back', 'Occ','CME','N/A']
     elif version=='v5':
@@ -160,6 +163,7 @@ def plot_to_png(ofile,found_maska,found_maskb,found_maskl, orig_img, masks, titl
                 if scr > scr_threshold:    
                     
                     masked = nans.copy()
+             
                     masked[:, :][masks[i][nb] > mask_threshold] = nb
                     axs[i+3].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
                     box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
@@ -170,25 +174,6 @@ def plot_to_png(ofile,found_maska,found_maskb,found_maskl, orig_img, masks, titl
                     
                     if labels is not None:
                         axs[i+3].annotate(obj_labels[labels[i][nb]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
-                    
-                    for a in range(len(found_maska)):
-                        masked = nans.copy()
-                        masked[:, :][found_maska[a][nb] > mask_threshold] = nb
-                        axs[0].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
-                        mask_thresholdeada = nans.copy()
-                        mask_thresholdeada[:, :][found_maska[a][nb] > mask_threshold] = 1
-                        mask_thresholdeada[:, :][found_maska[a][nb] < mask_threshold] = 0
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
                     
                     
                     if masks_gcs is not None:
@@ -239,51 +224,49 @@ def plot_to_png(ofile,found_maska,found_maskb,found_maskl, orig_img, masks, titl
             #axs[i+6].imshow(masks_gcs[i][0], vmin=0, vmax=1, cmap='gray', origin='lower')
             axs[i+6].imshow(mask_aux, vmin=0, vmax=1, cmap='gray', origin='lower')
             axs[i+6].axis('off')
-        #calculate the scr value that maximizes the IoU. Use only the box/mask with higher iou value.
+    
 
-
-
-        # for b in range(len(found_maskb)):
-        #     nb = 0
-        #     nb_aux = 1
-        #     scr = 0
-        #     if version in ('v4', 'A4', 'A6') and labels[b][nb] == 1: #avoid plotting occulter
-        #         nb+=1
-        #         nb_aux+=1
-        #         continue
-        #     if version=='v5':
-        #         nb_aux+=1
-        #         masked = nans.copy()
-        #         masked[:, :][found_maskb[b][nb] > mask_threshold] = nb
-        #         axs[1].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
-        #         mask_thresholdeada = nans.copy()
-        #         mask_thresholdeada[:, :][found_maskb[b][nb] > mask_threshold] = 1
-        #         mask_thresholdeada[:, :][found_maskb[b][nb] < mask_threshold] = 0
-                
-
-        # for l in range(len(found_maskl)):
-        #     nb = 0
-        #     nb_aux = 1
-        #     scr = 0
-        #     if version in ('v4', 'A4', 'A6') and labels[l][nb] == 1: #avoid plotting occulter
-        #         nb+=1
-        #         nb_aux+=1
-        #         continue
-        #     if version=='v5':
-        #         nb_aux+=1
-        #         masked = nans.copy()
-        #         masked[:, :][found_maskb[l][nb] > mask_threshold] = nb
-        #         axs[2].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
-        #         mask_thresholdeada = nans.copy()
-        #         mask_thresholdeada[:, :][found_maskb[l][nb] > mask_threshold] = 1
-        #         mask_thresholdeada[:, :][found_maskb[l][nb] < mask_threshold] = 0
+    for a in range(len(found_maska)):
+        maskeda = nans.copy()
+        maskeda[:, :][found_maska[a] > mask_threshold] = a
+        axs[2].imshow(maskeda, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
+        try:
+            ba=found_boxa[a]
+            box =  mpl.patches.Rectangle(ba[0:2],ba[2]-ba[0],ba[3]-ba[1], linewidth=2, edgecolor=color[a], facecolor='none') # add box
+            axs[2].add_patch(box)
+        except:
+            breakpoint()
+        nba=+1
+    for b in range(len(found_maskb)):
+        maskedb = nans.copy()
+        maskedb[:, :][found_maskb[b] > mask_threshold] = b
+        axs[0].imshow(maskedb, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
+        try:
+            bb=found_boxb[b]
+            box =  mpl.patches.Rectangle(bb[0:2],bb[2]-bb[0],bb[3]-bb[1], linewidth=2, edgecolor=color[b], facecolor='none') # add box
+            axs[0].add_patch(box)
+        except:
+            breakpoint()
+        nbb=+1
+    for l in range(len(found_maskl)):
+        
+        maskedl = nans.copy()
+        maskedl[:, :][found_maskl[l] > mask_threshold] = l#nbl
+        axs[1].imshow(maskedl, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
+        try:
+            bl=found_boxl[l]
+            box =  mpl.patches.Rectangle(bl[0:2],bl[2]-bl[0],bl[3]-bl[1], linewidth=2, edgecolor=color[l], facecolor='none') # add box
+            axs[1].add_patch(box)
+        except:
+            breakpoint()    
+        #nbl=+1  
 
 
 
 
-    axs[0].set_title(f'Cor2 A: {len(boxes[0])} obj detected.  {title[0]}') 
-    axs[1].set_title(f'Cor2 B: {len(boxes[1])} obj detected.  {title[1]}')               
-    axs[2].set_title(f'Lasco C2: {len(boxes[2])} obj detected.  {title[2]}')     
+    axs[2].set_title(f'Cor2 A: {len(boxes[0])} obj detected.  {title[0]}') 
+    axs[0].set_title(f'Cor2 B: {len(boxes[1])} obj detected.  {title[1]}')               
+    axs[1].set_title(f'Lasco C2: {len(boxes[2])} obj detected.  {title[2]}')     
     #if title is not None:
     #    fig.suptitle('\n'.join([title[i] for i in range(0,len(title))]) , fontsize=16)   
     plt.tight_layout()
@@ -308,6 +291,7 @@ def plot_to_png(ofile,found_maska,found_maskb,found_maskl, orig_img, masks, titl
                     sz_ratio = np.array(masked.shape)/np.array([h0['NAXIS1'], h0['NAXIS2']])
                     h0['NAXIS1'] = masked.shape[0]
                     h0['NAXIS2'] = masked.shape[1]
+                    breakpoint()
                     h0['CDELT1'] = h0['CDELT1']/sz_ratio[0]
                     h0['CDELT2'] = h0['CDELT2']/sz_ratio[1]
                     h0['CRPIX2'] = int(h0['CRPIX2']*sz_ratio[1])
@@ -513,6 +497,7 @@ def read_fits(file_path, header=False, imageSize=[512,512],smooth_kernel=[0,0]):
         img = fits.open(file_path)[0].data
         img=img.astype("float32")
         img = gaussian_filter(img, sigma=smooth_kernel)
+      
         if imageSize:
             img = rebin(img, imageSize, operation='mean')  
             #img = rebin_interp(img, new_size=[512,512])#si la imagen no es cuadrada usar esto
@@ -617,7 +602,7 @@ def save_png(array, ofile=None, range=None):
 
 
 
-def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,filter=True,version=''):
+def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,cpa_plot_rad=False,apex_plot_arsec=False,filter=True,version=''):
     imageSize=[512,512]
     all_occ_size = []
     all_diff_img = []    
@@ -651,7 +636,7 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_m
         else:
             cur_occ_size = 0
             occulter_size_ext = 0
-        #breakpoint()
+        
         all_occ_size.append(cur_occ_size)
         all_occ_size_ext.append(occulter_size_ext)
         
@@ -659,13 +644,17 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_m
             cprea = ev[imgs_labels[1]][t]
         else:
             cprea = ev[imgs_labels[2]][t]
-        #breakpoint()
+        
         imga, ha = read_fits(cimga, header=True,imageSize=imageSize)
         occ_center=[ha["crpix1"],ha["crpix2"]]
         img = imga-read_fits(cprea, imageSize=imageSize)
         all_occ_center.append(occ_center)
+        
+        # if cimga.find('lasco') > 0: 
+        #     img = np.rot90(img)  # para cada imagen leída
         all_diff_img.append(img)
         all_dates.append(datetime.datetime.strptime(ha['DATE-OBS'], '%Y-%m-%dT%H:%M:%S.%f'))
+        
         if ha['NAXIS1'] != imageSize[0]:
             plt_scl = ha['CDELT1'] * ha['NAXIS1']/imageSize[0] 
         else:
@@ -677,7 +666,7 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_m
     props_path=ev_opath+'/'+imgs_labels[0]
     if not os.path.exists(props_path):
         os.makedirs(props_path)
-    data_list =  nn_seg.infer_event2(all_diff_img, all_dates, w_metric,filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_occ_center,  plot_params=props_path, occulter_size_ext=all_occ_size_ext, filter_halos=False)
+    data_list =  nn_seg.infer_event2(all_diff_img,all_headers, all_dates, w_metric,cpa_plot_rad=False,apex_plot_arsec=False,filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_occ_center,  plot_params=props_path, occulter_size_ext=all_occ_size_ext, filter_halos=False)
      
     if len(data_list)==4:
         ok_orig_img,ok_dates,df, control_df =data_list 
@@ -685,18 +674,93 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_m
         all_score.append(df["SCR"].tolist())
         all_lbl.append(df["LABEL"].tolist())
         all_box.append(df["BOX"].tolist())
-
-        # all_mask.append(df["MASK"].values)
-        # all_score.append(df["SCR"].values)
-        # all_lbl.append(df["LABEL"].values)
-        # all_box.append(df["BOX"].values)
-       
         
         return  ok_orig_img, ok_dates, all_mask[0], all_score[0], all_lbl[0], all_box[0], all_headers, all_plate_scl, df,  control_df
     else:
+        breakpoint()
         return [], [], [], [], [], [], [], [], [], []
 
+def plot_all_seq(ofile,orig_img, masks, title=None, labels=None, boxes=None, scores=None, save_masks=None, version='v4', scr_threshold = 0.25, masks_gcs=None):
+   #(ofile,[orig_imga,orig_imgb, orig_imgl], [[maska],[maskb],[maskl]], title=[datesa, datesb, datesl],labels=[[labelsa],[labelsb], [labelsl]], boxes=[[boxesa], [boxesb], [boxesl]], scores=[[scra], [scrb], [scrl]],version=model_version,scr_threshold=scr_threshold,masks_gcs=None):
+    """
+    Plot the input images (orig_img) along with the infered masks, labels and scores
+    in a single image saved to ofile
+    save_masks: set to a list of fits headers to save the masks as fits files
+    """    
+   
+    mask_threshold = 0.75 # value to consider a pixel belongs to the object
+    #scr_threshold = 0.25 # only detections with score larger than this value are considered
+    color = ['blue', 'red', 'green', 'black', 'yellow', 'magenta', 'cyan', 'white',
+                   'orange', 'purple', 'brown', 'pink', 'grey', 'lime', 'navy']
+    #color=['b','r','g','k','y','m','c','w','b','r','g','k','y','m','c','w']
+    if version=='v4':
+        obj_labels = ['Back', 'Occ','CME','N/A']
+    elif version=='v5':
+        obj_labels = ['Back', 'CME']
+    elif version=='A4':
+        obj_labels = ['Back', 'Occ','CME']
+    elif version=='A6':
+        obj_labels = ['Back', 'Occ','CME']
+    else:
+        print(f'ERROR. Version {version} not supported')
+        sys.exit()
+    cmap = mpl.colors.ListedColormap(color)  
+    nans = np.full(np.shape(orig_img[0][0]), np.nan)
 
+    len_event=len(orig_img[0])
+    fig, axs = plt.subplots(len_event, 3, figsize=[20,10])
+    axs = axs.ravel()
+
+    for j in range(len_event):
+        for i in range(len(orig_img)):
+            ax_index = j * 3 + i
+            axs[ax_index].imshow(orig_img[i][j], vmin=0, vmax=1, cmap='gray', origin='lower')
+            axs[ax_index].axis('off')
+      
+            if boxes is not None:
+                nb = 0
+                nb_aux = 1
+                b=boxes[i][0][j]
+                scr = 0
+                if version in ('v4', 'A4', 'A6') and labels[i][0][j] == 1: #avoid plotting occulter
+                    nb+=1
+                    nb_aux+=1
+                    continue
+                if version=='v5':
+                    nb_aux+=1
+                if scores is not None:
+                    if scores[i][0][j] is not None:
+                        scr = scores[i][0][j]
+                if scr > scr_threshold:    
+                    
+                    masked = nans.copy()
+                    masked[:, :][masks[i][0][j] > mask_threshold] = nb
+                    axs[ax_index].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
+                  
+                    box =  mpl.patches.Rectangle(b[0:2],b[2]-b[0],b[3]-b[1], linewidth=2, edgecolor=color[nb], facecolor='none') # add box
+                    axs[ax_index].add_patch(box)
+
+                    
+                    # if labels is not None:
+                    #     axs[ax_index].annotate(obj_labels[labels[i][0][j]]+':'+'{:.2f}'.format(scr),xy=b[0:2], fontsize=15, color=color[nb])
+                    
+                    
+                nb+=1
+                nb_aux+=1
+                
+        
+    axs[2].set_title(f'Cor2 A: {len(boxes[0])} obj detected.  {title[0]}') 
+    axs[0].set_title(f'Cor2 B: {len(boxes[1])} obj detected.  {title[1]}')               
+    axs[1].set_title(f'Lasco C2: {len(boxes[2])} obj detected.  {title[2]}')     
+    #if title is not None:
+    #    fig.suptitle('\n'.join([title[i] for i in range(0,len(title))]) , fontsize=16)   
+    plt.tight_layout()
+    plt.savefig(ofile)
+    plt.close()
+
+    
+
+    
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
 model = 'A4_DS32' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
@@ -706,7 +770,7 @@ if model == "v5":
     trained_model = '49.torch'
 
 if model == 'A4_DS31':
-    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS32"
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A4_DS31"
     model_version="A4"
     trained_model = '49.torch'
 
@@ -717,6 +781,11 @@ if model == 'A4_DS32':
 
 if model == 'A6_DS32':
     model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS32"
+    model_version="A6"
+    trained_model = '49.torch'
+
+if model == 'A6_DS31':
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS31"
     model_version="A6"
     trained_model = '49.torch'
 
@@ -732,7 +801,9 @@ scr_threshold = 0.15
 make_gcs_masks = False #if set True, the sav files are used to set GCS masks.
 w_metric=[0.4,0.4,0.1,0.1] #weights for the metric used to select the best mask [IOU,CPA,AW,APEX]
 occ_center=[[256,256]]
-
+plot_all=True# If True plots the full event for the three views all in one plot
+cpa_plot_rad=False #If True the cpa plots will be on radians otherwise they will be ploted on degrees
+apex_plot_arsec=False #If True the apex plots will be on arsec otherwise they will be ploted on solar radius
 #main
 gpu=0 # GPU to use
 device = torch.device(f'cuda:{gpu}') if torch.cuda.is_available() else torch.device('cpu') #runing on gpu unless its not available
@@ -754,24 +825,26 @@ nn_seg.mask_threshold = mask_threshold
 for ev in event:
     print(f'Processing event {ev["date"]}')
     ev_opath = os.path.join(opath, ev['date'].split('/')[-1]) + '_filter_'+str(filter)   
+   # if (ev['date'].split('/')[-1])[4:] == "20130209":
     #coracf
     imgs_labels = ['ima1', 'ima0','pre_ima']
-    orig_imga, datesa, maska, scra, labelsa, boxesa, headersa, plate_scl_a, dfa, control_dfa = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric, filter=filter, version=model_version)
+    orig_imga, datesa, maska, scra, labelsa, boxesa, headersa, plate_scl_a, dfa, control_dfa = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,cpa_plot_rad=cpa_plot_rad,apex_plot_arsec=apex_plot_arsec, filter=filter, version=model_version)
     if datesa is not None:
-        datesa = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesa]      
+        datesa = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesa] 
 
     #corb
     imgs_labels = ['imb1', 'imb0','pre_imb']
-    orig_imgb, datesb, maskb, scrb, labelsb, boxesb, headersb, plate_scl_b, dfb, control_dfb  = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,filter=filter, version=model_version) 
+    orig_imgb, datesb, maskb, scrb, labelsb, boxesb, headersb, plate_scl_b, dfb, control_dfb  = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,cpa_plot_rad=cpa_plot_rad,apex_plot_arsec=apex_plot_arsec,filter=filter, version=model_version) 
     if datesb is not None:
         datesb = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesb]        
-    
+
     #lasco
     imgs_labels = ['lasco1', 'lasco0','pre_lasco']
-    orig_imgl, datesl, maskl, scrl, labelsl, boxesl, headersl, plate_scl_l, dfl, control_dfl  = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,filter=filter, version=model_version)
+
+    orig_imgl, datesl, maskl, scrl, labelsl, boxesl, headersl, plate_scl_l, dfl, control_dfl  = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,cpa_plot_rad=cpa_plot_rad,apex_plot_arsec=apex_plot_arsec,filter=filter, version=model_version)
     if datesl is not None:
         datesl = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesl]    
-    
+
     #plot_to_png_3sources(ev_opath,ev, orig_imga, orig_imgb, orig_imgl, dfa,dfb,dfl, control_dfa, control_dfb, control_dfl, occ_center, mask_threshold, scr_threshold, title=None)
     
     if len(orig_imga) != len(orig_imgb) or len(orig_imga) != len(orig_imgl):
@@ -897,13 +970,30 @@ for ev in event:
                 found_maska= control_dfa.loc[control_dfa['DATE_TIME']==datesa[t], 'MASK'].tolist()
                 found_maskb= control_dfb.loc[control_dfb['DATE_TIME']==datesb[t], 'MASK'].tolist()
                 found_maskl= control_dfl.loc[control_dfl['DATE_TIME']==datesl[t], 'MASK'].tolist()
+                found_boxa = control_dfa.loc[control_dfa['DATE_TIME']==datesa[t], "BOX"].tolist()
+                found_boxb = control_dfb.loc[control_dfb['DATE_TIME']==datesb[t], "BOX"].tolist()
+                found_boxl = control_dfl.loc[control_dfl['DATE_TIME']==datesl[t], "BOX"].tolist()
+               
+                # plot_to_png(ofile,found_maska,found_maskb,found_maskl,found_boxa,found_boxb, found_boxl, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [[maska[t]],[maskb[t]],[maskl[t]]], 
+                #             title=[datesa[t], datesb[t], datesl[t]],labels=[[labelsa[t]],[labelsb[t]], [labelsl[t]]], 
+                #             boxes=[[boxesa[t]], [boxesb[t]], [boxesl[t]]], scores=[[scra[t]], [scrb[t]], [scrl[t]]],
+                            # version=model_version,scr_threshold=scr_threshold,masks_gcs=None)
+                plot_to_png(ofile,found_maska,found_maskb,found_maskl,found_boxa,found_boxb, found_boxl,[orig_imgb[t],orig_imgl[t], orig_imga[t]], [[maskb[t]],[maskl[t]],[maska[t]]], 
+                            title=[datesb[t], datesl[t], datesa[t]],labels=[[labelsb[t]],[labelsl[t]], [labelsa[t]]], 
+                            boxes=[[boxesb[t]], [boxesl[t]], [boxesa[t]]], scores=[[scrb[t]], [scrl[t]], [scra[t]]],
+                            version=model_version,scr_threshold=scr_threshold,masks_gcs=None)
+                
+    if plot_all:     
+        ofile = os.path.join(ev_opath,"all_sequence.png")
+       
+        # plot_all_seq(ofile,[orig_imga,orig_imgb, orig_imgl], [[maska],[maskb],[maskl]], 
+        #                     title=[datesa, datesb, datesl],labels=[[labelsa],[labelsb], [labelsl]], 
+        #                     boxes=[[boxesa], [boxesb], [boxesl]], scores=[[scra], [scrb], [scrl]],
+        #                     version=model_version,scr_threshold=scr_threshold,masks_gcs=None)
 
-                plot_to_png(ofile,found_maska,found_maskb,found_maskl, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [[maska[t]],[maskb[t]],[maskl[t]]], 
-                            title=[datesa[t], datesb[t], datesl[t]],labels=[[labelsa[t]],[labelsb[t]], [labelsl[t]]], 
-                            boxes=[[boxesa[t]], [boxesb[t]], [boxesl[t]]], scores=[[scra[t]], [scrb[t]], [scrl[t]]],
-                            version=model_version,scr_threshold=scr_threshold,masks_gcs=None )
-                  
-
-
+        plot_all_seq(ofile,[orig_imgb,orig_imgl, orig_imga], [[maskb],[maskl],[maska]], 
+                            title=[datesb, datesl, datesa],labels=[[labelsb],[labelsl], [labelsa]], 
+                            boxes=[[boxesb], [boxesl], [boxesa]], scores=[[scrb], [scrl], [scra]],
+                            version=model_version,scr_threshold=scr_threshold,masks_gcs=None)
 
 
