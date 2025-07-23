@@ -24,7 +24,7 @@ import itertools
 from sunpy.map import Map
 from astropy import units as u
 from sunpy.coordinates import get_horizons_coord
-from astropy.constants import R_sun
+
 
 
 
@@ -844,7 +844,7 @@ class neural_cme_segmentation():
     
     
 
-    def _filter_masks2(self, dates, masks, scores, labels, boxes, mask_prop,plate_scl,headers,opath,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS,comb_df,w_metric,cpa_plot_rad,apex_plot_arsec):
+    def _filter_masks2(self, dates, masks, scores, labels, boxes, mask_prop,plate_scl,headers,pix_vel_sats,opath,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS,w_metric,cpa_plot_rad,apex_plot_arsec):
         '''
         Filters the masks by creating clusters based on the cpa and fitting functions to every cluster found, according to cpa, wa and apex_dist.
         The filter criterion is based on the minimal distances from the mask properties(cpa, wa and apex_dist) to the fitted functions, from wich the euclidian distance its calculated. 
@@ -872,13 +872,20 @@ class neural_cme_segmentation():
                 area_score= mask_prop[i][j][8]
                 apex_dist_per = mask_prop[i][j][9]
                 apex_angl_per = mask_prop[i][j][10]
-                if apex_plot_arsec==False:
-                    apex= self._pix_2_rsun(apex,headers[i])
                 data_list.append((date,mask_id,scr,cpa,wa,apex,label,box,mask,apex_angl,aw_min,aw_max,area_score,apex_dist_per,apex_angl_per))
         df = pd.DataFrame(data_list, columns=["DATE_TIME","MASK_ID","SCR","CPA","AW","APEX","LABEL","BOX","MASK","APEX_ANGL","AW_MIN","AW_MAX", "AREA_SCORE","APEX_DIST_PER","APEX_ANGL_PER"])
         control_df = pd.DataFrame(data_list, columns=["DATE_TIME","MASK_ID","SCR","CPA","AW","APEX","LABEL","BOX","MASK","APEX_ANGL","AW_MIN","AW_MAX", "AREA_SCORE","APEX_DIST_PER","APEX_ANGL_PER"]) 
         df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"])
         
+       
+
+
+
+        comb_df = self._combinatory(df,pix_vel_sats,headers,dates, masks, scores, labels, boxes, mask_prop, plate_scl,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS)
+
+
+
+
         #Gets the optimal number of clusters for the data
         data= df["CPA"].values.reshape(-1, 1)
         silhouette_scores = []
@@ -934,10 +941,9 @@ class neural_cme_segmentation():
         min_error=[]
         dt_list=[]
         hours=[]
-        filter_criterion=[]
-        dist=[]
 
-        if len(comb_df)>1:        
+
+        if len(comb_df)>1:     
             comb_df = comb_df.sort_values(by='IOU_TOT', ascending=False)
             comb_df['IOU_NORM'] = 1 - ((comb_df['IOU_TOT'] - comb_df['IOU_TOT'].min()) / (comb_df['IOU_TOT'].max() - comb_df['IOU_TOT'].min()))
             comb_df["CPA_NORM"]=(comb_df["CPA_TOT"]-comb_df["CPA_TOT"].min())/(comb_df["CPA_TOT"].max()-comb_df["CPA_TOT"].min())
@@ -952,6 +958,11 @@ class neural_cme_segmentation():
         else:
             best_comb = comb_df.loc[0]
         
+
+
+
+
+
         unique_dates = df["DATE_TIME"].unique()
         for index, column in enumerate(best_comb.index[:len(unique_dates)]):
             id1 = best_comb[column]
@@ -963,151 +974,9 @@ class neural_cme_segmentation():
         min_error_df.columns=cols
         min_error_df = min_error_df.reset_index(drop=True)
 
-        # for k in range(optimal_n_clusters):
-        #     filtered_df = df[df['CME_ID'] == k]
-        #     unique_dates = filtered_df["DATE_TIME"].unique()
-        #     #filtering small events (less than 3 images per event with one cluster), we keep all the masks for this event
-        #     if (optimal_n_clusters==1) & (len(filtered_df["CME_ID"])<3):
-                
-        #         #filtering cases with more than one mask per day per cluster, keeps one per cluster (the one with the max IoU)
-        #         row= iou_df.loc[iou_df["IOU_TOT"].idxmax()]
-        #         for index, column in enumerate(row.index[:len(unique_dates)]):
-        #             id2 = row[column]
-        #             selected_mask = filtered_df[(filtered_df["MASK_ID"] == id2) & (filtered_df["DATE_TIME"] == column)]
-        #             min_error.append(selected_mask.values[0])
-
-                
-        #         # for m in unique_dates:
-        #         #     event = filtered_df[filtered_df['DATE_TIME'] == str(m)]
-        #         #     frec_id = filtered_df["MASK_ID"].mode()[0]
-        #         #     #keeps one mask per date, here the filtering includes the mask id and keeps the predominant id in the event
-        #         #     filtered_mask = event.loc[event["MASK_ID"] == frec_id]
-        #         #     if len(filtered_mask)>0:
-        #         #         min_error.append(filtered_mask.iloc[0])
-        #         # min_error_df = pd.DataFrame(min_error)
-                
-        #     else:
-        #         x_points =np.array([i.timestamp() for i in filtered_df["DATE_TIME"]])
-        #         y_cpa=np.array(filtered_df["CPA"])
-        #         y_wa=np.array(filtered_df["AW"])
-        #         y_apex=np.array(filtered_df["APEX"])
-
-        #         #Fits the corresponding function type and calculates the distance from the masks
-        #         # to the fitted function, the concavity of the function and the median velocity of it   
-        #         cpa_dist,cpa_parabola,cpa_vel,axis1 = self._select_mask(axs[0],k,x_points, y_cpa, linear_error, linear, [1.,1.])
-        #         wa_dist,wa_parabola,wa_vel,axis2= self._select_mask(axs[1],k,x_points, y_wa, linear_error, linear, [1.,1.])
-        #         apex_dist,apex_parabola,apex_vel,axis3=self._select_mask(axs[2],k,x_points, y_apex, quadratic_error, quadratic, [1.,1.,0])   
-        #         dist.append([cpa_dist,wa_dist,apex_dist])
-        #         filter_criterion.append([apex_parabola,apex_vel])
-                
-        #         #Plotting data and the fitted function before filtering
-        #         hours.extend([str(i.time()) for i in filtered_df["DATE_TIME"]])
-        #         dt_list.extend(x_points)
-        #         axs[0].scatter(x_points, filtered_df["CPA"], color=colors[k])
-        #         axs[1].scatter(x_points, filtered_df["AW"], color=colors[k])
-        #         axs[2].scatter(x_points, filtered_df["APEX"], color=colors[k])    
-
-        # if len(filtered_df["CME_ID"])>=3:   
-        #     #filtering cases where all apex parabolas are negative
-        #     parabola_criterion = [filter_criterion[v][0] for v in range(optimal_n_clusters)]
-        #     count = all(valor is True for valor in parabola_criterion)
-        #     if count:
-        #         velocity_criterion = [filter_criterion[v][1] for v in range(optimal_n_clusters)]
-        #         optimal_vel_idx = np.argmax(np.abs(velocity_criterion))
-        #         selected_cluster= df[df['CME_ID'] == optimal_vel_idx]
-        #         unique_dates_cluster = selected_cluster["DATE_TIME"].unique()
-        #         #filtering cases with more than one mask per day per cluster, keeps one per cluster (the one with the max IoU)
-        #         row= iou_df.loc[iou_df["IOU_TOT"].idxmax()]
-        #         for index, column in enumerate(row.index[:len(unique_dates_cluster)]):
-        #             id2 = row[column]
-        #             selected_mask = filtered_df[(filtered_df["MASK_ID"] == id2) & (filtered_df["DATE_TIME"] == column)]
-        #             min_error.append(selected_mask.values[0])
-                
-        #         #for m in unique_dates:
-        #             #event = selected_cluster[selected_cluster['DATE_TIME'] == str(m)]
-        #             # frec_id = selected_cluster["MASK_ID"].mode()[0]
-        #             # #keeps one mask per date, here the filtering includes the mask id and keeps the predominant id in the event
-        #             # filtered_mask = event.loc[event["MASK_ID"] == frec_id]
-        #             # if len(filtered_mask)>0:
-        #             #     min_error.append(filtered_mask.iloc[0])
-        #             #     min_error_df = pd.DataFrame(min_error)
-
-        #     #filtering cases where at least one apex parabola is positive 
-        #     else:
-        #         all_filtered_dfs = []
-        #         for r in range(optimal_n_clusters):
-        #             filtered_df = df[df['CME_ID'] == r]
-        #             #Droping negative apex parabola cases
-        #             if (filter_criterion[r][0] & (optimal_n_clusters>1)):
-        #                 idx = df[df['CME_ID'] == r].index
-        #                 #df = df.drop(idx)
-        #                 #df = df.reset_index(drop=True)
-        #                 all_filtered_dfs.append(filtered_df)
-
-        #             else:
-        #                 error_weights=[0.5,0.2,0.3]
-        #                 filtered_df["CPA_DIST"] = dist[r][0]
-        #                 filtered_df["AW_DIST"] = dist[r][1]
-        #                 filtered_df["APEX_DIST"] = dist[r][2]
-        #                 error=np.sqrt(error_weights[0]*(dist[r][0]**2)+error_weights[0]*(dist[r][1]**2)+error_weights[0]*(dist[r][2]**2))
-        #                 filtered_df["ERROR"] = error
-        #                 all_filtered_dfs.append(filtered_df)
-        #         all_filtered = pd.concat(all_filtered_dfs, ignore_index=True)
-               
-        #         #filtering disperse masks according to cpa distance criterion  
-        #         #filter_cpa = filtered_df.loc[filtered_df["CPA_DIST"]>MAX_CPA_DIST]
-        #         #filtered_df = filtered_df[~filtered_df.isin(filter_cpa)].dropna()
-                
-        #         if len(all_filtered)>0:
-        #             unique_dates = all_filtered["DATE_TIME"].unique()
-        #             if len(iou_df)==1:
-        #                 row=iou_df.iloc[0]
-        #                 for index, column in enumerate(row.index[:len(unique_dates)]):
-        #                     id2 = row[column]
-        #                     selected_mask = all_filtered[(all_filtered["MASK_ID"] == id2) & (all_filtered["DATE_TIME"] == column)]
-        #                     min_error.append(selected_mask.values[0])
-
-        #             else:
-        #                 filtered_dates = all_filtered["DATE_TIME"].unique()
-        #                 for a in range(len(iou_df)):
-        #                     row = iou_df.iloc[a] 
-        #                     acc_error=[]
-        #                     for index, column in enumerate(row.index[:len(filtered_dates)]): 
-        #                         id1 = row[column]
-        #                         error1 = all_filtered[(all_filtered["MASK_ID"] == id1) & (all_filtered["DATE_TIME"] == column)]["ERROR"]
-        #                         try:
-        #                             acc_error.append(error1.values[0])
-        #                         except:
-        #                             breakpoint()
-        #                     error_val= np.sum(acc_error)
-        #                     iou_df.loc[a, "ERROR"] = error_val
-        #                 iou_df = iou_df.sort_values(by='IOU_TOT', ascending=False)
-        #                 iou_df['IOU_NORM'] = (iou_df['IOU_TOT'] - iou_df['IOU_TOT'].min()) / (iou_df['IOU_TOT'].max() - iou_df['IOU_TOT'].min())
-        #                 valid_error = iou_df['ERROR'].dropna() 
-        #                 if valid_error.empty:
-        #                     best_comb = iou_df.loc[iou_df['IOU_TOT'].idxmax()]
-        #                 else:
-        #                     iou_df['ERROR_NORM'] = 1 - (iou_df['ERROR'] - valid_error.min()) / (valid_error.max() - valid_error.min())                        
-        #                     iou_df['SCORE'] = (0.5 * iou_df['IOU_NORM']) + (0.5 * iou_df['ERROR_NORM'])
-        #                     best_comb = iou_df.loc[iou_df['SCORE'].idxmax()]
-                        
-                        
-        #                 for index, column in enumerate(row.index[:len(unique_dates)]):
-        #                     id2 = best_comb[column]
-        #                     selected_mask = all_filtered[(all_filtered["MASK_ID"] == id2) & (all_filtered["DATE_TIME"] == column)]
-        #                     min_error.append(selected_mask.values[0])
-        #                 #filtering cases with more than one mask per day per cluster, keeps one per cluster (the one with the minimal error)
-        #                 # for m in unique_dates:
-        #                 #     event = filtered_df[filtered_df['DATE_TIME'] == str(m)]
-        #                 #     filtered_mask = event.loc[event['ERROR'].idxmin()]
-        #                 #     min_error.append(filtered_mask)
-        #         else:
-        #             print("All masks droped due to cpa filtering criterion")    
-        # cols=selected_mask.columns.values
-        # min_error_df = pd.DataFrame(min_error)
-        # min_error_df.columns=cols
-              
-        # min_error_df = min_error_df.reset_index(drop=True)
+        if apex_plot_arsec==False:
+                  
+            df["APEX"]=self._pix_2_rsun(df["APEX"],headers[0])
 
         for k in range(optimal_n_clusters):
             filtered_df = df[df['CME_ID'] == k]
@@ -1365,30 +1234,17 @@ class neural_cme_segmentation():
         iou=intersection / union 
         return iou
 
-    def _combinatory(self, dates, masks, scores, labels, boxes, mask_prop,plate_scl,opath,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS):
-        data=[]
-        for i in range(len(dates)):
-            for j in range(len(masks[i])):
-                mask_id=mask_prop[i][j][0]
-                scr=mask_prop[i][j][1]
-                cpa = mask_prop[i][j][2]
-                wa=mask_prop[i][j][3]
-                date= dates[i]
-                label=labels[i][j]
-                box=boxes[i][j]
-                mask=masks[i][j]
-                apex = mask_prop[i][j][4]  #apex in same Units as calculated in compute_mask_prop (based on plate_scl)
-                apex_angl = mask_prop[i][j][5]
-                aw_min    = mask_prop[i][j][6]
-                aw_max    = mask_prop[i][j][7]
-                area_score= mask_prop[i][j][8]
-                apex_dist_per = mask_prop[i][j][9]
-                apex_angl_per = mask_prop[i][j][10]
-                data.append((date,mask_id,scr,cpa,wa,apex,label,box,mask,apex_angl,aw_min,aw_max,area_score,apex_dist_per,apex_angl_per))
-        df = pd.DataFrame(data, columns=["DATE_TIME","MASK_ID","SCR","CPA","AW","APEX","LABEL","BOX","MASK","APEX_ANGL","AW_MIN","AW_MAX", "AREA_SCORE","APEX_DIST_PER","APEX_ANGL_PER"])
-        df["DATE_TIME"]=pd.to_datetime(df["DATE_TIME"])
-
-
+    def _combinatory(self, df,pix_vel_sats,headers,dates, masks, scores, labels, boxes, mask_prop,plate_scl,opath,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS):
+        sat=headers[0]["OBSRVTRY"]
+        if sat=="STEREO_A":
+            apex_vel=pix_vel_sats[0]
+        elif sat=="STEREO_B":
+            apex_vel=pix_vel_sats[1]
+        else:
+            apex_vel=pix_vel_sats[2]
+        
+        plt_scale=headers[0]["CDELT1"]
+        
         groups = df.groupby('DATE_TIME')['MASK_ID'].apply(list)    
         comb = list(itertools.product(*groups))
         df_comb = pd.DataFrame(comb, columns=groups.index)
@@ -1399,20 +1255,29 @@ class neural_cme_segmentation():
                 for index, column in enumerate(row.index[:len(groups)-1]): 
                     id1 = row[column]
                     id2 = row[row.index[index + 1]]
-
-                    mask1 = df[(df["MASK_ID"] == id1) & (df["DATE_TIME"] == column)]["MASK"]
-                    mask2 = df[(df["MASK_ID"] == id2) & (df["DATE_TIME"] == row.index[index + 1])]["MASK"]    
-                    cpa1 = df[(df["MASK_ID"] == id1) & (df["DATE_TIME"] == column)]["CPA"]
-                    cpa2 = df[(df["MASK_ID"] == id2) & (df["DATE_TIME"] == row.index[index + 1])]["CPA"] 
-                    aw1 = df[(df["MASK_ID"] == id1) & (df["DATE_TIME"] == column)]["AW"]
-                    aw2 = df[(df["MASK_ID"] == id2) & (df["DATE_TIME"] == row.index[index + 1])]["AW"] 
-                    apex1 = df[(df["MASK_ID"] == id1) & (df["DATE_TIME"] == column)]["APEX"]
-                    apex2 = df[(df["MASK_ID"] == id2) & (df["DATE_TIME"] == row.index[index + 1])]["APEX"] 
+                    dt1=column
+                    dt2=row.index[index + 1]
+                    mask1 = df[(df["MASK_ID"] == id1) & (df["DATE_TIME"] == dt1)]["MASK"]
+                    mask2 = df[(df["MASK_ID"] == id2) & (df["DATE_TIME"] == dt2)]["MASK"]    
+                    cpa1 = df[(df["MASK_ID"] == id1) & (df["DATE_TIME"] == dt1)]["CPA"]
+                    cpa2 = df[(df["MASK_ID"] == id2) & (df["DATE_TIME"] == dt2)]["CPA"] 
+                    aw1 = df[(df["MASK_ID"] == id1) & (df["DATE_TIME"] == dt1)]["AW"]
+                    aw2 = df[(df["MASK_ID"] == id2) & (df["DATE_TIME"] == dt2)]["AW"] 
+                    apex1 = (df[(df["MASK_ID"] == id1) & (df["DATE_TIME"] == dt1)]["APEX"])/plt_scale
+                    apex2 = (df[(df["MASK_ID"] == id2) & (df["DATE_TIME"] == dt2)]["APEX"])/plt_scale
+                   
+                    dt_diff=(dt2-dt1).total_seconds()
+                    min_apex2= apex1+apex_vel*dt_diff
+                    breakpoint()
+                    if apex2< min_apex2:
+                        breakpoint()
+                  
+                   
                     try:
-                        col_mask=str(column.time())+"_"+"IOU"+"_"+str(row.index[index + 1].time())
-                        col_cpa=str(column.time())+"_"+"CPA_CORR"+"_"+str(row.index[index + 1].time())
-                        col_aw=str(column.time())+"_"+"AW_CORR"+"_"+str(row.index[index + 1].time())
-                        col_apex=str(column.time())+"_"+"APEX_CORR"+"_"+str(row.index[index + 1].time())
+                        col_mask=str(dt1.time())+"_"+"IOU"+"_"+str(dt2.time())
+                        col_cpa=str(dt1.time())+"_"+"CPA_CORR"+"_"+str(dt2.time())
+                        col_aw=str(dt1.time())+"_"+"AW_CORR"+"_"+str(dt2.time())
+                        col_apex=str(dt1.time())+"_"+"APEX_CORR"+"_"+str(dt2.time())
                     except:
                         breakpoint()
                     if not mask1.empty and not mask2.empty:
@@ -1431,7 +1296,7 @@ class neural_cme_segmentation():
         return df_comb  
   
 
-    def infer_event2(self, imgs,headers, dates, w_metric,cpa_plot_rad=False,apex_plot_arsec=False, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None,occulter_size_ext=None,
+    def infer_event2(self, imgs,headers, dates, w_metric,pix_vel_sats,cpa_plot_rad=False,apex_plot_arsec=False, filter=True, model_param=None, resize=True, plate_scl=None, occulter_size=None,occulter_size_ext=None,
                     centerpix=None, mask_threshold=None, scr_threshold=None, plot_params=None, filter_halos=False,modified_masks=None,
                     percentiles=[5,95],increase_contrast=None):
         '''
@@ -1550,11 +1415,10 @@ class neural_cme_segmentation():
         if len(all_masks)>=2:
             # keeps only one mask per img based on cpa, aw and apex radius evolution consistency
             if filter:
-                combination_df = self._combinatory(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,
-                                         all_plate_scl,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS)
+
                 
                 df, control_df = self._filter_masks2(all_dates, all_masks, all_scores, all_lbl, all_boxes, all_mask_prop,
-                                        all_plate_scl,all_headers,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS,combination_df, w_metric,cpa_plot_rad,apex_plot_arsec)
+                                        all_plate_scl,all_headers,pix_vel_sats,self.plot_params,MAX_CPA_DIST,MIN_CPA_DIFF,MIN_CLUSTER_POINTS,w_metric,cpa_plot_rad,apex_plot_arsec)
 
                 
                 if len(df)>0:                        

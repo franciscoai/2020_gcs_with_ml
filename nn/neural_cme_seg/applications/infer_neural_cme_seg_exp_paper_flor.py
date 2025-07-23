@@ -7,6 +7,7 @@ import cv2
 import torch
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from sunpy.coordinates import get_horizons_coord
 mpl.use('Agg')
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))))
@@ -602,7 +603,7 @@ def save_png(array, ofile=None, range=None):
 
 
 
-def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,cpa_plot_rad=False,apex_plot_arsec=False,filter=True,version=''):
+def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,pix_vel_sats,cpa_plot_rad=False,apex_plot_arsec=False,filter=True,version=''):
     imageSize=[512,512]
     all_occ_size = []
     all_diff_img = []    
@@ -666,7 +667,7 @@ def inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_m
     props_path=ev_opath+'/'+imgs_labels[0]
     if not os.path.exists(props_path):
         os.makedirs(props_path)
-    data_list =  nn_seg.infer_event2(all_diff_img,all_headers, all_dates, w_metric,cpa_plot_rad=False,apex_plot_arsec=False,filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_occ_center,  plot_params=props_path, occulter_size_ext=all_occ_size_ext, filter_halos=False)
+    data_list =  nn_seg.infer_event2(all_diff_img,all_headers, all_dates, w_metric,pix_vel_sats,cpa_plot_rad=False,apex_plot_arsec=False,filter=filter, plate_scl=all_plate_scl, occulter_size=all_occ_size,centerpix=all_occ_center,  plot_params=props_path, occulter_size_ext=all_occ_size_ext, filter_halos=False)
      
     if len(data_list)==4:
         ok_orig_img,ok_dates,df, control_df =data_list 
@@ -758,9 +759,79 @@ def plot_all_seq(ofile,orig_img, masks, title=None, labels=None, boxes=None, sco
     plt.savefig(ofile)
     plt.close()
 
-    
+def propagation_vel(events,sat_lbl):
+    imageSize=[512,512]
+    sat_cad=[]
+    sat_rsun=[]
+    test=[]
+    test_abs=[]
+    for ev in events:
+        ev_cad=[]
+        ev_rsun=[]
+        for t in range(len(ev[sat_lbl])-1):    
+            t1 = ev[sat_lbl][t]
+            t2 = ev[sat_lbl][t+1]
+            imga1, ha1 = read_fits(t1, header=True,imageSize=imageSize)
+            imga2, ha2 = read_fits(t2, header=True,imageSize=imageSize)
+           
+            datetime_1= datetime.datetime.strptime(ha1["DATE-OBS"],"%Y-%m-%dT%H:%M:%S.%f")
+            datetime_2= datetime.datetime.strptime(ha2["DATE-OBS"],"%Y-%m-%dT%H:%M:%S.%f")
+            t_diff = datetime_2 - datetime_1
+            abs_t_diff = abs(t_diff.total_seconds())  
+            ev_cad.append(abs_t_diff)
+            if sat_lbl != "lasco1":
+                rsun1=ha1["RSUN"] #rsun in Arsec
+                rsun2=ha2["RSUN"] #rsun in Arsec
+                cdelt = ha1["cdelt2"]  #cdelt en Arcsec/pixel
+                breakpoint()
+                rsun_pix1 = rsun1 / cdelt
+                rsun_pix2 = rsun2 / cdelt
+                r_diff= abs(rsun_pix2-rsun_pix1)
+                ev_rsun.append(r_diff)
+                test.append(rsun_pix1)
+            else:
+                #ESTO ESTA MAL ESTOY TOMANDO RSUN PARA LASCO Y NO LA DIFERENCIA CONSECUTIVA PORQUE ES CERO
+                ha1['HGLN_OBS'] = get_horizons_coord('SOHO',  datetime_1).lon.to('deg').value
+                ha1['HGLT_OBS'] = get_horizons_coord('SOHO',  datetime_1).lat.to('deg').value
+                ha1['DSUN_OBS'] = get_horizons_coord('SOHO',  datetime_1).radius.to('m').value
+                rsun1 = ha1["rsun"] #rsun in Arsec
+                cdelt = ha1["cdelt2"]  #cdelt en Arcsec/pixel
+                rsun_pix1 = rsun1 / cdelt
+                ev_rsun.append(rsun_pix1)
+           
 
-    
+        sat_cad.extend(ev_cad)
+        sat_rsun.extend(ev_rsun)
+        test_abs.extend(test)
+        # ev_mean=sum(ev_cad)/ len(ev_cad)
+        # sat_cad.append(ev_mean)
+        # ev_r_mean=sum(ev_rsun)/ len(ev_rsun)
+        # sat_rsun.append(ev_r_mean)
+   
+    sat_mean=sum(sat_cad)/ len(sat_cad) 
+    sat_rsun_mean=sum(sat_rsun)/ len(sat_rsun) 
+       
+    return sat_mean,sat_rsun_mean
+
+def propagation_vel2(events,sat_lbl):
+    MIN_CME_VEL=200#CME min propagation velocity in solar minimum
+    imageSize=[512,512]
+
+    for ev in events:
+        ev_cad=[]
+        ev_rsun=[]
+        for t in range(len(ev[sat_lbl])-1):    
+            t1 = ev[sat_lbl][t]
+            t2 = ev[sat_lbl][t+1]
+            imga1, ha1 = read_fits(t1, header=True,imageSize=imageSize)
+            imga2, ha2 = read_fits(t2, header=True,imageSize=imageSize)
+            breakpoint()
+            datetime_1= datetime.datetime.strptime(ha1["DATE-OBS"],"%Y-%m-%dT%H:%M:%S.%f")
+            datetime_2= datetime.datetime.strptime(ha2["DATE-OBS"],"%Y-%m-%dT%H:%M:%S.%f")
+            t_diff = datetime_2 - datetime_1
+            abs_t_diff = abs(t_diff.total_seconds())  
+            ev_cad.append(abs_t_diff)
+
 #main
 #------------------------------------------------------------------Testing the CNN--------------------------------------------------------------------------
 model = 'A4_DS32' #'A6_DS32' # 'A4_DS31' #'A6_DS32'
@@ -822,26 +893,36 @@ file.close()
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 nn_seg.mask_threshold = mask_threshold
 
+
+
+satelites =['ima1', 'imb1','lasco1']
+
+pix_vel_sats=[]
+for sat_lbl in satelites:
+    mean_vel, mean_rsun=propagation_vel2(event,sat_lbl)
+    pix_vel=mean_rsun/mean_vel
+    pix_vel_sats.append(pix_vel)
+breakpoint()
 for ev in event:
     print(f'Processing event {ev["date"]}')
     ev_opath = os.path.join(opath, ev['date'].split('/')[-1]) + '_filter_'+str(filter)   
    # if (ev['date'].split('/')[-1])[4:] == "20130209":
     #coracf
     imgs_labels = ['ima1', 'ima0','pre_ima']
-    orig_imga, datesa, maska, scra, labelsa, boxesa, headersa, plate_scl_a, dfa, control_dfa = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,cpa_plot_rad=cpa_plot_rad,apex_plot_arsec=apex_plot_arsec, filter=filter, version=model_version)
+    orig_imga, datesa, maska, scra, labelsa, boxesa, headersa, plate_scl_a, dfa, control_dfa = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,pix_vel_sats,cpa_plot_rad=cpa_plot_rad,apex_plot_arsec=apex_plot_arsec, filter=filter, version=model_version)
     if datesa is not None:
         datesa = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesa] 
 
     #corb
     imgs_labels = ['imb1', 'imb0','pre_imb']
-    orig_imgb, datesb, maskb, scrb, labelsb, boxesb, headersb, plate_scl_b, dfb, control_dfb  = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,cpa_plot_rad=cpa_plot_rad,apex_plot_arsec=apex_plot_arsec,filter=filter, version=model_version) 
+    orig_imgb, datesb, maskb, scrb, labelsb, boxesb, headersb, plate_scl_b, dfb, control_dfb  = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,pix_vel_sats,cpa_plot_rad=cpa_plot_rad,apex_plot_arsec=apex_plot_arsec,filter=filter, version=model_version) 
     if datesb is not None:
         datesb = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesb]        
 
     #lasco
     imgs_labels = ['lasco1', 'lasco0','pre_lasco']
 
-    orig_imgl, datesl, maskl, scrl, labelsl, boxesl, headersl, plate_scl_l, dfl, control_dfl  = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,cpa_plot_rad=cpa_plot_rad,apex_plot_arsec=apex_plot_arsec,filter=filter, version=model_version)
+    orig_imgl, datesl, maskl, scrl, labelsl, boxesl, headersl, plate_scl_l, dfl, control_dfl  = inference_base(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, w_metric,pix_vel_sats,cpa_plot_rad=cpa_plot_rad,apex_plot_arsec=apex_plot_arsec,filter=filter, version=model_version)
     if datesl is not None:
         datesl = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesl]    
 
