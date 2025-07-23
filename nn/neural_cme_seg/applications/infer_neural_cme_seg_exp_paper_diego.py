@@ -461,6 +461,110 @@ def plot_to_png(ofile, orig_img, masks, title=None, labels=None, boxes=None, sco
                     h0['CRPIX1'] = int(h0['CRPIX1']*sz_ratio[1])                    
                     fits.writeto(ofile_fits, masked, h0, overwrite=True, output_verify='ignore')
 
+def plot_to_png_contour(ofile, orig_img, masks, title=None, labels=None, boxes=None, scores=None, save_masks=None, version='v4', scr_threshold = 0.25, masks_gcs=None):
+    """
+    Plot the input images (orig_img) along with the infered masks, labels and scores
+    in a single image saved to ofile
+    save_masks: set to a list of fits headers to save the masks as fits files
+    """    
+    mask_threshold = 0.54 # value to consider a pixel belongs to the object
+    color=['b','r','g','k','y','m','c','w','b','r','g','k','y','m','c','w']
+    if version=='v4':
+        obj_labels = ['Back', 'Occ','CME','N/A']
+    elif version=='v5':
+        obj_labels = ['Back', 'CME']
+    elif version=='A4':
+        obj_labels = ['Back', 'Occ','CME']
+    elif version=='A6':
+        obj_labels = ['Back', 'Occ','CME']
+    else:
+        print(f'ERROR. Version {version} not supported')
+        sys.exit()
+    cmap = mpl.colors.ListedColormap(color)  
+    nans = np.full(np.shape(orig_img[0]), np.nan)
+    #fig, axs = plt.subplots(2, 3, figsize=[15,10])
+    fig, axs = plt.subplots(1, 3, figsize=[15,10])
+    axs = axs.ravel()
+    #breakpoint()
+    for i in range(len(orig_img)):
+        axs[i].imshow(orig_img[i], vmin=0, vmax=1, cmap='gray', origin='lower')
+        axs[i].axis('off')  
+        if boxes is not None:
+            nb = 0
+            nb_aux = 1
+            iou_mask_list = [0 for _ in range(len(boxes[i]))]
+            for b in boxes[i]:
+                scr = 0
+                if version in ('v4', 'A4', 'A6') and labels[i][nb] == 1: #avoid plotting occulter
+                    nb+=1
+                    nb_aux+=1
+                    continue
+                if version=='v5':
+                    nb_aux+=1
+                if scores is not None:
+                    if scores[i][nb] is not None:
+                        scr = scores[i][nb]
+                if scr > scr_threshold:    
+                    try:
+                        if np.max(masks_gcs[i]) == 0:    
+                            breakpoint()
+                    except:
+                        masks_gcs[i] = [np.zeros((512,512))] #if no mask is given by gcs proyection.
+                        breakpoint()
+                    masked = nans.copy()
+                    masked[:, :][masks[i][nb] > mask_threshold] = nb
+
+                    #poner contorno pero con el IoU que corresponda al Mask Threshold.
+                    mask_thresholdeada = nans.copy()
+                    mask_thresholdeada[:, :][masks[i][nb] > mask_threshold] = 1
+                    mask_thresholdeada[:, :][masks[i][nb] < mask_threshold] = 0
+                    precision, recall, dice, iou = calculate_metrics(masks_gcs[i][0], mask_thresholdeada)
+                    iou_mask_list[nb] = iou
+                nb+=1
+                nb_aux+=1
+
+            if len(iou_mask_list) > 0:
+                nb_index = np.argmax(iou_mask_list)
+                masked = nans.copy()
+                masked[:, :][masks[i][nb_index] > mask_threshold]= nb_index
+                axs[i].imshow(masked, cmap=cmap, alpha=0.4, vmin=0, vmax=len(color)-1, origin='lower')
+                bb = boxes[i][nb_index]
+                box =  mpl.patches.Rectangle(bb[0:2],bb[2]-bb[0],bb[3]-bb[1], linewidth=2, edgecolor=color[nb_index], facecolor='none') 
+                axs[i].add_patch(box)
+                #axs[i+3].annotate('IoU: '                            ,xy=[10 ,20] , fontsize=15, color='black')
+                #axs[i+3].annotate(''+'{:.2f}'.format(iou_mask_list[nb_index])            ,xy=[60,20]  , fontsize=15, color='black')
+                axs[i].annotate('IoU: '                            ,xy=[10 ,20] , fontsize=15, color='black')
+                axs[i].annotate(''+'{:.2f}'.format(iou_mask_list[nb_index])            ,xy=[60,20]  , fontsize=15, color='black')
+
+        if masks_gcs is not None:
+            #breakpoint()
+            mask_aux = masks_gcs[i][0].copy()
+            mask_aux[masks_gcs[i][0] == 0] = 1
+            mask_aux[masks_gcs[i][0] == 1] = 0
+            #borders to improve the context of the cme mask.
+            try:
+                mask_aux[0 ,: ]  = 0
+            except:
+                breakpoint()
+            mask_aux[-1,: ]  = 1
+            mask_aux[: , 0]  = 1
+            mask_aux[: ,-1]  = 1 
+            mask_aux[0 , :]  = 1
+            #axs[i+3].imshow(mask_aux, vmin=0, vmax=1, cmap='gray', origin='lower')
+            #axs[i+3].contour(mask_aux, levels=[0.7], colors='r', alpha=0.9,thick=3) 
+            axs[i].contour(mask_aux, levels=[0.7], colors='r', alpha=0.9,thick=3) 
+            #axs[i+3].axis('off')
+        #calculate the scr value that maximizes the IoU. Use only the box/mask with higher iou value.
+
+    axs[0].set_title(f'Cor2 A: {title[0]}') 
+    axs[1].set_title(f'Cor2 B: {title[1]}')               
+    axs[2].set_title(f'Lasco C2: {title[2]}')     
+    #if title is not None:
+    #    fig.suptitle('\n'.join([title[i] for i in range(0,len(title))]) , fontsize=16)   
+    plt.tight_layout()
+    plt.savefig(ofile)
+    plt.close()
+
 
 def inference(nn_seg, ev, imgs_labels, occ_size, do_run_diff, ev_opath, filter=True):
     imageSize=[512,512]
@@ -624,6 +728,11 @@ if model == 'A6_DS32':
     model_version="A6"
     trained_model = '49.torch'
 
+if model == 'A6_DS31':
+    model_path= "/gehme-gpu2/projects/2020_gcs_with_ml/output/neural_cme_seg_A6_DS31"
+    model_version="A6"
+    trained_model = '49.torch'
+
 mask_threshold = 0.54 
 
 #model_path= "/gehme-gpu/projects/2020_gcs_with_ml/output/neural_cme_seg_v4"
@@ -657,7 +766,7 @@ file.close()
 #loads nn model
 nn_seg = neural_cme_segmentation(device, pre_trained_model = model_path + "/"+ trained_model, version=model_version)
 nn_seg.mask_threshold = mask_threshold
-breakpoint()
+
 for ev in event:
     print(f'Processing event {ev["date"]}')
     ev_opath = os.path.join(opath, ev['date'].split('/')[-1]) + '_filter_'+str(filter)   
@@ -678,42 +787,15 @@ for ev in event:
     datesl = [d.strftime('%Y-%m-%dT%H:%M:%S.%f') for d in datesl]    
     #breakpoint()
 
-   
-                mask[r >= size_occ_ext[sat]] = 0
-                #save mask
-                if sat == 0:
-                    mask_list_cor2a.append(mask)
-                if sat == 1:
-                    mask_list_cor2b.append(mask)
-                    if len(mask) == 0:
-                        breakpoint()
-                if sat == 2:
-                    mask_list_c2.append(mask)
-                    if len(mask) == 0:
-                        breakpoint()
-        mask_list.append([mask_list_cor2a,mask_list_cor2b,mask_list_c2])
-        #breakpoint()
-        ofile = os.path.join(ev_opath,os.path.basename(ev['pro_files'][t])+'.png')
-        #breakpoint()
-        if filter:
-            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [[maska[t]],[maskb[t]],[maskl[t]]], 
-                        title=[datesa[t], datesb[t], datesl[t]],labels=[[labelsa[t]],[labelsb[t]], [labelsl[t]]], 
-                        boxes=[[boxesa[t]], [boxesb[t]], [boxesl[t]]], scores=[[scra[t]], [scrb[t]], [scrl[t]]],
-                        masks_gcs = mask_list[t],
-                        version=model_version,scr_threshold=scr_threshold)#, save_masks=[ha[t],hb[t],hl[t]])
-            #breakpoint()
-        else:
-            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [maska[t],maskb[t],maskl[t]], 
-                        title=[datesa[t], datesb[t], datesl[t]],labels=[labelsa[t],labelsb[t], labelsl[t]], 
-                        boxes=[boxesa[t], boxesb[t], boxesl[t]], scores=[scra[t], scrb[t], scrl[t]],
-                        masks_gcs = mask_list[t],
-                        version=model_version,scr_threshold=scr_threshold) if len(orig_imga) != len(orig_imgb) or len(orig_imga) != len(orig_imgl):
+    if len(orig_imga) != len(orig_imgb) or len(orig_imga) != len(orig_imgl):
         print('Different number of images in the three instruments. We are repeting some images in the triplet plots.')
         max_size = max(len(orig_imga), len(orig_imgb), len(orig_imgl))
         for i in range(3):
+                
             if len(orig_imga) < max_size:
                 orig_imga.insert(0,orig_imga[0])
-                datesa.insert(0,datesa[0])
+                #datesa = [sss.split('.')[0] for sss in datesa]
+                datesa.insert(0,datesa[0].split('.')[0])
                 maska.insert(0,maska[0])
                 scra.insert(0,scra[0])
                 labelsa.insert(0,labelsa[0])
@@ -722,7 +804,8 @@ for ev in event:
                 plate_scl_a.insert(0,plate_scl_a[0])
             if len(orig_imgb) < max_size:
                 orig_imgb.insert(0,orig_imgb[0])
-                datesb.insert(0,datesb[0])
+                #datesb = [sss.split('.')[0] for sss in datesb]
+                datesb.insert(0,datesb[0].split('.')[0])
                 maskb.insert(0,maskb[0])
                 scrb.insert(0,scrb[0])
                 labelsb.insert(0,labelsb[0])
@@ -731,7 +814,8 @@ for ev in event:
                 plate_scl_b.insert(0,plate_scl_b[0])
             if len(orig_imgl) < max_size:
                 orig_imgl.insert(0,orig_imgl[0])
-                datesl.insert(0,datesl[0])
+                #datesl = [sss.split('.')[0] for sss in datesl]
+                datesl.insert(0,datesl[0].split('.')[0])
                 maskl.insert(0,maskl[0])
                 scrl.insert(0,scrl[0])
                 labelsl.insert(0,labelsl[0])
@@ -755,7 +839,7 @@ for ev in event:
             usr_center_off = None
             inner_hole_mask=False
             occ_center   = [[0.,0.], [0.3,-0.3] , [0.,0.]]
-            size_occ     = [2.9, 3.9, 1.9]
+            size_occ     = [2.9, 3.9, 2.25]
             size_occ_ext = [16+1, 16+1, 6+1]
             n_sat=3
             mask_list_cor2a = []
@@ -792,5 +876,40 @@ for ev in event:
                     breakpoint()
                     break
                 #adds occulter to the masks and checks for null masks
-                mask[r <= size_occ[sat]] = 0   
-            #breakpoint()        
+                mask[r <= size_occ[sat]] = 0  
+                mask[r >= size_occ_ext[sat]] = 0
+                #save mask
+                if sat == 0:
+                    mask_list_cor2a.append(mask)
+                if sat == 1:
+                    mask_list_cor2b.append(mask)
+                    if len(mask) == 0:
+                        breakpoint()
+                if sat == 2:
+                    mask_list_c2.append(mask)
+                    if len(mask) == 0:
+                        breakpoint()
+        mask_list.append([mask_list_cor2a,mask_list_cor2b,mask_list_c2])
+        #breakpoint()
+        ofile = os.path.join(ev_opath,os.path.basename(ev['pro_files'][t])+'.png')
+        #breakpoint()
+        if filter:
+            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [[maska[t]],[maskb[t]],[maskl[t]]], 
+                        title=[datesa[t], datesb[t], datesl[t]],labels=[[labelsa[t]],[labelsb[t]], [labelsl[t]]], 
+                        boxes=[[boxesa[t]], [boxesb[t]], [boxesl[t]]], scores=[[scra[t]], [scrb[t]], [scrl[t]]],
+                        masks_gcs = mask_list[t],
+                        version=model_version,scr_threshold=scr_threshold)#, save_masks=[ha[t],hb[t],hl[t]])
+            #breakpoint()
+        else:
+            plot_to_png(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [maska[t],maskb[t],maskl[t]], 
+                        title=[datesa[t], datesb[t], datesl[t]],labels=[labelsa[t],labelsb[t], labelsl[t]], 
+                        boxes=[boxesa[t], boxesb[t], boxesl[t]], scores=[scra[t], scrb[t], scrl[t]],
+                        masks_gcs = mask_list[t],
+                        version=model_version,scr_threshold=scr_threshold) 
+            
+            plot_to_png_contour(ofile, [orig_imga[t],orig_imgb[t], orig_imgl[t]], [maska[t],maskb[t],maskl[t]], 
+                        title=[datesa[t], datesb[t], datesl[t]],labels=[labelsa[t],labelsb[t], labelsl[t]], 
+                        boxes=[boxesa[t], boxesb[t], boxesl[t]], scores=[scra[t], scrb[t], scrl[t]],
+                        masks_gcs = mask_list[t],
+                        version=model_version,scr_threshold=scr_threshold) 
+            breakpoint()

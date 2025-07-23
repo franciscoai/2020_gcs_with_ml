@@ -4,7 +4,7 @@
 # ## Librerias
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 from pyGCS_raytrace import pyGCS
 from pyGCS_raytrace.rtraytracewcs import rtraytracewcs
 from nn_training.get_cme_mask import get_mask_cloud,get_cme_mask
@@ -176,7 +176,6 @@ def plot_histogram(back,btot,mask,filename,plot_ratio_histo=False,plot_ratio_his
         cota = [x * selected_cota +1 for x in cota]
         area_cota_7   = area_outside_std(B/A, cota=[0,7], positive_only=True)
         area_cota_positive = area_outside_std(B/A, cota=cota, positive_only=True)
-        breakpoint()
         plt.text(0.03, 0.95 ,f'\nMean: {mean_BA:.3f}\nStd: {std_BA:.3f}\nMedian: {median_BA:.3f}',transform=ax.transAxes,fontsize=10,color='blue',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
         plt.text(0.03, 0.75 ,f'\nper 85: {percentile_superior:.1f}\nper 15: {percentile_inferior:.1f}',transform=ax.transAxes,fontsize=10,color='green',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
         plt.text(0.70, 0.75 ,f'\nArea Tot: {area:.1f}',transform=ax.transAxes,fontsize=10,color='red',verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5, edgecolor='none')) 
@@ -247,8 +246,8 @@ def plot_histogram(back,btot,mask,filename,plot_ratio_histo=False,plot_ratio_his
 #DATA_PATH = '/gehme/data'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20240912'
 #OPATH = '/gehme-gpu/projects/2020_gcs_with_ml/data/cme_seg_20250212'
-OPATH = '/gehme-gpu2/projects/2020_gcs_with_ml/data/cme_seg_poster_colombia'
-opath_fstructure='check'#'run' # use 'check' to save all the ouput images in the same dir together for easier checkout
+OPATH = '/gehme-gpu2/projects/2020_gcs_with_ml/data/sirats_3VP'
+opath_fstructure='run' # use 'check' to save all the ouput images in the same dir together for easier checkout
                          # use 'run' to save each image in a different folder as required for training dataset
 #Syntethic image options
 # morphology
@@ -257,7 +256,7 @@ add_flux_rope = True # set to add a flux rope-like structure to the cme image
 par_names = ['CMElon', 'CMElat', 'CMEtilt', 'height', 'k','ang', 'level_cme'] # GCS parameters plus CME intensity level
 par_units = ['deg', 'deg', 'deg', 'Rsun','','deg','frac of back sdev'] # par units
 par_rng = [[-180,180],[-70,70],[-90,90],[2.0,20],[0.2,0.6], [5,65],[2,7]] 
-par_num = 10#50000#300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
+par_num = 100000 #300000  # total number of GCS samples that will be generated. n_sat images are generated per GCS sample.
 rnd_par=True # set to randomnly shuffle the generated parameters linspace 
 #background
 n_sat = 3 #number of satellites to  use [Cor2 A, Cor2 B, Lasco C2]
@@ -280,18 +279,15 @@ imsize=np.array([512, 512], dtype='int32') # output image size
 add_mesh_image=False # adds the GCS mesh on top of the image (only for otype='png')
 cme_only_image=False # set to True to save an addditional image with only the cme without the background corona
 back_only_image = False # set to True to save an addditional image with only the background corona without the cme
-save_masks = True # set to True to save the masks images
-save_background = True#True # set to True to save the background images
-save_leading_edge = True # set to True to save the leading edge images
+save_masks = False # set to True to save the masks images
+save_background = False #True # set to True to save the background images
+save_leading_edge = False # set to True to save the leading edge images
 save_only_cme_mask = False # set to True to save only the cme mask and not the occulter masks. save_masks must be True
-inner_hole_mask=False #Set to True to produce a mask that contains the inner hole of the GCS (if visible)
-mask_from_cloud=True #True to calculete mask from clouds, False to do it from an independent ratraycing total brigthness image
+inner_hole_mask=True #Set to True to produce a mask that contains the inner hole of the GCS (if visible)
+mask_from_cloud=False #True #True to calculete mask from clouds, False to do it from an independent ratraycing total brigthness image
 two_cmes = False # set to include two cme per image on some (random) cases
 show_middle_cross = False #False # set to show the middle cross of the image
-#None # set to a list of fixed satellite positions, sorted by cor2A, 2B and C2
-fixed_satpos = [[300.081940747, 1.95463511752, 0.0], [32.8937181611, 7.05123478188, 0.0], [170.0892,  -6.5866,   0.0000]]
-recorte_lasco_height = False#True # set to True to recorte the lasco height by a factor of 2.667, so that it matches the other satellites.
-                            # la idea es que la CME no exceda el FoV de lasco, pero usando el mismo parametro del GCS.
+
 #### main
 if opath_fstructure=='check':
     save_masks = True #False
@@ -299,14 +295,12 @@ if opath_fstructure=='check':
     back_only_image = False
     add_mesh_image = True
     rnd_par=True#False 
-    save_only_cme_mask = False#True
+    save_only_cme_mask = True
     diff_int_cme = True #False
-    #par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
-    #par_rng = [[19.2, 19.2],[64.7, 64.7], [13.6, 13.6], [8.5, 8.5], [0.535, 0.535], [36.535, 26.535], [5,5]]
-    par_rng = [[-115.604,-115.604],[-53.178,-53.178], [-89.378,-89.378], [4.0,7.0], [0.491,0.491], [54.966,54.966], [6,6]]
+    par_rng = [[-180,180],[-70,70],[-90,90],[1.5,20],[0.2,0.6], [5,65],[2,7]] 
     #par_rng = [[-0,0.1],[0,0.1],[90,90],[19,20],[0.15,0.15], [70,71],[10,10]] 
     inner_hole_mask= False
-    show_middle_cross = False#True
+    show_middle_cross = True
     add_flux_rope = True
 
 start_time = time.time()
@@ -322,7 +316,7 @@ for (rng, num) in zip(par_rng, par_num):
     if rnd_par:
         np.random.shuffle(cpar)
     all_par.append(cpar)
-    
+
 # Save param to .CSV
 date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d_')
 configfile_name = OPATH + '/' + date_str+'Set_Parameters.csv'
@@ -359,34 +353,32 @@ stats_cme_mask_outer_all = []
 folder_name_all = []
 row_not_ordered = []
 
-def create_sintetic_image(row):
-    global ok_cases, halo_count,satpos_all, plotranges_all, mask_aw,sceond_mask
+def create_sintetic_image(row, df_row_data):
+    """
+    df_row_data: dictionary containing the row data from the dataframe
+    """
     #get background corona,headers and occulter size
     ok_cases = 0
     halo_count = 0
-    if same_corona==False or row==0:
-        back_corona=[]
-        headers=[]
-        size_occ=[]
-        size_occ_ext=[]
-        occ_center = []
-        for sat in range(n_sat):
-            a,b,c,d,e=get_corona(sat, imsize=imsize, custom_headers=same_position)
-            back_corona.append(a)
-            headers.append(b)
-            if rnd_int_occ is not None:
-                c=c*np.random.uniform(low=1., high=1.+rnd_int_occ)
-            if rnd_ext_occ is not None:
-                d=d*np.random.uniform(low=1.-rnd_ext_occ, high=1.)
-            size_occ.append(c)
-            size_occ_ext.append(d)
-            occ_center.append(e)
+    # Always initialize for each worker process (multiprocessing doesn't share global state)
+    back_corona=[]
+    headers=[]
+    size_occ=[]
+    size_occ_ext=[]
+    occ_center = []
+    for sat in range(n_sat):
+        a,b,c,d,e=get_corona(sat, imsize=imsize, custom_headers=same_position)
+        back_corona.append(a)
+        headers.append(b)
+        if rnd_int_occ is not None:
+            c=c*np.random.uniform(low=1., high=1.+rnd_int_occ)
+        if rnd_ext_occ is not None:
+            d=d*np.random.uniform(low=1.-rnd_ext_occ, high=1.)
+        size_occ.append(c)
+        size_occ_ext.append(d)
+        occ_center.append(e)
     # Get the location of sats and gcs: 
     satpos, plotranges = pyGCS.processHeaders(headers)
-    print(f'Satellite positions: {satpos}')
-    if fixed_satpos:
-        satpos = fixed_satpos
-    print(f'Satellite positions: {satpos}')
     mask_aw_sat     = [-666 for i in range(n_sat)]
     area_sat        = [-666 for i in range(n_sat)]
     apex_sat        = [-666 for i in range(n_sat)]
@@ -412,6 +404,20 @@ def create_sintetic_image(row):
 
     print(f'Saving image pair {row} of {df.index.stop-1}')
 
+    # Create single folder per event (outside satellite loop)
+    if opath_fstructure=='run':
+        folder = os.path.join(OPATH, f"{row}")
+        os.makedirs(folder, exist_ok=True)
+        mask_folder = os.path.join(folder, "mask")
+        os.makedirs(mask_folder, exist_ok=True)
+    elif opath_fstructure=='check':
+        # save all images in the same folder
+        folder = OPATH
+        mask_folder = folder
+    else:
+        print('ERROR: opath_fstructure value not recognized')
+        sys.exit(1)
+
     for sat in range(n_sat):
         # for sat==2 (LASCO) we divide the current height by 16/6 to match the scale of the other satellites
         if sat==0:
@@ -420,8 +426,6 @@ def create_sintetic_image(row):
             occ_size_1024 = 120
         elif sat==2:
             occ_size_1024 = 150
-        if sat==2 and recorte_lasco_height:
-            df.loc[row, 'height'] = df.loc[row, 'height']/2.667 #<---- Cuidado con esto. fue puesto para que en la estatistica no se llegue al FoV de lasco
         #defining ranges and radius of the occulter
         x = np.linspace(plotranges[sat][0], plotranges[sat][1], num=imsize[0])
         y = np.linspace(plotranges[sat][2], plotranges[sat][3], num=imsize[1])
@@ -433,17 +437,17 @@ def create_sintetic_image(row):
         phi = np.arctan2(yy - y_cS, xx - x_cS)
         if mask_from_cloud: 
             #mask for cme outer envelope
-            clouds = pyGCS.getGCS(df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row],
-                                    satpos, do_rotate_lat=[False, False, False])                         
+            clouds = pyGCS.getGCS(df_row_data['CMElon'], df_row_data['CMElat'], df_row_data['CMEtilt'], df_row_data['height'], df_row_data['k'], df_row_data['ang'],
+                                    satpos, do_rotate_lat=[False, False, True])                         
             x = clouds[sat, :, 1]
             y = clouds[sat, :, 2] # sat has always been 0 in this line, but why ???
 
             p_x,p_y=deg2px(x,y,plotranges,imsize, sat)
             mask=get_mask_cloud(p_x,p_y,imsize)
         else:
-            btot_mask = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row],
-                                      df['ang'][row], imsize=imsize, occrad=size_occ[sat]*0.9, in_sig=1., out_sig=0.0001, nel=1e5, usr_center_off=usr_center_off,
-                                      losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] +1.0]))     
+            btot_mask = rtraytracewcs(headers[sat], df_row_data['CMElon'], df_row_data['CMElat'], df_row_data['CMEtilt'], df_row_data['height'], df_row_data['k'],
+                                      df_row_data['ang'], imsize=imsize, occrad=size_occ[sat]*0.9, in_sig=1., out_sig=0.0001, nel=1e5, usr_center_off=usr_center_off,
+                                      losrange=np.array([-1*df_row_data['height'] - 1.0 , df_row_data['height'] +1.0]))     
             cme_npix= len(btot_mask[btot_mask>0].flatten())
             if cme_npix<=0:
                 print("\033[93m WARNING: CME number {} raytracing did not work\033".format(row))                
@@ -476,46 +480,27 @@ def create_sintetic_image(row):
         occ_mask = np.zeros(xx.shape)
         occ_mask[r <= size_occ[sat]] = 1    
         occ_mask_ext = np.zeros(xx.shape)
-        occ_mask_ext[r >= size_occ_ext[sat]] = 1 
-
-        if opath_fstructure=='run':
-            #creating folders for each case
-            folder = os.path.join(OPATH, str(row*len(satpos)+sat))
-            if os.path.exists(folder):
-                os.system("rm -r " + folder) 
-            os.makedirs(folder)
-            mask_folder = os.path.join(folder, "mask")
-            os.makedirs(mask_folder) 
-            #if save_background:
-            #    back_folder = os.path.join(folder, "back")
-            #    os.makedirs(back_folder)        
-        elif opath_fstructure=='check':
-            # save all images in the same folder
-            folder = OPATH
-            mask_folder = folder
-        else:
-            print('ERROR: opath_fstructure value not recognized')
-            sys.exit(1)
+        occ_mask_ext[r >= size_occ_ext[sat]] = 1
 
         #Total intensity (Btot) figure from raytrace:      
         print(headers[sat]['TELESCOP'], headers[sat]['CRPIX1'], headers[sat]['CRPIX2'],headers[sat]['INSTRUME'], 
               headers[sat]['NAXIS1'], headers[sat]['NAXIS2'], headers[sat]['CRVAL1'], headers[sat]['CRVAL2'], headers[sat]['CROTA'])
-        btot = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row],
+        btot = rtraytracewcs(headers[sat], df_row_data['CMElon'], df_row_data['CMElat'], df_row_data['CMEtilt'], df_row_data['height'], df_row_data['k'], df_row_data['ang'],
                              imsize=imsize, occrad=size_occ[sat], in_sig=1.0, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off,
-                             losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))
-        sinthetic_params_Bt_out_sat[sat] = [1, df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row]]
+                             losrange=np.array([-1*df_row_data['height'] - 1.0 , df_row_data['height'] + 1.0]))
+        sinthetic_params_Bt_out_sat[sat] = [1, df_row_data['CMElon'], df_row_data['CMElat'], df_row_data['CMEtilt'], df_row_data['height'], df_row_data['k'], df_row_data['ang']]
 
-        btot_outer = rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row],
+        btot_outer = rtraytracewcs(headers[sat], df_row_data['CMElon'], df_row_data['CMElat'], df_row_data['CMEtilt'], df_row_data['height'], df_row_data['k'], df_row_data['ang'],
                              imsize=imsize, occrad=size_occ[sat], in_sig=1.0, out_sig=0.075, nel=1e5, usr_center_off=usr_center_off,
-                             losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))
+                             losrange=np.array([-1*df_row_data['height'] - 1.0 , df_row_data['height'] + 1.0]))
         mask_outer_for_filter = get_cme_mask(btot_outer,inner_cme=inner_hole_mask,occ_size=occ_size_1024)
         #diff intensity by adding a second, smaller GCS
         if diff_int_cme:
             # self-similar expansion -> height increase
             height_diff = get_random_lognormal(1)
-            if height_diff > df['height'][row]:
-                height_diff = df['height'][row]*height_diff
-            scl_fac = factor(height_diff, df['height'][row])
+            if height_diff > df_row_data['height']:
+                height_diff = df_row_data['height']*height_diff
+            scl_fac = factor(height_diff, df_row_data['height'])
             scl_fac_fr_sat[sat] = scl_fac
             #scl_fac = np.random.uniform(low=1.00, high=1.3) # int scaling factor
             def_fac = np.random.uniform(low=0.95, high=1.05, size=3) # deflection and rotation factors [lat, lon, tilt]
@@ -523,29 +508,29 @@ def create_sintetic_image(row):
             exp_fac = np.random.uniform(low=0.90, high=1,    size=2) # non-self-similar expansion factor [k, ang]
             exp_fac_sat[sat] = exp_fac.tolist()
             # avoids lat and lon overturns 
-            if def_fac[0]*df['CMElon'][row]>180:
+            if def_fac[0]*df_row_data['CMElon']>180:
                 fr_lon = 180
             else:
-                fr_lon = def_fac[0]*df['CMElon'][row]
-            if def_fac[1]*df['CMElat'][row]>90:
+                fr_lon = def_fac[0]*df_row_data['CMElon']
+            if def_fac[1]*df_row_data['CMElat']>90:
                 fr_lat = 90
             else:
-                fr_lat = def_fac[1]*df['CMElat'][row]
-            btot -= scl_fac*rtraytracewcs(headers[sat], fr_lon, fr_lat ,def_fac[2]*df['CMEtilt'][row],
-                                          df['height'][row]-height_diff,df['k'][row]*exp_fac[0], df['ang'][row]*exp_fac[1], imsize=imsize, 
+                fr_lat = def_fac[1]*df_row_data['CMElat']
+            btot -= scl_fac*rtraytracewcs(headers[sat], fr_lon, fr_lat ,def_fac[2]*df_row_data['CMEtilt'],
+                                          df_row_data['height']-height_diff,df_row_data['k']*exp_fac[0], df_row_data['ang']*exp_fac[1], imsize=imsize, 
                                           occrad=size_occ[sat], in_sig=1.0, out_sig=0.2, nel=1e5, usr_center_off=usr_center_off,
-                                          losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))
-            sinthetic_params_Bt_RD_sat[sat] = [scl_fac, fr_lon, fr_lat,def_fac[2]*df['CMEtilt'][row], df['height'][row]-height_diff,df['k'][row]*exp_fac[0], df['ang'][row]*exp_fac[1]]
+                                          losrange=np.array([-1*df_row_data['height'] - 1.0 , df_row_data['height'] + 1.0]))
+            sinthetic_params_Bt_RD_sat[sat] = [scl_fac, fr_lon, fr_lat,def_fac[2]*df_row_data['CMEtilt'], df_row_data['height']-height_diff,df_row_data['k']*exp_fac[0], df_row_data['ang']*exp_fac[1]]
 
-            btot_inner = rtraytracewcs(headers[sat], fr_lon, fr_lat ,def_fac[2]*df['CMEtilt'][row],
-                                          df['height'][row]-height_diff,df['k'][row]*exp_fac[0], df['ang'][row]*exp_fac[1], imsize=imsize, 
+            btot_inner = rtraytracewcs(headers[sat], fr_lon, fr_lat ,def_fac[2]*df_row_data['CMEtilt'],
+                                          df_row_data['height']-height_diff,df_row_data['k']*exp_fac[0], df_row_data['ang']*exp_fac[1], imsize=imsize, 
                                           occrad=size_occ[sat], in_sig=1.0, out_sig=0.0001, nel=1e5, usr_center_off=usr_center_off,
-                                          losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))
+                                          losrange=np.array([-1*df_row_data['height'] - 1.0 , df_row_data['height'] + 1.0]))
             mask_inner_for_filter = get_cme_mask(btot_inner,inner_cme=inner_hole_mask,occ_size=occ_size_1024)
 
         #adds a flux rope-like structure
         if add_flux_rope:
-            if df['height'][row] < 3:
+            if df_row_data['height'] < 3:
                 frope_height_diff = np.random.uniform(low=0.55, high=0.85) # random flux rope height
             else:
                 frope_height_diff = np.random.uniform(low=0.45, high=0.75)
@@ -553,18 +538,18 @@ def create_sintetic_image(row):
             aspect_ratio_frope_sat[sat] = aspect_ratio_frope
             scl_fac_fr = np.random.uniform(low=0, high=2) # int scaling factor
             scl_fac_fr_sat[sat]=scl_fac_fr
-            btot += scl_fac_fr*rtraytracewcs(headers[sat], df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*frope_height_diff,
-                                          df['k'][row]*aspect_ratio_frope, df['ang'][row], imsize=imsize,
+            btot += scl_fac_fr*rtraytracewcs(headers[sat], df_row_data['CMElon'], df_row_data['CMElat'], df_row_data['CMEtilt'], df_row_data['height']*frope_height_diff,
+                                          df_row_data['k']*aspect_ratio_frope, df_row_data['ang'], imsize=imsize,
                                           occrad=size_occ[sat], in_sig=2., out_sig=0.2, nel=1e5, usr_center_off=usr_center_off,
-                                          losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))    
-            sinthetic_params_FR_out_sat[sat] = [scl_fac_fr, df['CMElon'][row], df['CMElat'][row],df['CMEtilt'][row], df['height'][row]*frope_height_diff, df['k'][row]*aspect_ratio_frope, df['ang'][row]]
+                                          losrange=np.array([-1*df_row_data['height'] - 1.0 , df_row_data['height'] + 1.0]))    
+            sinthetic_params_FR_out_sat[sat] = [scl_fac_fr, df_row_data['CMElon'], df_row_data['CMElat'], df_row_data['CMEtilt'], df_row_data['height']*frope_height_diff, df_row_data['k']*aspect_ratio_frope, df_row_data['ang']]
             # uses a differential flux rope
             if diff_int_cme:
-                btot -= scl_fac*scl_fac_fr*rtraytracewcs(headers[sat], fr_lon, fr_lat,def_fac[2]*df['CMEtilt'][row], 
-                                              df['height'][row]*frope_height_diff-height_diff,df['k'][row]*aspect_ratio_frope*exp_fac[0],df['ang'][row]*exp_fac[1],
+                btot -= scl_fac*scl_fac_fr*rtraytracewcs(headers[sat], fr_lon, fr_lat,def_fac[2]*df_row_data['CMEtilt'], 
+                                              df_row_data['height']*frope_height_diff-height_diff,df_row_data['k']*aspect_ratio_frope*exp_fac[0],df_row_data['ang']*exp_fac[1],
                                               imsize=imsize, occrad=size_occ[sat], in_sig=2., out_sig=0.2, nel=1e5, usr_center_off=usr_center_off,
-                                              losrange=np.array([-1*df['height'][row] - 1.0 , df['height'][row] + 1.0]))    
-                sinthetic_params_FR_RD_sat[sat] = [scl_fac*scl_fac_fr, fr_lon, fr_lat,def_fac[2]*df['CMEtilt'][row], df['height'][row]*frope_height_diff-height_diff, df['k'][row]*aspect_ratio_frope*exp_fac[0], df['ang'][row]*exp_fac[1]]
+                                              losrange=np.array([-1*df_row_data['height'] - 1.0 , df_row_data['height'] + 1.0]))    
+                sinthetic_params_FR_RD_sat[sat] = [scl_fac*scl_fac_fr, fr_lon, fr_lat,def_fac[2]*df_row_data['CMEtilt'], df_row_data['height']*frope_height_diff-height_diff, df_row_data['k']*aspect_ratio_frope*exp_fac[0], df_row_data['ang']*exp_fac[1]]
         #background corona
         back = back_corona[sat]
         if back_rnd_rot:
@@ -582,8 +567,8 @@ def create_sintetic_image(row):
         var_map = (var_map-np.min(var_map))/(np.max(var_map)-np.min(var_map)) # normalizes to 0-1
         btot *= var_map
 
-        # normalizes CME btot to 0-df['level_cme'][row]*sd_back
-        btot = (btot-np.min(btot))/(np.max(btot)-np.min(btot))*df['level_cme'][row]*sd_back
+        # normalizes CME btot to 0-df_row_data['level_cme']*sd_back
+        btot = (btot-np.min(btot))/(np.max(btot)-np.min(btot))*df_row_data['level_cme']*sd_back
 
         # checks NaNs in btot
         m_abs_btot=np.abs(np.mean(btot))
@@ -608,12 +593,12 @@ def create_sintetic_image(row):
                 btot += btot_prev
                 btot_prev = cbtot
                 cbtot = 0
-                second_mask = np.array(mask_prev)
+                sceond_mask = np.array(mask_prev)
                 mask_prev = mask
-        print(f'Height of CME {row} is {df["height"][row]} Rsun')
+
         # output files base name
         ofile_name = '{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_{:08.3f}_sat{}'.format(
-                    df['CMElon'][row], df['CMElat'][row], df['CMEtilt'][row], df['height'][row], df['k'][row], df['ang'][row], sat+1)
+                    df_row_data['CMElon'], df_row_data['CMElat'], df_row_data['CMEtilt'], df_row_data['height'], df_row_data['k'], df_row_data['ang'], sat+1)
         
         # adds row number at the begining of the file name
         if opath_fstructure=='check':
@@ -790,11 +775,10 @@ def print_stuffs():
     df_sorted = df_sorted.drop(columns=['index'])
     df_fusion = pd.concat([df, df_sorted], axis=1) 
     df_fusion.to_csv(configfile_name)
-    breakpoint()
 
 num_cpus = os.cpu_count()
 ########### end of paralelize
-MAX_WORKERS = 1#num_cpus -1# number of workers for parallel processing
+MAX_WORKERS = num_cpus - 4 # number of workers for parallel processing
 futures = []
 index = 0
 halo_count_tot = []#0
@@ -804,7 +788,7 @@ ok_cases_tot = []#0
 ########### paralelize this for loop
 with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
     #while len(futures) != MAX_WORKERS: # Task loader
-    futures = [executor.submit(create_sintetic_image, row) for row in df.index]
+    futures = [executor.submit(create_sintetic_image, row, df.iloc[row].to_dict()) for row in df.index]
     for future in concurrent.futures.as_completed(futures):
         satpos_f, plotranges_f, mask_aw_sat_f, halo_count_f, ok_cases_f,apex_sat_f, scl_fac_fr_sat_f, def_fac_sat_f, exp_fac_sat_f, aspect_ratio_frope_sat_f, median_btot_over_back_sat_f,filter_area_threshold_sat_f, sinthetic_params_Bt_out_sat_f, sinthetic_params_Bt_RD_sat_f, sinthetic_params_FR_out_sat_f, sinthetic_params_FR_RD_sat_f, stats_btot_mask_sat_f, stats_back_mask_sat_f, stats_cme_mask_sat_f, stats_btot_mask_outer_sat_f, stats_back_mask_outer_sat_f, stats_cme_mask_outer_sat_f, folder_name_sat_f,row = future.result()
         satpos_all.append(satpos_f)

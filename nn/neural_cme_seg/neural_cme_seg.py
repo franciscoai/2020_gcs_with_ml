@@ -438,8 +438,11 @@ class neural_cme_segmentation():
             return None
         # compute IoU for all masks
         all_iou= []
+        all_precision = []
+        all_cuadratic_error = []
+        all_error_test = []
         for i in range(len(all_masks)):
-            msk = all_masks[i].copy() #This is mandatory to avoid changing the original mask!!!!!!!
+            msk = all_masks[i].copy() 
             msk[msk > self.mask_threshold] = 1
             msk[msk <= self.mask_threshold] = 0
             TP = np.sum(np.logical_and(msk, target))
@@ -447,9 +450,20 @@ class neural_cme_segmentation():
             FN = np.sum(np.logical_and(np.logical_not(msk), target))
             iou = TP / (TP + FP + FN) if TP + FP + FN > 0 else 0
             all_iou.append(iou)
+            precision = TP / (TP + FP) if TP + FP > 0 else 0
+            all_precision.append(precision)
+            #cuadratic_error = (np.abs(msk - target))/np.sum(target)
+            if np.sum(target) == 0:
+                cuadratic_error = 0
+            else:
+                cuadratic_error = np.sum((msk-target)** 2) / np.sum(target)
+            error_test = FP + FN if FP + FN > 0 else 0
+            all_error_test.append(error_test)
+            all_cuadratic_error.append(cuadratic_error)
         # return the mask with the highest iou
         imax = np.argmax(all_iou)
-        return orig_img, all_masks[imax], all_scores[imax], all_lbl[imax], all_boxes[imax], all_iou[imax]
+        #returns precision corresponding to the mask with the highest iou
+        return orig_img, all_masks[imax], all_scores[imax], all_lbl[imax], all_boxes[imax], all_iou[imax], all_precision[imax], all_cuadratic_error[imax],all_error_test[imax]
         
 
     def _rec2pol(self, mask, center=None):
